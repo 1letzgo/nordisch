@@ -11,15 +11,15 @@ namespace LeGamez.Player
         public float walkSpeed = 2.6f;
         public float runSpeed = 6f;
         [Tooltip("Stick deflection where walking turns into running (speed blends continuously).")]
-        public float runBlendStart = 0.7f;
+        public float runBlendStart = 0.6f;
         public float deadZone = 0.12f;
 
         [Header("Smoothing")]
-        public float accelerationTime = 0.18f;
-        public float decelerationTime = 0.12f;
-        public float turnSmoothTime = 0.12f;
+        public float accelerationTime = 0.12f;
+        public float decelerationTime = 0.09f;
+        public float turnSmoothTime = 0.08f;
         [Tooltip("Smoothing of the raw stick direction (touch input is noisy).")]
-        public float inputSmoothTime = 0.06f;
+        public float inputSmoothTime = 0.03f;
 
         [Header("Jump")]
         public float jumpHeight = 1.1f;
@@ -40,6 +40,7 @@ namespace LeGamez.Player
         public bool IsGrounded => controller.isGrounded;
         /// <summary>When false (e.g. sitting in a vehicle) input is ignored.</summary>
         public bool InputEnabled { get; set; } = true;
+        public event System.Action Jumped;
 
         void Awake() => controller = GetComponent<CharacterController>();
 
@@ -74,7 +75,11 @@ namespace LeGamez.Player
             if (controller.isGrounded)
             {
                 verticalVelocity = -2f;
-                if (InputEnabled && GameInput.ConsumeJump()) verticalVelocity = Mathf.Sqrt(2f * jumpHeight * -gravity);
+                if (InputEnabled && GameInput.ConsumeJump())
+                {
+                    verticalVelocity = Mathf.Sqrt(2f * jumpHeight * -gravity);
+                    Jumped?.Invoke();
+                }
             }
             verticalVelocity += gravity * Time.deltaTime;
 

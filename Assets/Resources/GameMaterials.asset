@@ -18,3 +18,21 @@ MonoBehaviour:
   poiOpen: {fileID: 2100000, guid: 335cd6ff3591d4f29b4d236436d9fca8, type: 2}
   poiDone: {fileID: 2100000, guid: dd901778af999458382f30f057319230, type: 2}
   postProfile: {fileID: 11400000, guid: 93b24c28e0fbe4915a6937d3a541d321, type: 2}
+  characters:
+  - {fileID: 919132149155446097, guid: ebc115203884049108011072d733b909, type: 3}
+  - {fileID: 919132149155446097, guid: 40b57a61621cb41019dbb7d6af942a3f, type: 3}
+  - {fileID: 919132149155446097, guid: 91db3ecb93176462b8271430faabb2c0, type: 3}
+  - {fileID: 919132149155446097, guid: 78ac21f1e4c254d3ebeb55277c8d814d, type: 3}
+  - {fileID: 919132149155446097, guid: 2c3ba3c9ee0184c47a11558068d7693d, type: 3}
+  - {fileID: 919132149155446097, guid: 1d36de2d255fe45bdaa54f95ea9371f9, type: 3}
+  - {fileID: 919132149155446097, guid: 480cb986e231a40f0b3091d983b9d3fe, type: 3}
+  - {fileID: 919132149155446097, guid: 4bfb67f5910ce488f9a687528b4ccb1a, type: 3}
+  - {fileID: 919132149155446097, guid: 3780f62c0820a44dd9d0e6a0b7ac5fa4, type: 3}
+  - {fileID: 919132149155446097, guid: af167484f156b4c3a9158a1f0aed2d00, type: 3}
+  - {fileID: 919132149155446097, guid: 9988f53b60e8a4de2830efe98f946741, type: 3}
+  - {fileID: 919132149155446097, guid: b302a655cd25d4b288deaf342c53892f, type: 3}
+  characterMaterial: {fileID: 2100000, guid: 5a517db0e6acc48a49ae3fe041355df9, type: 2}
+  characterController: {fileID: 9100000, guid: 5ec78b9f80dc44a4b839b4af08302771, type: 2}
+  characterScale: 2.1143043
+  characterFootOffset: 0.11029713
+  pedestalMaterial: {fileID: 2100000, guid: 80ae7b7f04bb0457c8711c02f887b43b, type: 2}

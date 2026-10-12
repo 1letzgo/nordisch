@@ -26,8 +26,13 @@ namespace LeGamez.Core
 
             EnsureEventSystem();
             var player = CreatePlayer(spawn);
+            FaceNearestPoi(player.transform, area);
             var cam = CreateCamera(player.transform);
             player.cameraTransform = cam.transform;
+
+            NavState.Player = player.transform;
+            NavState.View = cam.transform;
+            NavState.Target = null;
 
             var hud = Hud.Create(area != null ? area.displayName : "LeGamez",
                 area != null ? area.attribution : "© OpenStreetMap-Mitwirkende");
@@ -35,6 +40,24 @@ namespace LeGamez.Core
             var poiManager = new GameObject("POIs").AddComponent<PoiManager>();
             poiManager.player = player.transform;
             poiManager.hud = hud;
+        }
+
+        /// <summary>Start looking at the closest stamp target instead of whatever wall happens to be north.</summary>
+        static void FaceNearestPoi(Transform player, AreaInfo area)
+        {
+            if (area == null || area.pois == null || area.pois.entries.Count == 0) return;
+            Vector3 best = Vector3.zero;
+            float bestDist = float.MaxValue;
+            foreach (var poi in area.pois.entries)
+            {
+                if (StampBook.Has(area.areaId, poi.id)) continue;
+                float d = Vector3.Distance(poi.position, player.position);
+                if (d < bestDist) { bestDist = d; best = poi.position; }
+            }
+            if (bestDist == float.MaxValue) return;
+            Vector3 dir = best - player.position;
+            dir.y = 0f;
+            if (dir.sqrMagnitude > 0.01f) player.rotation = Quaternion.LookRotation(dir);
         }
 
         static void EnsureEventSystem()
@@ -60,7 +83,9 @@ namespace LeGamez.Core
             cc.stepOffset = 0.4f;
             cc.slopeLimit = 50f;
 
-            // Placeholder low-poly figure until a rigged character is imported.
+            if (PlayerAvatar.TryCreate(root)) return root.AddComponent<PlayerController>();
+
+            // Fallback placeholder figure if no character assets are available.
             var mats = GameMaterials.Instance;
             var body = Part(root.transform, PrimitiveType.Capsule, new Vector3(0, 0.85f, 0), new Vector3(0.6f, 0.65f, 0.45f), mats.playerBody);
             Part(root.transform, PrimitiveType.Sphere, new Vector3(0, 1.62f, 0), Vector3.one * 0.36f, mats.playerSkin);

@@ -12,7 +12,9 @@ namespace LeGamez.UI
     {
         public RectTransform background;
         public RectTransform handle;
-        public float radius = 110f;
+        public float radius = 125f;
+        [Tooltip("Stick deflection (0..1 of radius) that already counts as full input.")]
+        public float fullAt = 0.85f;
 
         int pointerId = int.MinValue;
         Vector2 restPosition;
@@ -46,9 +48,15 @@ namespace LeGamez.UI
         void UpdateStick(PointerEventData e)
         {
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(background, e.position, e.pressEventCamera, out var local)) return;
-            Vector2 clamped = Vector2.ClampMagnitude(local, radius);
-            handle.anchoredPosition = clamped;
-            GameInput.TouchMove = clamped / radius;
+            // Dragging past the rim pulls the whole stick along, so the thumb never "loses" it.
+            if (local.magnitude > radius)
+            {
+                Vector2 excess = local - local.normalized * radius;
+                background.position += background.TransformVector(excess);
+                local -= excess;
+            }
+            handle.anchoredPosition = local;
+            GameInput.TouchMove = Vector2.ClampMagnitude(local / (radius * fullAt), 1f);
         }
 
         public void OnPointerUp(PointerEventData e)

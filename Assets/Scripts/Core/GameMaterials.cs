@@ -17,6 +17,14 @@ namespace LeGamez.Core
         public Material poiDone;
         public UnityEngine.Rendering.VolumeProfile postProfile;
 
+        [Header("Player character (Kenney Mini Characters, CC0)")]
+        public System.Collections.Generic.List<GameObject> characters = new System.Collections.Generic.List<GameObject>();
+        public Material characterMaterial;
+        public RuntimeAnimatorController characterController;
+        public float characterScale = 1f;
+        public float characterFootOffset;
+        public Material pedestalMaterial;
+
         static GameMaterials instance;
 
         public static GameMaterials Instance

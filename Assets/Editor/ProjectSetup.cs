@@ -198,6 +198,8 @@ namespace LeGamez.Editor
             gm.poiOpen = Mat("Poi_Open", unlit, new Color(1f, 0.78f, 0.15f));
             gm.poiDone = Mat("Poi_Done", unlit, new Color(0.35f, 0.85f, 0.45f));
             gm.postProfile = CreatePostProfile();
+            gm.pedestalMaterial = Mat("Pedestal", lit, new Color(0.93f, 0.89f, 0.80f));
+            CharacterSetup.Run(gm);
             EditorUtility.SetDirty(gm);
         }
 

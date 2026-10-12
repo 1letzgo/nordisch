@@ -51,6 +51,8 @@ namespace LeGamez.Editor.OsmImport
         public static void ImportAllBatch()
         {
             ImportAll();
+            SceneSnapshot.RenderThumbnails();
+            CreateMenuScene();
             AssetDatabase.SaveAssets();
         }
 
@@ -63,6 +65,8 @@ namespace LeGamez.Editor.OsmImport
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var cam = new GameObject("Main Camera", typeof(Camera), typeof(AudioListener));
             cam.tag = "MainCamera";
+            AddLighting(EnsureSkyMaterial());
+            RenderSettings.fog = false;
             new GameObject("MainMenu").AddComponent<LeGamez.UI.MainMenu>();
             EditorSceneManager.SaveScene(scene, MenuScenePath);
 

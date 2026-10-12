@@ -91,21 +91,17 @@ namespace LeGamez.Quests
                 if (!visited && dist < nearestDist) { nearestDist = dist; nearestOpen = poi; }
             }
 
-            if (hud != null && nearestOpen != null && Time.frameCount % 15 == 0)
-                UpdateInfo(nearestOpen, nearestDist);
+            NavState.Target = nearestOpen;
+            if (hud != null && Time.frameCount % 15 == 0) UpdateInfo();
         }
 
         void UpdateInfo(PoiEntry next = null, float dist = 0f)
         {
             if (hud == null || area == null) return;
             int total = area.pois.entries.Count;
-            string text = $"Stempel {StampBook.CountForArea(area.areaId)}/{total}";
-            if (next != null)
-            {
-                Vector3 dir = next.position - player.position;
-                text += $"  ·  Nächstes Ziel: {next.name} ({Mathf.RoundToInt(dist)} m {Compass(dir)})";
-            }
-            hud.infoLabel.text = text;
+            hud.infoLabel.text = total > 0 && StampBook.CountForArea(area.areaId) >= total
+                ? $"Alle {total} Stempel gesammelt!"
+                : $"Stempel {StampBook.CountForArea(area.areaId)} / {total}";
         }
 
         static string Compass(Vector3 dir)

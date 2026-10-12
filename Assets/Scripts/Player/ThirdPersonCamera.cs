@@ -24,9 +24,14 @@ namespace LeGamez.Player
         public float followSmoothTime = 0.08f;
         public float collisionInTime = 0.05f;
         public float collisionOutTime = 0.35f;
-        [Tooltip("Degrees/second the camera recenters behind the player while running straight.")]
-        public float recenterSpeed = 35f;
-        public float recenterDelay = 1.5f;
+        [Header("Auto follow")]
+        [Tooltip("Degrees/second the camera turns with sideways stick input (turning a corner).")]
+        public float turnFollowSpeed = 110f;
+        [Tooltip("Degrees/second the camera recenters behind the player while walking forward.")]
+        public float recenterSpeed = 60f;
+        [Tooltip("Seconds after a manual swipe before auto follow takes over again.")]
+        public float manualLookHold = 0.6f;
+        public float defaultPitch = 16f;
 
         float targetYaw, targetPitch = 16f;
         float yaw, pitch = 16f;
@@ -64,13 +69,26 @@ namespace LeGamez.Player
             targetPitch = Mathf.Clamp(targetPitch - look.y, minPitch, maxPitch);
             distance = Mathf.Clamp(distance - GameInput.Zoom() * 2f, minDistance, maxDistance);
 
-            // Recenter only while the stick points forward – sideways input must not feed back into the camera.
-            if (player != null && idleLookTime > recenterDelay)
+            // Auto follow (Zelda/Genshin style): sideways input swings the camera round so the player
+            // runs a curve instead of strafing across the screen; forward input recentres behind them.
+            if (player != null && idleLookTime > manualLookHold)
             {
                 Vector2 input = player.SmoothedInput;
-                float straightness = Mathf.Clamp01((input.y - 0.5f) * 2f) * Mathf.Clamp01(1f - Mathf.Abs(input.x) * 2.5f);
-                if (straightness > 0f)
-                    targetYaw = Mathf.MoveTowardsAngle(targetYaw, target.eulerAngles.y, recenterSpeed * straightness * Time.deltaTime);
+                float moving = Mathf.Clamp01(player.CurrentSpeed / 2f);
+                if (moving > 0f)
+                {
+                    // Lateral swing, eased in so tiny stick wobble doesn't rotate the view.
+                    float lateral = Mathf.Sign(input.x) * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.15f, 0.9f, Mathf.Abs(input.x)));
+                    if (input.y < -0.3f) lateral *= 0.3f; // walking towards the camera: don't spin
+                    targetYaw += lateral * turnFollowSpeed * moving * Time.deltaTime;
+
+                    float forwardness = Mathf.Clamp01(input.y * 1.5f) * Mathf.Clamp01(1f - Mathf.Abs(input.x) * 1.5f);
+                    if (forwardness > 0f)
+                        targetYaw = Mathf.MoveTowardsAngle(targetYaw, target.eulerAngles.y, recenterSpeed * forwardness * moving * Time.deltaTime);
+                }
+                // Drift pitch back to the default angle after looking up/down.
+                if (idleLookTime > 2f)
+                    targetPitch = Mathf.MoveTowards(targetPitch, defaultPitch, 20f * Time.deltaTime);
             }
 
             yaw = Mathf.SmoothDampAngle(yaw, targetYaw, ref yawVel, lookSmoothTime);

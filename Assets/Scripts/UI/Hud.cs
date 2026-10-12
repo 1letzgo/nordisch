@@ -24,6 +24,7 @@ namespace LeGamez.UI
         bool? portrait;
 
         public static bool IsPortrait => Screen.height > Screen.width;
+        const float MiniMapSize = 280f;
 
         static Font uiFont;
         public static Font UiFont => uiFont != null ? uiFont : uiFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -56,12 +57,15 @@ namespace LeGamez.UI
             hud.joystickZone = zone;
             var bg = NewRect("Base", zone);
             bg.anchorMin = bg.anchorMax = Vector2.zero;
-            bg.sizeDelta = new Vector2(240, 240);
+            bg.sizeDelta = new Vector2(280, 280);
             bg.anchoredPosition = new Vector2(220, 220);
-            AddCircle(bg.gameObject, new Color(1f, 1f, 1f, 0.18f)).raycastTarget = false;
+            AddCircle(bg.gameObject, new Color(0.1f, 0.12f, 0.15f, 0.28f)).raycastTarget = false;
+            var rim = NewRect("Rim", bg);
+            rim.sizeDelta = new Vector2(280, 280);
+            AddRing(rim.gameObject, new Color(1f, 1f, 1f, 0.55f)).raycastTarget = false;
             var handle = NewRect("Handle", bg);
-            handle.sizeDelta = new Vector2(110, 110);
-            AddCircle(handle.gameObject, new Color(1f, 1f, 1f, 0.55f)).raycastTarget = false;
+            handle.sizeDelta = new Vector2(120, 120);
+            AddCircle(handle.gameObject, new Color(1f, 1f, 1f, 0.8f)).raycastTarget = false;
             var stick = zone.gameObject.AddComponent<VirtualJoystick>();
             stick.background = bg;
             stick.handle = handle;
@@ -78,14 +82,16 @@ namespace LeGamez.UI
             var menuButton = CreateButton(hud.safeRoot, "Menu", "×", Vector2.zero, 90);
             var menuRt = (RectTransform)menuButton.transform;
             menuRt.anchorMin = menuRt.anchorMax = Vector2.one;
-            menuRt.anchoredPosition = new Vector2(-70, -70);
+            menuRt.anchoredPosition = new Vector2(-28 - MiniMapSize - 20 - 45, -28 - 45);
             menuButton.GetComponentInChildren<Text>().fontSize = 40;
             menuButton.onPress = () => UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(0);
 
             hud.titleLabel = CreateLabel(hud.safeRoot, "Title", areaName, 44, TextAnchor.UpperLeft,
-                new Vector2(0, 1), new Vector2(40, -30), new Vector2(860, 60));
+                new Vector2(0, 1), new Vector2(40, -30), new Vector2(580, 60));
             hud.infoLabel = CreateLabel(hud.safeRoot, "Info", "", 30, TextAnchor.UpperLeft,
-                new Vector2(0, 1), new Vector2(40, -90), new Vector2(860, 50));
+                new Vector2(0, 1), new Vector2(40, -90), new Vector2(580, 50));
+
+            MiniMap.Create(hud.safeRoot, MiniMapSize);
             hud.toastLabel = CreateLabel(hud.safeRoot, "Toast", "", 40, TextAnchor.MiddleCenter,
                 new Vector2(0.5f, 1f), new Vector2(0, -160), new Vector2(1000, 70));
             hud.toastRect = hud.toastLabel.rectTransform;
@@ -124,10 +130,10 @@ namespace LeGamez.UI
             bool p = portrait.Value;
             scaler.matchWidthOrHeight = p ? 0f : 1f; // match the short side
             joystickZone.anchorMin = Vector2.zero;
-            joystickZone.anchorMax = p ? new Vector2(0.6f, 0.4f) : new Vector2(0.4f, 0.7f);
+            joystickZone.anchorMax = p ? new Vector2(0.62f, 0.5f) : new Vector2(0.45f, 0.8f);
             joystickZone.offsetMin = joystickZone.offsetMax = Vector2.zero;
-            joystick.ResetRest(p ? new Vector2(200, 260) : new Vector2(220, 220));
-            toastRect.anchoredPosition = new Vector2(0, p ? -200 : -160);
+            joystick.ResetRest(p ? new Vector2(230, 330) : new Vector2(250, 250));
+            toastRect.anchoredPosition = new Vector2(0, p ? -420 : -190);
         }
 
         void ApplySafeArea()
@@ -184,6 +190,33 @@ namespace LeGamez.UI
             tex.Apply();
             circleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
             return circleSprite;
+        }
+
+        static Sprite ringSprite;
+
+        static Image AddRing(GameObject go, Color color)
+        {
+            if (ringSprite == null)
+            {
+                const int size = 128;
+                var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+                var px = new Color32[size * size];
+                float r = size * 0.5f;
+                for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(r, r));
+                    float a = Mathf.Clamp01(r - d) * Mathf.Clamp01(d - (r - 5f));
+                    px[y * size + x] = new Color32(255, 255, 255, (byte)(a * 255));
+                }
+                tex.SetPixels32(px);
+                tex.Apply();
+                ringSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+            }
+            var img = go.AddComponent<Image>();
+            img.sprite = ringSprite;
+            img.color = color;
+            return img;
         }
 
         static Image AddCircle(GameObject go, Color color)

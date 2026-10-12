@@ -89,14 +89,87 @@ namespace LeGamez.Editor
             }
         }
 
-        static void Render(Camera cam, string file)
+        const string ThumbDir = "Assets/Resources/AreaThumbs";
+        const string MapDir = "Assets/Resources/AreaMaps";
+
+        /// <summary>Oblique bird's-eye thumbnails per area for the main menu cards.</summary>
+        [MenuItem("LeGamez/Render Menu Thumbnails")]
+        public static void RenderThumbnails()
         {
-            var rt = new RenderTexture(Width, Height, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
+            OsmImport.OsmAreaImporter.EnsureFolder(ThumbDir);
+            var activeScene = EditorSceneManager.GetActiveScene().path;
+            foreach (var guid in AssetDatabase.FindAssets("t:Scene", new[] { "Assets/Scenes/Areas" }))
+            {
+                EditorSceneManager.OpenScene(AssetDatabase.GUIDToAssetPath(guid), OpenSceneMode.Single);
+                var area = Object.FindAnyObjectByType<AreaInfo>();
+                if (area == null) continue;
+
+                var camGo = new GameObject("ThumbCam");
+                var cam = camGo.AddComponent<Camera>();
+                cam.fieldOfView = 40f;
+                cam.farClipPlane = 3000f;
+                cam.clearFlags = CameraClearFlags.Skybox;
+                cam.GetUniversalAdditionalCameraData().renderPostProcessing = true;
+                var volume = new GameObject("ThumbVolume").AddComponent<Volume>();
+                volume.isGlobal = true;
+                var gm = LeGamez.Core.GameMaterials.Instance;
+                if (gm != null) volume.sharedProfile = gm.postProfile;
+
+                // Look at the best POI (or the centre) from the south at ~40° down.
+                Vector3 focus = area.pois != null && area.pois.entries.Count > 0 ? area.pois.entries[0].position : Vector3.zero;
+                focus = Vector3.Lerp(focus, Vector3.zero, 0.4f);
+                camGo.transform.position = focus + new Vector3(-90f, 170f, -200f);
+                camGo.transform.LookAt(focus);
+                bool fog = RenderSettings.fog;
+                RenderSettings.fog = false;
+                string file = Path.Combine(ThumbDir, area.areaId + ".png");
+                RenderTo(cam, file, 768, 512);
+                RenderSettings.fog = fog;
+
+                // Minimap: orthographic top-down render of the whole area (+60 m margin), north up.
+                float extent = area.HalfSize + 60f;
+                cam.orthographic = true;
+                cam.orthographicSize = extent;
+                camGo.transform.SetPositionAndRotation(new Vector3(0f, 500f, 0f), Quaternion.Euler(90f, 0f, 0f));
+                RenderSettings.fog = false;
+                OsmImport.OsmAreaImporter.EnsureFolder(MapDir);
+                string mapFile = Path.Combine(MapDir, area.areaId + ".png");
+                RenderTo(cam, mapFile, 1024, 1024);
+                RenderSettings.fog = fog;
+                AssetDatabase.ImportAsset(mapFile);
+                if (AssetImporter.GetAtPath(mapFile) is TextureImporter mi)
+                {
+                    mi.textureType = TextureImporterType.Default;
+                    mi.mipmapEnabled = true;
+                    mi.wrapMode = TextureWrapMode.Clamp;
+                    mi.maxTextureSize = 1024;
+                    mi.SaveAndReimport();
+                }
+
+                Object.DestroyImmediate(volume.gameObject);
+                Object.DestroyImmediate(camGo);
+                AssetDatabase.ImportAsset(file);
+                if (AssetImporter.GetAtPath(file) is TextureImporter ti)
+                {
+                    ti.textureType = TextureImporterType.Sprite;
+                    ti.mipmapEnabled = false;
+                    ti.maxTextureSize = 1024;
+                    ti.SaveAndReimport();
+                }
+            }
+            if (!string.IsNullOrEmpty(activeScene)) EditorSceneManager.OpenScene(activeScene, OpenSceneMode.Single);
+        }
+
+        static void Render(Camera cam, string file) => RenderTo(cam, file, Width, Height);
+
+        static void RenderTo(Camera cam, string file, int width, int height)
+        {
+            var rt = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
             cam.targetTexture = rt;
             cam.Render();
             RenderTexture.active = rt;
-            var tex = new Texture2D(Width, Height, TextureFormat.RGB24, false);
-            tex.ReadPixels(new Rect(0, 0, Width, Height), 0, 0);
+            var tex = new Texture2D(width, height, TextureFormat.RGB24, false);
+            tex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
             tex.Apply();
             File.WriteAllBytes(file, tex.EncodeToPNG());
             cam.targetTexture = null;

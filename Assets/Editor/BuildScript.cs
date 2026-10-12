@@ -31,6 +31,7 @@ namespace LeGamez.Editor
             var scenes = EditorBuildSettings.scenes.Where(s => s.enabled && File.Exists(s.path)).Select(s => s.path).ToArray();
             if (scenes.Length == 0) throw new System.Exception("No scenes in build settings – run LeGamez/Import All Areas first.");
 
+            EditorUserBuildSettings.development = false; // no on-screen development console
             string outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Builds", folder));
             var options = new BuildPlayerOptions
             {
