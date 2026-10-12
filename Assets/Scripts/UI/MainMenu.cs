@@ -143,13 +143,10 @@ namespace LeGamez.UI
 
         static void Header(RectTransform root, Vector2 anchor, Vector2 pos, TextAnchor align)
         {
-            var title = UiKit.Label(root, "LeGamez", 104, Color.white, align, FontStyle.Bold).Place(anchor, pos, new Vector2(900, 120));
-            var sh = title.gameObject.AddComponent<Shadow>();
-            sh.effectColor = new Color(0.05f, 0.15f, 0.3f, 0.45f);
-            sh.effectDistance = new Vector2(0, -5);
-            var sub = UiKit.Label(root, "Entdecke den Nordwesten", 40, new Color(1, 1, 1, 0.92f), align)
-                .Place(anchor, pos + new Vector2(0, -122), new Vector2(900, 50));
-            sub.gameObject.AddComponent<Shadow>().effectColor = new Color(0.05f, 0.15f, 0.3f, 0.35f);
+            UiKit.Logo(root, anchor, pos, 120f);
+            var sub = UiKit.Label(root, "Entdecke den Nordwesten", 38, Color.white, align, FontStyle.Bold)
+                .Place(anchor, pos + new Vector2(0, -146), new Vector2(900, 50));
+            sub.gameObject.AddComponent<Shadow>().effectColor = new Color(0.1f, 0.23f, 0.31f, 0.6f);
         }
 
         void CharacterControls(RectTransform zone)
@@ -180,7 +177,7 @@ namespace LeGamez.UI
             var btn = rt.gameObject.AddComponent<Button>();
             btn.targetGraphic = img;
             btn.onClick.AddListener(() => ChangeCharacter(step));
-            var t = UiKit.Label(rt, glyph, 60, UiKit.Accent, TextAnchor.MiddleCenter, FontStyle.Bold);
+            var t = UiKit.Label(rt, glyph, 60, UiKit.Navy, TextAnchor.MiddleCenter, FontStyle.Bold);
             UiKit.Stretch(t.rectTransform);
         }
 
@@ -282,7 +279,7 @@ namespace LeGamez.UI
             var track = UiKit.Rect("Track", card, new Vector2(0, 0), new Vector2(26, 24), new Vector2(size.x - 52, 14));
             UiKit.Panel(track.gameObject, UiKit.Track);
             var fill = UiKit.Rect("Fill", track, new Vector2(0, 0.5f), Vector2.zero, new Vector2(Mathf.Max(14, (size.x - 52) * progress), 14));
-            UiKit.Panel(fill.gameObject, progress >= 1f ? UiKit.City : UiKit.Accent);
+            UiKit.Panel(fill.gameObject, progress >= 1f ? UiKit.Done : UiKit.Accent);
             fill.gameObject.SetActive(progress > 0f);
         }
 

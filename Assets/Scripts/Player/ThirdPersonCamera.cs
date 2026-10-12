@@ -22,8 +22,9 @@ namespace LeGamez.Player
         [Header("Smoothing")]
         public float lookSmoothTime = 0.07f;
         public float followSmoothTime = 0.08f;
-        public float collisionInTime = 0.05f;
-        public float collisionOutTime = 0.35f;
+        public float heightSmoothTime = 0.22f;
+        public float collisionInTime = 0.1f;
+        public float collisionOutTime = 0.5f;
         [Header("Auto follow")]
         [Tooltip("Degrees/second the camera turns with sideways stick input (turning a corner).")]
         public float turnFollowSpeed = 110f;
@@ -39,6 +40,13 @@ namespace LeGamez.Player
         Vector3 pivot, pivotVel;
         float currentDistance, distanceVel;
         float idleLookTime;
+        float pivotY, pivotYVel;
+
+        /// <summary>
+        /// Heading the camera is settling towards. Movement uses this instead of the smoothed
+        /// transform so player and camera don't chase each other's lag (that caused the wobble).
+        /// </summary>
+        public float IntendedYaw => targetYaw;
         Camera cam;
         PlayerController player;
 
@@ -93,7 +101,11 @@ namespace LeGamez.Player
 
             yaw = Mathf.SmoothDampAngle(yaw, targetYaw, ref yawVel, lookSmoothTime);
             pitch = Mathf.SmoothDamp(pitch, targetPitch, ref pitchVel, lookSmoothTime);
-            pivot = Vector3.SmoothDamp(pivot, target.position + pivotOffset, ref pivotVel, followSmoothTime);
+            // Horizontal follow is tight; height is smoothed more so steps/kerbs don't bob the view.
+            Vector3 goal = target.position + pivotOffset;
+            pivot = Vector3.SmoothDamp(new Vector3(pivot.x, goal.y, pivot.z), goal, ref pivotVel, followSmoothTime);
+            pivotY = Mathf.SmoothDamp(pivotY == 0f ? goal.y : pivotY, goal.y, ref pivotYVel, heightSmoothTime);
+            pivot.y = pivotY;
 
             var rotation = Quaternion.Euler(pitch, yaw, 0f);
             Vector3 back = rotation * Vector3.back;

@@ -28,6 +28,7 @@ namespace LeGamez.Player
         public Transform cameraTransform;
 
         CharacterController controller;
+        ThirdPersonCamera orbit;
         float verticalVelocity;
         Vector3 planarVelocity;
         Vector3 planarVelocityRef;
@@ -52,7 +53,10 @@ namespace LeGamez.Player
             Vector3 forward = Vector3.forward, right = Vector3.right;
             if (cameraTransform != null)
             {
-                forward = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
+                // Use the camera's intended heading (not its lagging transform) as the input frame.
+                if (orbit == null) orbit = cameraTransform.GetComponent<ThirdPersonCamera>();
+                float yaw = orbit != null ? orbit.IntendedYaw : cameraTransform.eulerAngles.y;
+                forward = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
                 right = Vector3.Cross(Vector3.up, forward);
             }
 

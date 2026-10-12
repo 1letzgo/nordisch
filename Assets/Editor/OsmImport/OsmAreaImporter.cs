@@ -159,6 +159,8 @@ namespace LeGamez.Editor.OsmImport
                 mr.shadowCastingMode = casts ? ShadowCastingMode.On : ShadowCastingMode.Off;
                 if (WorldStyle.HasCollider(mat))
                     go.AddComponent<MeshCollider>().sharedMesh = mesh;
+                // Thin props (lamps, trunks, fences) block the player but not the camera probe.
+                if (mat == WorldStyle.MatProps || mat == WorldStyle.MatTreeTrunks) go.layer = 2;
                 GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccluderStatic | StaticEditorFlags.OccludeeStatic);
             }
 

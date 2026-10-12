@@ -34,7 +34,7 @@ namespace LeGamez.Core
             NavState.View = cam.transform;
             NavState.Target = null;
 
-            var hud = Hud.Create(area != null ? area.displayName : "LeGamez",
+            var hud = Hud.Create(area != null ? area.displayName : "Nordisch",
                 area != null ? area.attribution : "© OpenStreetMap-Mitwirkende");
 
             var poiManager = new GameObject("POIs").AddComponent<PoiManager>();

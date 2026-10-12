@@ -92,7 +92,7 @@ namespace LeGamez.UI
             playerArrow = UiKit.Rect("Player", mask, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(34, 34));
             var arrow = playerArrow.gameObject.AddComponent<Image>();
             arrow.sprite = ArrowSprite();
-            arrow.color = UiKit.Accent;
+            arrow.color = UiKit.Navy;
             arrow.raycastTarget = false;
             playerArrow.gameObject.AddComponent<Outline>().effectColor = Color.white;
 
@@ -100,12 +100,12 @@ namespace LeGamez.UI
             targetEdge = UiKit.Rect("TargetEdge", root, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(26, 26));
             var te = targetEdge.gameObject.AddComponent<Image>();
             te.sprite = ArrowSprite();
-            te.color = new Color(1f, 0.78f, 0.15f);
+            te.color = UiKit.Mustard;
             te.raycastTarget = false;
 
             // Next target name + distance, as a pill under the map.
             var pill = UiKit.Rect("TargetPill", root, new Vector2(0.5f, 0f), new Vector2(0, -60), new Vector2(size + 20, 50));
-            UiKit.Panel(pill.gameObject, new Color(0.08f, 0.12f, 0.2f, 0.65f));
+            UiKit.Panel(pill.gameObject, new Color(UiKit.Navy.r, UiKit.Navy.g, UiKit.Navy.b, 0.88f));
             targetLabel = UiKit.Label(pill, "", 24, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
             UiKit.Stretch(targetLabel.rectTransform, 6f);
             targetLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
@@ -114,7 +114,7 @@ namespace LeGamez.UI
             targetLabel.resizeTextMaxSize = 24;
 
             north = UiKit.Rect("North", root, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(40, 40));
-            UiKit.Panel(north.gameObject, UiKit.Ink, UiKit.Circle);
+            UiKit.Panel(north.gameObject, UiKit.Mustard, UiKit.Circle);
             UiKit.Stretch(UiKit.Label(north, "N", 24, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform);
         }
 
@@ -134,7 +134,7 @@ namespace LeGamez.UI
             {
                 bool visited = area != null && StampBook.Has(area.areaId, poi.id);
                 bool target = NavState.Target == poi;
-                dot.color = target ? new Color(1f, 0.78f, 0.15f) : visited ? new Color(0.35f, 0.8f, 0.45f) : Color.white;
+                dot.color = target ? UiKit.Mustard : visited ? UiKit.Done : Color.white;
                 dot.rectTransform.sizeDelta = Vector2.one * (target ? 26f * pulse : 16f);
                 dot.rectTransform.localRotation = Quaternion.Euler(0, 0, -viewYaw);
             }

@@ -30,7 +30,7 @@ namespace LeGamez.Editor
         static void ConfigurePlayer()
         {
             PlayerSettings.companyName = "letzgo";
-            PlayerSettings.productName = "LeGamez";
+            PlayerSettings.productName = "Nordisch";
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.iOS, BundleId);
             PlayerSettings.bundleVersion = "0.1.0";
             PlayerSettings.iOS.buildNumber = "1";
@@ -195,8 +195,8 @@ namespace LeGamez.Editor
             gm.playerBody = Mat("Player_Body", lit, new Color(0.15f, 0.45f, 0.85f));
             gm.playerSkin = Mat("Player_Skin", lit, new Color(0.96f, 0.80f, 0.67f));
             gm.playerAccent = Mat("Player_Accent", lit, new Color(0.9f, 0.4f, 0.3f));
-            gm.poiOpen = Mat("Poi_Open", unlit, new Color(1f, 0.78f, 0.15f));
-            gm.poiDone = Mat("Poi_Done", unlit, new Color(0.35f, 0.85f, 0.45f));
+            gm.poiOpen = Mat("Poi_Open", unlit, new Color(0.89f, 0.66f, 0.17f));   // brand mustard
+            gm.poiDone = Mat("Poi_Done", unlit, new Color(0.31f, 0.60f, 0.42f));
             gm.postProfile = CreatePostProfile();
             gm.pedestalMaterial = Mat("Pedestal", lit, new Color(0.93f, 0.89f, 0.80f));
             CharacterSetup.Run(gm);

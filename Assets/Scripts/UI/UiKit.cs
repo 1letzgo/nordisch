@@ -6,16 +6,34 @@ namespace LeGamez.UI
     /// <summary>Tiny code-only UI toolkit: rounded panels, soft shadows, labels, palette.</summary>
     public static class UiKit
     {
-        // Palette: north-sea blues, warm brick accent, off-white cards.
-        public static readonly Color Ink = new Color(0.11f, 0.16f, 0.24f);
-        public static readonly Color InkSoft = new Color(0.36f, 0.42f, 0.50f);
-        public static readonly Color Card = new Color(1f, 0.99f, 0.97f, 0.96f);
-        public static readonly Color Accent = new Color(0.86f, 0.38f, 0.24f);
-        public static readonly Color AccentSoft = new Color(0.98f, 0.88f, 0.82f);
-        public static readonly Color Sea = new Color(0.20f, 0.47f, 0.68f);
-        public static readonly Color Island = new Color(0.90f, 0.78f, 0.45f);
-        public static readonly Color City = new Color(0.45f, 0.62f, 0.40f);
-        public static readonly Color Track = new Color(0.88f, 0.89f, 0.91f);
+        // Brand palette from the "NORDisch" logo: deep navy, mustard, white.
+        public static readonly Color Navy = Hex(0x1A3A4E);
+        public static readonly Color Mustard = Hex(0xE3A82B);
+        public static readonly Color Ink = Navy;
+        public static readonly Color InkSoft = Hex(0x5D7383);
+        public static readonly Color Card = new Color(1f, 0.99f, 0.97f, 0.97f);
+        public static readonly Color Accent = Mustard;
+        public static readonly Color AccentSoft = Hex(0xF7E7C2);
+        public static readonly Color Sea = Navy;
+        public static readonly Color Island = Mustard;
+        public static readonly Color City = Navy;
+        public static readonly Color Track = Hex(0xE4E8EB);
+        public static readonly Color Done = Hex(0x4E9A6B);
+
+        public static Color Hex(int rgb) => new Color(((rgb >> 16) & 255) / 255f, ((rgb >> 8) & 255) / 255f, (rgb & 255) / 255f);
+
+        /// <summary>Recreation of the logo: mustard rounded badge with white "NORDisch".</summary>
+        public static RectTransform Logo(Transform parent, Vector2 anchor, Vector2 pos, float height)
+        {
+            float width = height * 2.67f;
+            var badge = Rect("Logo", parent, anchor, pos, new Vector2(width, height));
+            DropShadow(badge, height * 0.12f, -height * 0.05f, 0.35f);
+            Panel(badge.gameObject, Mustard);
+            var t = Label(badge, "<b>NORD</b>isch", Mathf.RoundToInt(height * 0.56f), Color.white, TextAnchor.MiddleCenter);
+            Stretch(t.rectTransform);
+            t.rectTransform.anchoredPosition = new Vector2(0, -height * 0.02f);
+            return badge;
+        }
 
         static Sprite rounded, shadow, circle;
 
