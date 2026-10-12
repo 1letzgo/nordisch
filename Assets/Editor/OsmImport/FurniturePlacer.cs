@@ -27,7 +27,31 @@ namespace LeGamez.Editor.OsmImport
         /// <summary>Everything placed by the last <see cref="Place"/> call (used to keep bikes clear).</summary>
         public static readonly List<Vector2> LastOccupied = new List<Vector2>();
 
-        public static Stats Place(OsmData data, MeshSink sink, float half, System.Random rng)
+        /// <summary>One item of <paramref name="type"/> at the origin, facing north (map editor objects).</summary>
+        public static bool BuildSingle(string type, MeshSink sink, System.Random rng)
+        {
+            var p = Vector2.zero;
+            var b = sink.Get(WorldStyle.MatProps, p);
+            switch (type)
+            {
+                case "bench": Bench(b, p, 0f); return true;
+                case "picnic_table": PicnicTable(b, p, 0f); return true;
+                case "bike_stands": BikeStands(b, p, 0f); return true;
+                case "bin": Bin(b, p); return true;
+                case "bollard": Bollard(b, p, 0.8f, Iron); return true;
+                case "flagpole": Flagpole(b, p); return true;
+                case "statue": Statue(b, p, 0f, rng); return true;
+                case "planter": Planter(sink, p, rng); return true;
+                case "cafe_table": CafeSet(b, p, 0f, rng.NextDouble() < 0.5 ? Mustard : Navy); return true;
+                case "fountain": Fountain(sink, p, 2.2f); return true;
+                case "drinking_water": Bollard(b, p, 0.9f, Steel); return true;
+                default: return false;
+            }
+        }
+
+        const string Props = WorldStyle.MatProps;
+
+        public static Stats Place(OsmData data, MeshSink sink, AreaRect area, System.Random rng)
         {
             var st = new Stats();
             var occupied = LastOccupied;
@@ -64,26 +88,30 @@ namespace LeGamez.Editor.OsmImport
             foreach (var n in data.nodes)
             {
                 var p = data.projection.ToLocal(n.lat, n.lon);
-                if (Mathf.Abs(p.x) > half - 1 || Mathf.Abs(p.y) > half - 1) continue;
+                if (!area.Contains(p, 1f)) continue;
                 float yaw = (float)(rng.NextDouble() * 360.0);
                 var dir = n.tags.Get("direction");
-                if (dir != null && float.TryParse(dir, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var d)) yaw = d;
-                var b = sink.Get(WorldStyle.MatProps, p);
+                float d = 0f;
+                bool hasDirection = dir != null && float.TryParse(dir, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out d);
+                if (hasDirection) yaw = d;
+                else if (n.tags.Is("amenity", "bench") && OrientToSurroundings(p, buildings, data, out float oriented)) yaw = oriented;
                 switch (n.tags.Get("amenity"))
                 {
-                    case "bench": Bench(b, p, yaw); Take(p); st.mapped++; continue;
-                    case "fountain": Fountain(sink, p, rng.NextDouble() < 0.5 ? 2.2f : 1.6f); Take(p); st.fountains++; continue;
-                    case "drinking_water": Bollard(b, p, 0.9f, Steel); Take(p); st.mapped++; continue;
-                    case "bicycle_parking": BikeStands(b, p, yaw); Take(p); st.mapped++; continue;
-                    case "waste_basket": Bin(b, p); Take(p); st.mapped++; continue;
+                    case "bench": EditsPlacer.Emit(sink, "bench", p, yaw, 1f, (s, q, y) => Bench(s.Get(Props, q), q, y)); Take(p); st.mapped++; continue;
+                    case "fountain":
+                        float fr = rng.NextDouble() < 0.5 ? 2.2f : 1.6f;
+                        EditsPlacer.Emit(sink, "fountain", p, 0f, fr / 2.2f, (s, q, y) => Fountain(s, q, fr)); Take(p); st.fountains++; continue;
+                    case "drinking_water": EditsPlacer.Emit(sink, "drinking_water", p, 0f, 1f, (s, q, y) => Bollard(s.Get(Props, q), q, 0.9f, Steel)); Take(p); st.mapped++; continue;
+                    case "bicycle_parking": EditsPlacer.Emit(sink, "bike_stands", p, yaw, 1f, (s, q, y) => BikeStands(s.Get(Props, q), q, y)); Take(p); st.mapped++; continue;
+                    case "waste_basket": EditsPlacer.Emit(sink, "bin", p, 0f, 1f, (s, q, y) => Bin(s.Get(Props, q), q)); Take(p); st.mapped++; continue;
                 }
-                if (n.tags.Is("leisure", "picnic_table")) { PicnicTable(b, p, yaw); Take(p); st.mapped++; continue; }
+                if (n.tags.Is("leisure", "picnic_table")) { EditsPlacer.Emit(sink, "picnic_table", p, yaw, 1f, (s, q, y) => PicnicTable(s.Get(Props, q), q, y)); Take(p); st.mapped++; continue; }
                 if (n.tags.Is("tourism", "artwork") || n.tags.Is("historic", "memorial") || n.tags.Is("historic", "monument"))
                 {
-                    Statue(b, p, yaw, rng); Take(p); st.mapped++; continue;
+                    EditsPlacer.Emit(sink, "statue", p, yaw, 1f, (s, q, y) => Statue(s.Get(Props, q), q, y, rng)); Take(p); st.mapped++; continue;
                 }
-                if (n.tags.Is("man_made", "flagpole")) { Flagpole(b, p); Take(p); st.mapped++; continue; }
-                if (n.tags.Is("barrier", "bollard")) { Bollard(b, p, 0.8f, Iron); Take(p); st.mapped++; continue; }
+                if (n.tags.Is("man_made", "flagpole")) { EditsPlacer.Emit(sink, "flagpole", p, 0f, 1f, (s, q, y) => Flagpole(s.Get(Props, q), q)); Take(p); st.mapped++; continue; }
+                if (n.tags.Is("barrier", "bollard")) { EditsPlacer.Emit(sink, "bollard", p, 0f, 1f, (s, q, y) => Bollard(s.Get(Props, q), q, 0.8f, Iron)); Take(p); st.mapped++; continue; }
             }
             // Fountain areas (way polygons).
             foreach (var poly in data.polygons)
@@ -91,7 +119,8 @@ namespace LeGamez.Editor.OsmImport
                 if (!poly.tags.Is("amenity", "fountain")) continue;
                 var c = GeoUtil.Centroid(poly.outer);
                 var r = GeoUtil.Bounds(poly.outer);
-                Fountain(sink, c, Mathf.Clamp(Mathf.Min(r.width, r.height) * 0.5f, 1.4f, 6f));
+                float radius = Mathf.Clamp(Mathf.Min(r.width, r.height) * 0.5f, 1.4f, 6f);
+                EditsPlacer.Emit(sink, "fountain", c, 0f, radius / 2.2f, (s, q, y) => Fountain(s, q, radius));
                 Take(c);
                 st.fountains++;
             }
@@ -100,10 +129,10 @@ namespace LeGamez.Editor.OsmImport
             foreach (var ring in squares)
             {
                 if (ring.Count < 3) continue;
-                float area = Mathf.Abs(PolygonTriangulator.SignedArea(ring));
-                if (area < 300f) continue;
+                float sqArea = Mathf.Abs(PolygonTriangulator.SignedArea(ring));
+                if (sqArea < 300f) continue;
                 var centre = GeoUtil.Centroid(ring);
-                float perimeterStep = area > 3000f ? 16f : 12f;
+                float perimeterStep = sqArea > 3000f ? 16f : 12f;
                 float carry = perimeterStep * 0.5f;
                 int k = 0;
                 for (int i = 0; i < ring.Count; i++)
@@ -117,9 +146,8 @@ namespace LeGamez.Editor.OsmImport
                         var p = edge + inward * 2.4f;
                         if (!OsmData.PointInRing(p, ring) || InBuilding(p) || !Free(p, 3f)) continue;
                         float yaw = Mathf.Atan2(inward.x, inward.y) * Mathf.Rad2Deg;
-                        var b = sink.Get(WorldStyle.MatProps, p);
-                        if (k++ % 3 == 2) { Planter(sink, p, rng); st.planters++; }
-                        else { Bench(b, p, yaw); st.benches++; }
+                        if (k++ % 3 == 2) { EditsPlacer.Emit(sink, "planter", p, 0f, 1f, (s, q, y) => Planter(s, q, rng)); st.planters++; }
+                        else { EditsPlacer.Emit(sink, "bench", p, yaw, 1f, (s, q, y) => Bench(s.Get(Props, q), q, y)); st.benches++; }
                         Take(p);
                     }
                     carry = (carry + len) % perimeterStep;
@@ -142,12 +170,12 @@ namespace LeGamez.Editor.OsmImport
                     {
                         var p = a + dir * s + nrm * side * 2.6f;
                         side = -side;
-                        if (Mathf.Abs(p.x) > half - 2 || Mathf.Abs(p.y) > half - 2 || InBuilding(p) || !Free(p, 4f)) continue;
-                        var b = sink.Get(WorldStyle.MatProps, p);
-                        var face = -nrm * -side; // face the street centre
+                        if (!area.Contains(p, 2f) || InBuilding(p) || !Free(p, 4f)) continue;
+                        var face = -nrm * -side; // fallback: face the street centre
                         float yaw = Mathf.Atan2(face.x, face.y) * Mathf.Rad2Deg;
-                        if (k++ % 2 == 0) { Bench(b, p, yaw); st.benches++; }
-                        else { Planter(sink, p, rng); st.planters++; }
+                        if (OrientToSurroundings(p, buildings, data, out float alongFacade)) yaw = alongFacade;
+                        if (k++ % 2 == 0) { EditsPlacer.Emit(sink, "bench", p, yaw, 1f, (s, q, y) => Bench(s.Get(Props, q), q, y)); st.benches++; }
+                        else { EditsPlacer.Emit(sink, "planter", p, 0f, 1f, (s, q, y) => Planter(s, q, rng)); st.planters++; }
                         Take(p);
                     }
                     carry = s - len;
@@ -161,7 +189,7 @@ namespace LeGamez.Editor.OsmImport
                 if (am != "cafe" && am != "restaurant" && am != "ice_cream" && am != "pub" && am != "bar") continue;
                 if (n.tags.Is("outdoor_seating", "no")) continue;
                 var p = data.projection.ToLocal(n.lat, n.lon);
-                if (Mathf.Abs(p.x) > half - 5 || Mathf.Abs(p.y) > half - 5) continue;
+                if (!area.Contains(p, 5f)) continue;
                 // Nearest open pedestrian spot within 18 m.
                 Vector2? spot = NearestPedestrian(p, squares, pedestrianLines, 18f);
                 if (spot == null) continue;
@@ -174,12 +202,65 @@ namespace LeGamez.Editor.OsmImport
                 {
                     var tp = basePos + right * (t * 2.8f);
                     if (InBuilding(tp) || !Free(tp, 2.2f)) continue;
-                    CafeSet(sink.Get(WorldStyle.MatProps, tp), tp, (float)(rng.NextDouble() * 90.0), umbrella);
+                    float cafeYaw = (float)(rng.NextDouble() * 90.0);
+                    EditsPlacer.Emit(sink, "cafe_table", tp, cafeYaw, 1f, (s, q, y) => CafeSet(s.Get(Props, q), q, y, umbrella));
                     Take(tp);
                     st.seating++;
                 }
             }
             return st;
+        }
+
+        /// <summary>
+        /// Bench heading: parallel to the nearest façade within 12 m, back to the wall, facing the street;
+        /// otherwise parallel to the nearest way within 10 m, facing it. Yaw is clockwise from north (+z).
+        /// </summary>
+        static bool OrientToSurroundings(Vector2 p, List<List<Vector2>> buildings, OsmData data, out float yaw)
+        {
+            yaw = 0f;
+            float best = 12f;
+            Vector2 bestA = default, bestB = default;
+            bool found = false;
+            foreach (var ring in buildings)
+            {
+                if (ring.Count < 3) continue;
+                for (int i = 0; i < ring.Count; i++)
+                {
+                    Vector2 a = ring[i], b = ring[(i + 1) % ring.Count];
+                    float d = Vector2.Distance(p, ClosestOnSegment(p, a, b));
+                    if (d < best) { best = d; bestA = a; bestB = b; found = true; }
+                }
+            }
+            if (found)
+            {
+                // Face away from the wall: towards p from the closest wall point.
+                var q = ClosestOnSegment(p, bestA, bestB);
+                var edge = (bestB - bestA).normalized;
+                var away = p - q;
+                var normal = new Vector2(-edge.y, edge.x);
+                if (Vector2.Dot(normal, away) < 0) normal = -normal;
+                yaw = Mathf.Atan2(normal.x, normal.y) * Mathf.Rad2Deg;
+                return true;
+            }
+            // No façade nearby: line up with the nearest path/street and look at it.
+            best = 10f;
+            foreach (var w in data.ways)
+            {
+                if (!w.tags.Has("highway")) continue;
+                for (int i = 0; i < w.points.Count - 1; i++)
+                {
+                    var q = ClosestOnSegment(p, w.points[i], w.points[i + 1]);
+                    float d = Vector2.Distance(p, q);
+                    if (d < best && d > 0.05f)
+                    {
+                        best = d;
+                        var towards = (q - p).normalized;
+                        yaw = Mathf.Atan2(towards.x, towards.y) * Mathf.Rad2Deg;
+                        found = true;
+                    }
+                }
+            }
+            return found;
         }
 
         static Vector2? NearestPedestrian(Vector2 p, List<List<Vector2>> squares, List<List<Vector2>> lines, float maxDist)

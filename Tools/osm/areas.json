@@ -17,12 +17,25 @@
       "name": "Westerstede",
       "lat": 53.257,
       "lon": 7.9275,
-      "size_m": 1600,
+      "size_m": 3150,
       "vehicles": [
         "bicycle",
         "car"
       ],
-      "ground": "grass"
+      "ground": "grass",
+      "extent": {
+        "west": 2350,
+        "east": 800,
+        "south": 900,
+        "north": 800
+      },
+      "car_spots": [
+        {
+          "lat": 53.2523949,
+          "lon": 7.9037102,
+          "note": "Alte Weide 4 (Testauto)"
+        }
+      ]
     },
     {
       "id": "langeoog",

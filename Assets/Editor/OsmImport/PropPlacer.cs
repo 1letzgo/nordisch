@@ -58,9 +58,35 @@ namespace LeGamez.Editor.OsmImport
                     if (polygonBounds[i].Contains(p) && OsmData.PointInRing(p, polygons[i])) return true;
                 return false;
             }
+
+            /// <summary>Moves <paramref name="p"/> sideways out of every line band (+extra). False if it can't get free.</summary>
+            public bool PushOut(ref Vector2 p, float extra)
+            {
+                for (int iter = 0; iter < 4; iter++)
+                {
+                    var key = new Vector2Int(Mathf.FloorToInt(p.x / Cell), Mathf.FloorToInt(p.y / Cell));
+                    if (!segments.TryGetValue(key, out var list)) return true;
+                    float worst = 0f;
+                    Vector2 target = p;
+                    foreach (var (a, b, r) in list)
+                    {
+                        Vector2 ab = b - a;
+                        float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(1e-5f, ab.sqrMagnitude));
+                        Vector2 c = a + ab * t, off = p - c;
+                        float depth = r + extra - off.magnitude;
+                        if (depth <= worst) continue;
+                        worst = depth;
+                        Vector2 n = off.sqrMagnitude > 1e-6f ? off.normalized : new Vector2(-ab.y, ab.x).normalized;
+                        target = c + n * (r + extra + 0.05f);
+                    }
+                    if (worst <= 0f) return true;
+                    p = target;
+                }
+                return !IsBlocked(p, extra - 0.01f);
+            }
         }
 
-        public static int PlaceTrees(OsmData data, MeshSink sink, float half, System.Random rng)
+        public static int PlaceTrees(OsmData data, MeshSink sink, AreaRect area, System.Random rng)
         {
             var clear = BuildClearance(data);
             int count = 0;
@@ -70,8 +96,8 @@ namespace LeGamez.Editor.OsmImport
             {
                 if (!n.tags.Is("natural", "tree")) continue;
                 var p = data.projection.ToLocal(n.lat, n.lon);
-                if (!Inside(p, half) || clear.IsBlocked(p, 0f)) continue;
-                Tree(sink, p, rng, 0.75f);
+                if (!area.Contains(p) || clear.IsBlocked(p, 0f)) continue;
+                EditsPlacer.Emit(sink, "tree", p, 0f, 0.75f, (s, q, y) => Tree(s, q, rng, 0.75f));
                 count++;
             }
             foreach (var w in data.ways)
@@ -84,8 +110,8 @@ namespace LeGamez.Editor.OsmImport
                     for (float d = 0; d < len; d += 9f)
                     {
                         var p = Vector2.Lerp(a, b, d / len);
-                        if (!Inside(p, half) || clear.IsBlocked(p, 0f)) continue;
-                        Tree(sink, p, rng, 0.8f);
+                        if (!area.Contains(p) || clear.IsBlocked(p, 0f)) continue;
+                        EditsPlacer.Emit(sink, "tree", p, 0f, 0.8f, (s, q, y) => Tree(s, q, rng, 0.8f));
                         count++;
                     }
                 }
@@ -103,7 +129,7 @@ namespace LeGamez.Editor.OsmImport
                 else if (poly.tags.Is("natural", "heath") || poly.tags.Is("natural", "dune")) { kind = VegetationKind.Bush; spacing = 9f; coverage = 0.3f; }
                 else continue;
 
-                var ring = GeoUtil.ClipToSquare(PolygonTriangulator.Clean(poly.outer), half);
+                var ring = area.Clip(PolygonTriangulator.Clean(poly.outer));
                 if (ring.Count < 3) continue;
                 var bounds = GeoUtil.Bounds(ring);
                 for (float x = bounds.xMin; x < bounds.xMax; x += spacing)
@@ -116,8 +142,8 @@ namespace LeGamez.Editor.OsmImport
                     bool inHole = false;
                     foreach (var h in poly.holes) if (OsmData.PointInRing(p, h)) { inHole = true; break; }
                     if (inHole || clear.IsBlocked(p, kind == VegetationKind.Tree ? 2.2f : 0.8f)) continue;
-                    if (kind == VegetationKind.Tree) Tree(sink, p, rng, 1f);
-                    else Bush(sink, p, rng);
+                    if (kind == VegetationKind.Tree) EditsPlacer.Emit(sink, "tree", p, 0f, 1f, (s, q, y) => Tree(s, q, rng, 1f));
+                    else EditsPlacer.Emit(sink, "bush", p, 0f, 1f, (s, q, y) => Bush(s, q, rng));
                     count++;
                 }
             }
@@ -126,7 +152,6 @@ namespace LeGamez.Editor.OsmImport
 
         enum VegetationKind { Tree, Bush }
 
-        static bool Inside(Vector2 p, float half) => Mathf.Abs(p.x) <= half && Mathf.Abs(p.y) <= half;
 
         static Clearance BuildClearance(OsmData data)
         {
@@ -225,36 +250,60 @@ namespace LeGamez.Editor.OsmImport
         }
 
         /// <summary>Street lamps every ~30 m along urban roads, alternating sides, kept off buildings.</summary>
-        public static int PlaceStreetLamps(OsmData data, MeshSink sink, float half)
+        /// <summary>One plant or lamp of <paramref name="type"/> at the origin (map editor objects).</summary>
+        public static bool BuildSingle(string type, MeshSink sink, System.Random rng)
+        {
+            switch (type)
+            {
+                case "tree": Tree(sink, Vector2.zero, rng, 1f); return true;
+                case "bush": Bush(sink, Vector2.zero, rng); return true;
+                case "lamp": Lamp(sink.Get(WorldStyle.MatProps, Vector2.zero), Vector2.zero, Vector2.right); return true;
+                default: return false;
+            }
+        }
+
+        public static int PlaceStreetLamps(OsmData data, MeshSink sink, AreaRect area)
         {
             var buildings = new Clearance();
             foreach (var p in data.polygons)
                 if (p.tags.Has("building")) buildings.AddPolygon(PolygonTriangulator.Clean(p.outer));
 
+            // Every drawn road, path, rail and waterway at its real ribbon width: poles stay off all of them
+            // (crossing streets at junctions, separately mapped footways, explicit width=* tags).
+            const float Kerb = 0.6f;
+            var roads = new Clearance();
+            foreach (var w in data.ways)
+            {
+                float lw = GroundBuilder.LineWidth(w.tags);
+                if (lw > 0f) roads.AddLine(w.points, lw * 0.5f);
+            }
+
             int count = 0;
 
-            // Mapped lamps (highway=street_lamp) at their real positions; the 30 m pattern fills the gaps.
+            // Mapped lamps (highway=street_lamp) at their real positions – nudged to the kerb if the node sits
+            // on a carriageway; the 30 m pattern fills the gaps.
             var mapped = new Clearance();
             foreach (var n in data.nodes)
             {
                 if (!n.tags.Is("highway", "street_lamp")) continue;
                 var p = data.projection.ToLocal(n.lat, n.lon);
-                if (!Inside(p, half - 1f)) continue;
-                Lamp(sink.Get(WorldStyle.MatProps, p), p, Vector2.right);
+                if (!area.Contains(p, 1f)) continue;
+                if (roads.IsBlocked(p, Kerb) && (!roads.PushOut(ref p, Kerb) || buildings.IsBlocked(p, 0.3f))) continue;
+                EditLamp(sink, p, Vector2.right);
                 mapped.AddLine(new List<Vector2> { p, p + Vector2.one * 0.01f }, 15f);
                 count++;
             }
 
             foreach (var w in data.ways)
             {
-                float halfWidth;
                 switch (w.tags.Get("highway"))
                 {
-                    case "primary": case "secondary": case "tertiary": halfWidth = 4.8f; break;
-                    case "residential": case "living_street": case "unclassified": halfWidth = 3.4f; break;
+                    case "primary": case "secondary": case "tertiary":
+                    case "residential": case "living_street": case "unclassified": break;
                     default: continue;
                 }
-                if (w.tags.Has("tunnel") && !w.tags.Is("tunnel", "no")) continue;
+                float halfWidth = GroundBuilder.LineWidth(w.tags) * 0.5f;
+                if (halfWidth <= 0f) continue;
                 float carry = 12f;
                 int side = (int)(w.id & 1) * 2 - 1;
                 for (int i = 0; i < w.points.Count - 1; i++)
@@ -266,16 +315,34 @@ namespace LeGamez.Editor.OsmImport
                     float d = carry;
                     for (; d < len; d += 30f)
                     {
-                        var p = a + dir * d + normal * side * (halfWidth + 0.7f);
+                        // Kerbside first; further out if a footway/cycleway runs along. Nothing fits (junction) -> skip.
+                        Vector2? spot = null;
+                        foreach (float gap in LampGaps)
+                        {
+                            var q = a + dir * d + normal * side * (halfWidth + gap);
+                            if (!roads.IsBlocked(q, Kerb)) { spot = q; break; }
+                        }
                         side = -side;
-                        if (!Inside(p, half - 2f) || buildings.IsBlocked(p, 1.2f) || mapped.IsBlocked(p, 0f)) continue;
-                        Lamp(sink.Get(WorldStyle.MatProps, p), p, dir);
+                        if (spot == null) continue;
+                        var p = spot.Value;
+                        if (!area.Contains(p, 2f) || buildings.IsBlocked(p, 1.2f) || mapped.IsBlocked(p, 0f)) continue;
+                        EditLamp(sink, p, dir);
                         count++;
                     }
                     carry = d - len;
                 }
             }
             return count;
+        }
+
+        static readonly float[] LampGaps = { 0.9f, 2.1f, 3.4f };
+
+        /// <summary>Lamp via <see cref="EditsPlacer"/>; yaw turns the head's +X towards <paramref name="roadDir"/>.</summary>
+        static void EditLamp(MeshSink sink, Vector2 p, Vector2 roadDir)
+        {
+            float yaw = Mathf.Atan2(-roadDir.y, roadDir.x) * Mathf.Rad2Deg;
+            EditsPlacer.Emit(sink, "lamp", p, yaw, 1f, (s, q, y) =>
+                Lamp(s.Get(WorldStyle.MatProps, q), q, new Vector2(Mathf.Cos(y * Mathf.Deg2Rad), -Mathf.Sin(y * Mathf.Deg2Rad))));
         }
 
         static void Lamp(MeshSink.Batch b, Vector2 p, Vector2 roadDir)

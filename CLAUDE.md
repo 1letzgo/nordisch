@@ -51,13 +51,31 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
 - `OsmData` + `MiniJson`: Overpass-JSON lesen, `GeoProjection` (äquirektangulär um den Mittelpunkt, 1 Unit = 1 m, +X Ost, +Z Nord).
 - `Lod2Builder`: echte Wand-/Dachflächen aus LoD2; regionaler Stil je ALKIS-Gebäudefunktion + Insel/Festland
   (Klinker rot/dunkel/gelb, weißer Putz, Pfannendach rot/anthrazit, Schornsteine). Materialcode steckt im Vertex-Alpha.
-- `BuildingBuilder`: Fallback aus OSM-Grundrissen.
+- `BuildingBuilder`: Fallback aus OSM-Grundrissen. Auch mit LoD2 aktiv für OSM-Häuser, die LoD2 (noch) nicht kennt
+  (Neubaugebiete; Test `Lod2Builder.Covers`), mit eigenem Zufallsgenerator, damit die Objekt-IDs stabil bleiben.
+- `BuildingOverrides`: Einzelhäuser anpassen über `Data/<id>.buildings.json` (Adresse oder `osmId`; Wandfarbe, Klinker,
+  Giebelfenster pro Geschoss). Wirkt nur auf OSM-gebaute Häuser; nicht passende Einträge → Warnung im Import-Log.
 - `GroundBuilder`: Grund-Kacheln, Flächen (landuse/natural/leisure), Straßen-Bänder mit Mittellinie, Wasser, Hecken/Mauern/Zäune.
 - `PropPlacer`: OSM-Bäume, Baumgruppen in Parks/Wäldern (mit Abstand zu Wegen), Büsche auf Dünen/Heide, Straßenlaternen.
 - `PoiExtractor`: benannte Sehenswürdigkeiten → Stempelheft.
 - `MeshSink`: Geometrie pro Material und 100-m-Chunk; Kollider für Gebäude, Stämme, Props
   (Stämme/Props liegen auf Layer 2, damit die Kamera sie ignoriert).
 - Shader `Assets/Shaders/VertexColorLit.shader`: Vertex-Farben, Fenster/Sprossen, Klinker, Putz, Dachpfannen, Wasser.
+
+### Map-Editor (macOS-App, `Tools/MapEditor`)
+Draufsicht je Gebiet (Minimap + LoD2-Dachumrisse). Neue Objekte setzen, außerdem alle vom Importer erzeugten
+(Bäume, Büsche, Laternen, Bänke, Kübel, Brunnen, Café-Tische, Denkmäler …) verschieben/drehen/skalieren/löschen.
+- Speichert nach `Data/<id>.edits.json`: `objects` = neue Objekte, `changes` = Overrides erzeugter Objekte per ID
+  (`<typ>@<x·10>,<z·10>`, Liste in `Assets/Generated/<id>/<id>_objects.json`, schreibt der Importer).
+- Importer: `EditsPlacer` – alle Placer laufen über `EditsPlacer.Emit` (baut auch gelöschte, damit die Zufallsfolge
+  und damit alle anderen Objekte gleich bleiben). Neue Objekttypen: in `FurniturePlacer/PropPlacer.BuildSingle` und `ObjectType.all` (Swift).
+- „In Unity übernehmen“ = `-executeMethod LeGamez.Editor.OsmImport.OsmAreaImporter.ImportAreaBatch -area <id>` (Unity-Editor muss zu sein).
+- Bauen/Installieren:
+  ```bash
+  cd Tools/MapEditor && xcodegen generate && xcodebuild -project NordischMapEditor.xcodeproj -scheme NordischMapEditor \
+    -configuration Release -derivedDataPath /tmp/NordischMapEditor-dd build && \
+    rm -rf "/Applications/Nordisch Map Editor.app" && cp -R "/tmp/NordischMapEditor-dd/Build/Products/Release/Nordisch Map Editor.app" /Applications/
+  ```
 
 ### Schnell eine Stadt ergänzen (Kurzfassung)
 ```bash

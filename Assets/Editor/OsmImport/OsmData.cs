@@ -33,6 +33,8 @@ namespace LeGamez.Editor.OsmImport
         public string id, name, ground, attribution;
         public double lat, lon;
         public float sizeM;
+        /// <summary>Playable rectangle in local metres (from "bounds" [xMin,xMax,zMin,zMax] or a centred size_m square).</summary>
+        public AreaRect bounds;
         public List<string> vehicles = new List<string>();
     }
 
@@ -66,6 +68,10 @@ namespace LeGamez.Editor.OsmImport
                 sizeM = (float)(double)m["size_m"],
             };
             foreach (var v in (List<object>)m["vehicles"]) data.meta.vehicles.Add((string)v);
+            if (m.TryGetValue("bounds", out var bObj) && bObj is List<object> bl && bl.Count == 4)
+                data.meta.bounds = new AreaRect((float)(double)bl[0], (float)(double)bl[1], (float)(double)bl[2], (float)(double)bl[3]);
+            else
+                data.meta.bounds = AreaRect.Square(data.meta.sizeM * 0.5f);
             data.projection = new GeoProjection(data.meta.lat, data.meta.lon);
 
             foreach (Dictionary<string, object> el in (List<object>)root["elements"])

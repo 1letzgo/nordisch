@@ -1,0 +1,5 @@
+{
+  "buildings": [
+    { "address": "Alte Weide 4", "wall": "#9E4834", "brick": true, "gableWindows": 2, "gableWindowFloor": 1 }
+  ]
+}

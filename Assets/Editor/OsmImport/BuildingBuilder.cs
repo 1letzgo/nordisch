@@ -9,7 +9,8 @@ namespace LeGamez.Editor.OsmImport
         const float LevelHeight = 3f;
         const float MaxPitchedArea = 260f;
 
-        public static int Build(OsmData data, MeshSink sink, float half, System.Random rng)
+        /// <param name="skip">Optional filter, e.g. <see cref="Lod2Builder.Covers"/> to only add buildings LoD2 lacks.</param>
+        public static int Build(OsmData data, MeshSink sink, AreaRect area, System.Random rng, System.Func<List<Vector2>, bool> skip = null)
         {
             // Outlines that contain building:part pieces are drawn via their parts instead.
             var partCentroids = new List<Vector2>();
@@ -24,7 +25,8 @@ namespace LeGamez.Editor.OsmImport
                 bool isBuilding = poly.tags.Has("building") && !poly.tags.Is("building", "no");
                 if (!isPart && !isBuilding) continue;
                 if (poly.tags.Is("location", "underground") || poly.tags.Is("building", "roof") && !isPart) continue;
-                if (!GeoUtil.Overlaps(poly.outer, half)) continue;
+                if (!area.Overlaps(poly.outer)) continue;
+                if (skip != null && skip(poly.outer)) continue;
 
                 if (!isPart && partCentroids.Count > 0)
                 {
@@ -65,6 +67,13 @@ namespace LeGamez.Editor.OsmImport
 
             var wallColor = WallStyleColor(tags, rng);
             var roofColor = WorldStyle.RoofColor(tags, rng, pitched);
+            // Hand tweaks (Data/<area>.buildings.json) – applied after the random picks so the sequence stays the same.
+            var custom = BuildingOverrides.Find(poly);
+            if (custom?.wall != null)
+            {
+                var w = custom.wall.Value;
+                wallColor = new Color32(w.r, w.g, w.b, custom.brick ? Lod2Builder.CodeBrick : (byte)255);
+            }
             var batch = sink.Get(WorldStyle.MatBuildings, GeoUtil.Centroid(outer));
             int firstVertex = batch.vertices.Count;
             bool windowed = HasWindows(tags, wallTop - minHeight);
@@ -94,7 +103,11 @@ namespace LeGamez.Editor.OsmImport
             }
 
             if (roofRect != null)
+            {
                 GabledRoof(batch, roofRect, wallTop, roofHeight, roofColor, wallColor, roofShape == "hipped");
+                if (custom != null && custom.gableWindows > 0)
+                    GableWindows(batch, roofRect, minHeight, wallTop, roofShape == "hipped" ? 0f : roofHeight, custom.gableWindows, custom.gableWindowFloor);
+            }
             else if (pitched && GeoUtil.IsConvex(outer))
                 PyramidRoof(batch, outer, wallTop, roofHeight, roofColor);
             else
@@ -259,6 +272,65 @@ namespace LeGamez.Editor.OsmImport
             // Gable ends: triangles in wall colour, hipped ends in roof colour.
             MeshSink.Tri(b, B, R1, C, hipped ? roof : wall);
             MeshSink.Tri(b, D, R0, A, hipped ? roof : wall);
+        }
+
+        static readonly Color32 WindowFrame = new Color32(238, 234, 226, 255);
+        static readonly Color32 WindowGlass = new Color32(68, 82, 94, 255);
+        const float WinWidth = 1.0f, WinHeight = 1.3f, WinSill = 0.9f, WinGap = 0.8f;
+
+        /// <summary>
+        /// <paramref name="count"/> windows centred side by side on both short (gable) walls of a ridge-roofed
+        /// rectangle, on floor <paramref name="floor"/>. Kept inside the gable triangle if they reach above the eaves.
+        /// </summary>
+        static void GableWindows(MeshSink.Batch b, List<Vector2> r, float y0, float wallTop, float roofHeight, int count, int floor)
+        {
+            if ((r[2] - r[1]).sqrMagnitude > (r[1] - r[0]).sqrMagnitude) r = new List<Vector2> { r[1], r[2], r[3], r[0] };
+            var centre = (r[0] + r[1] + r[2] + r[3]) * 0.25f;
+            float sill = y0 + floor * LevelHeight + WinSill;
+            // Never above what the wall + gable can hold.
+            float maxTop = wallTop + roofHeight * 0.55f;
+            if (sill + WinHeight > maxTop) sill = Mathf.Max(y0 + 0.5f, maxTop - WinHeight);
+            foreach (var (p, q) in new[] { (r[1], r[2]), (r[3], r[0]) })
+            {
+                Vector2 along = (q - p).normalized, mid = (p + q) * 0.5f;
+                Vector2 n2 = new Vector2(-along.y, along.x);
+                if (Vector2.Dot(n2, mid - centre) < 0f) n2 = -n2;
+                float halfLen = Vector2.Distance(p, q) * 0.5f;
+                Vector3 n = new Vector3(n2.x, 0f, n2.y), u = new Vector3(along.x, 0f, along.y);
+                for (int i = 0; i < count; i++)
+                {
+                    float offset = (i - (count - 1) * 0.5f) * (WinWidth + WinGap);
+                    float half = WinWidth * 0.5f;
+                    // Inside the gable triangle: available half-width shrinks with height above the eaves.
+                    float top = sill + WinHeight;
+                    if (top > wallTop && roofHeight > 0f)
+                    {
+                        float avail = halfLen * (1f - (top - wallTop) / roofHeight) - 0.15f;
+                        if (Mathf.Abs(offset) + half > avail) continue;
+                    }
+                    var c = V(mid, 0f) + u * offset + n * 0.03f;
+                    Window(b, c, u, n, sill);
+                }
+            }
+        }
+
+        /// <summary>Frame, glass and a mullion cross, slightly proud of the wall (normal <paramref name="n"/>).</summary>
+        static void Window(MeshSink.Batch b, Vector3 c, Vector3 u, Vector3 n, float sill)
+        {
+            void Rect(float x0, float x1, float yA, float yB, float out_, Color32 col)
+            {
+                Vector3 o = c + n * out_;
+                Vector3 p0 = o + u * x0 + Vector3.up * yA, p1 = o + u * x0 + Vector3.up * yB;
+                Vector3 p2 = o + u * x1 + Vector3.up * yB, p3 = o + u * x1 + Vector3.up * yA;
+                if (Vector3.Dot(Vector3.Cross(p1 - p0, p2 - p0), n) < 0f) { var t = p0; p0 = p3; p3 = t; t = p1; p1 = p2; p2 = t; }
+                MeshSink.Quad(b, p0, p1, p2, p3, col);
+            }
+            float h = WinWidth * 0.5f, f = 0.08f, m = 0.035f;
+            Rect(-h, h, sill, sill + WinHeight, 0f, WindowFrame);
+            Rect(-h + f, h - f, sill + f, sill + WinHeight - f, 0.01f, WindowGlass);
+            Rect(-m, m, sill + f, sill + WinHeight - f, 0.02f, WindowFrame);                        // vertical bar
+            float mid = sill + WinHeight * 0.62f;
+            Rect(-h + f, h - f, mid - m, mid + m, 0.02f, WindowFrame);                               // transom
         }
 
         static Vector3 V(Vector2 p, float y) => new Vector3(p.x, y, p.y);

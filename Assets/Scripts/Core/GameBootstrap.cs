@@ -32,7 +32,7 @@ namespace LeGamez.Core
             Vector3 saved = default;
             float savedYaw = 0f;
             if (area != null && PositionMemory.TryLoad(area.MemoryKey, out saved, out savedYaw)
-                && Mathf.Abs(saved.x) < area.HalfSize - 2f && Mathf.Abs(saved.z) < area.HalfSize - 2f)
+                && area.Contains(saved, 2f))
             {
                 // Re-validate: data may have changed since saving (new buildings, terrain, props).
                 Placement.TryFindFreeGround(saved, null, out var safe, 20f);

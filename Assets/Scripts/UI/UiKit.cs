@@ -24,7 +24,7 @@ namespace LeGamez.UI
 
         // ---------------------------------------------------------------- icons
 
-        public enum IconKind { Jump, Run, Bike, Walk, BikeFast }
+        public enum IconKind { Jump, Run, Bike, Walk, BikeFast, Car, CarFast }
 
         static readonly System.Collections.Generic.Dictionary<IconKind, Sprite> icons = new System.Collections.Generic.Dictionary<IconKind, Sprite>();
 
@@ -85,6 +85,28 @@ namespace LeGamez.UI
                     S(2, 34, 11, 34, 3.5f);
                     S(4, 26, 12, 26, 3.5f);
                     break;
+                case IconKind.Car:
+                case IconKind.CarFast:
+                {
+                    // Side view hatchback: body outline, roof, two wheels; fast variant with speed lines.
+                    float ox = kind == IconKind.CarFast ? 6f : 0f;
+                    S(8 + ox, 22, 56 + ox, 22, 4f);           // sill
+                    S(8 + ox, 22, 8 + ox, 32, 4f);            // rear
+                    S(56 + ox, 22, 56 + ox, 30, 4f);          // front
+                    S(8 + ox, 32, 18 + ox, 32, 4f);           // rear deck
+                    S(18 + ox, 32, 24 + ox, 42, 4f);          // rear pillar
+                    S(24 + ox, 42, 40 + ox, 42, 4f);          // roof
+                    S(40 + ox, 42, 47 + ox, 32, 4f);          // windscreen
+                    S(47 + ox, 32, 56 + ox, 30, 4f);          // bonnet
+                    Ring(strokes, new Vector2(19 + ox, 20), 6f, 4f);
+                    Ring(strokes, new Vector2(46 + ox, 20), 6f, 4f);
+                    if (kind == IconKind.CarFast)
+                    {
+                        S(0, 36, 8, 36, 3.5f);
+                        S(2, 28, 9, 28, 3.5f);
+                    }
+                    break;
+                }
                 case IconKind.Walk:
                     // Walking figure (calm, upright) – "get off the bike".
                     dots.Add((new Vector2(34, 54), 5.5f));
@@ -97,6 +119,22 @@ namespace LeGamez.UI
                     S(26, 16, 20, 9, 5f);
                     break;
             }
+            // Centre the pictogram on its actual ink extent (strokes + dots), not on the drawing grid.
+            float minX = float.MaxValue, maxX = float.MinValue, minY = float.MaxValue, maxY = float.MinValue;
+            foreach (var (a, b, w) in strokes)
+            {
+                minX = Mathf.Min(minX, Mathf.Min(a.x, b.x) - w / 2); maxX = Mathf.Max(maxX, Mathf.Max(a.x, b.x) + w / 2);
+                minY = Mathf.Min(minY, Mathf.Min(a.y, b.y) - w / 2); maxY = Mathf.Max(maxY, Mathf.Max(a.y, b.y) + w / 2);
+            }
+            foreach (var (c, r) in dots)
+            {
+                minX = Mathf.Min(minX, c.x - r); maxX = Mathf.Max(maxX, c.x + r);
+                minY = Mathf.Min(minY, c.y - r); maxY = Mathf.Max(maxY, c.y + r);
+            }
+            var shift = new Vector2(32f - (minX + maxX) * 0.5f, 32f - (minY + maxY) * 0.5f);
+            for (int i = 0; i < strokes.Count; i++) strokes[i] = (strokes[i].a + shift, strokes[i].b + shift, strokes[i].w);
+            for (int i = 0; i < dots.Count; i++) dots[i] = (dots[i].c + shift, dots[i].r);
+
             const int size = 128;
             const float scale = size / 64f;
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };

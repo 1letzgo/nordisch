@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using LeGamez.Core;
+using LeGamez.UI;
 using UnityEngine;
 
 namespace LeGamez.Vehicles
@@ -8,15 +9,23 @@ namespace LeGamez.Vehicles
     /// Low-poly bicycle (procedural mesh, brand colours). Parked it just stands there; while ridden it is
     /// parented to the player, spins its wheels with speed and leans into turns.
     /// </summary>
-    public class Bicycle : MonoBehaviour
+    public class Bicycle : Vehicle
     {
+        public override float CruiseSpeed => 7.5f;
+        public override float SprintSpeed => 11f;
+        public override float TurnSmoothTime => 0.2f;
+        public override float CameraBonus => 1.5f;
+        public override int AvatarMode => 2;
+        public override Vector3 SeatOffset => new Vector3(0, 0.52f, -0.12f);
+        public override UiKit.IconKind MountIcon => UiKit.IconKind.Bike;
+        public override UiKit.IconKind SprintIcon => UiKit.IconKind.BikeFast;
+
         const float WheelRadius = 0.34f;
         const float WheelBase = 1.05f;
 
         Transform frontWheel, rearWheel, body;
         float lean, leanVel;
         float lastYaw;
-        public bool Ridden { get; private set; }
 
         static Mesh frameMesh, wheelMesh;
 
@@ -33,8 +42,7 @@ namespace LeGamez.Vehicles
 
             bike.frontWheel = Wheel(bike.body, new Vector3(0, WheelRadius, WheelBase * 0.5f), mat);
             bike.rearWheel = Wheel(bike.body, new Vector3(0, WheelRadius, -WheelBase * 0.5f), mat);
-            // "Ignore Raycast": the camera probe must not zoom in on the bike under the player.
-            foreach (var t in root.GetComponentsInChildren<Transform>()) t.gameObject.layer = 2;
+            SetLayerRecursive(root);
             return bike;
         }
 
@@ -54,26 +62,20 @@ namespace LeGamez.Vehicles
             r.sharedMaterial = mat;
         }
 
-        public void Mount(Transform rider)
+        public override void Mount(Transform rider)
         {
-            Ridden = true;
-            transform.SetParent(rider, false);
-            transform.localPosition = Vector3.zero;
-            transform.localRotation = Quaternion.identity;
+            base.Mount(rider);
             lastYaw = rider.eulerAngles.y;
         }
 
-        public void Dismount(Vector3 parkPosition)
+        public override void Dismount(Vector3 parkPosition)
         {
-            Ridden = false;
-            var yaw = transform.eulerAngles.y;
-            transform.SetParent(null, true);
-            transform.SetPositionAndRotation(parkPosition, Quaternion.Euler(0, yaw, 0));
+            base.Dismount(parkPosition);
             body.localRotation = Quaternion.Euler(0, 0, 8f); // resting on its kickstand
         }
 
         /// <summary>Called by the rider each frame with the current ground speed.</summary>
-        public void Animate(float speed)
+        public override void Animate(float speed)
         {
             float spin = speed / WheelRadius * Mathf.Rad2Deg * Time.deltaTime;
             frontWheel.Rotate(spin, 0, 0, Space.Self);

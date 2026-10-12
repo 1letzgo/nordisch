@@ -11,10 +11,10 @@ namespace LeGamez.Core
         public string areaId;
         float timer;
 
-        /// <summary>Set by the vehicle system so the riding state survives leaving the area.</summary>
-        public static System.Func<bool> IsRiding;
+        /// <summary>Set by the vehicle system: 0 = on foot, 1 = bicycle, 2 = car.</summary>
+        public static System.Func<int> RidingKind;
 
-        public static bool WasRiding(string areaId) => PlayerPrefs.GetInt(Key(areaId) + ".ride", 0) == 1;
+        public static int LastRidingKind(string areaId) => PlayerPrefs.GetInt(Key(areaId) + ".ride", 0);
 
         static string Key(string areaId) => "legamez.pos." + areaId;
 
@@ -42,7 +42,7 @@ namespace LeGamez.Core
             var ci = CultureInfo.InvariantCulture;
             PlayerPrefs.SetString(Key(areaId),
                 string.Join(";", p.x.ToString("F2", ci), p.y.ToString("F2", ci), p.z.ToString("F2", ci), transform.eulerAngles.y.ToString("F1", ci)));
-            PlayerPrefs.SetInt(Key(areaId) + ".ride", IsRiding != null && IsRiding() ? 1 : 0);
+            PlayerPrefs.SetInt(Key(areaId) + ".ride", RidingKind != null ? RidingKind() : 0);
             PlayerPrefs.Save();
         }
 

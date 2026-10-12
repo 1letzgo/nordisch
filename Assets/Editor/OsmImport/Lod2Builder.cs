@@ -31,17 +31,26 @@ namespace LeGamez.Editor.OsmImport
             public bool chimney;
         }
 
-        public static bool TryBuild(string lod2Path, OsmData data, MeshSink sink, float half, bool island, out int count)
+        // Footprint hulls of every LoD2 building from the last TryBuild, bucketed on a grid for Covers().
+        const float CoverCell = 25f;
+        static readonly List<List<Vector2>> hulls = new List<List<Vector2>>();
+        static readonly List<Rect> hullBounds = new List<Rect>();
+        static readonly Dictionary<Vector2Int, List<int>> hullGrid = new Dictionary<Vector2Int, List<int>>();
+
+        public static bool TryBuild(string lod2Path, OsmData data, MeshSink sink, AreaRect area, bool island, out int count)
         {
             count = 0;
+            hulls.Clear();
+            hullBounds.Clear();
+            hullGrid.Clear();
             if (!File.Exists(lod2Path)) return false;
             var root = (Dictionary<string, object>)MiniJson.Parse(File.ReadAllText(lod2Path));
             foreach (Dictionary<string, object> b in (List<object>)root["buildings"])
-                if (BuildOne(b, sink, half, island)) count++;
+                if (BuildOne(b, sink, area, island)) count++;
             return true;
         }
 
-        static bool BuildOne(Dictionary<string, object> b, MeshSink sink, float half, bool island)
+        static bool BuildOne(Dictionary<string, object> b, MeshSink sink, AreaRect area, bool island)
         {
             string id = b.TryGetValue("id", out var idObj) ? (string)idObj : "";
             var rng = new System.Random(id.GetHashCode());
@@ -60,7 +69,7 @@ namespace LeGamez.Editor.OsmImport
             }
             if (n == 0) return false;
             Vector3 centre = sum / n;
-            if (Mathf.Abs(centre.x) > half + 20f || Mathf.Abs(centre.z) > half + 20f) return false;
+            if (!area.Contains(new Vector2(centre.x, centre.z), -20f)) return false;
 
             var use = Classify(b.TryGetValue("function", out var f) ? (string)f : null);
             var style = PickStyle(use, island, rng, maxY);
@@ -71,6 +80,7 @@ namespace LeGamez.Editor.OsmImport
             foreach (var (_, ring, _) in surfaces) foreach (var p in ring) if (p.y < 0.5f) footprint.Add(new Vector2(p.x, p.z));
             if (footprint.Count == 0) footprint.Add(new Vector2(centre.x, centre.z));
             float groundY = TerrainField.Current.MinUnder(footprint);
+            AddHull(footprint);
 
             // Some datasets wind wall rings inwards – detect per building and flip if needed.
             int agree = 0, walls = 0;
@@ -126,6 +136,70 @@ namespace LeGamez.Editor.OsmImport
                 Chimney(batch, Vector3.Lerp(ridgeA, ridgeB, 0.25f + (float)rng.NextDouble() * 0.5f), rng);
             TerrainDrape.Offset(batch, firstVertex, groundY);
             return true;
+        }
+
+        /// <summary>
+        /// True if a LoD2 building already stands on this OSM footprint (centroid inside a LoD2 hull, or a hull
+        /// corner inside the outline). Used to add only OSM houses that LoD2 lacks, e.g. new estates.
+        /// </summary>
+        public static bool Covers(List<Vector2> osmOuter)
+        {
+            var ring = PolygonTriangulator.Clean(osmOuter);
+            if (ring.Count < 3) return true;
+            var c = GeoUtil.Centroid(ring);
+            var bb = GeoUtil.Bounds(ring);
+            var seen = new HashSet<int>();
+            for (int gx = Mathf.FloorToInt(bb.xMin / CoverCell); gx <= Mathf.FloorToInt(bb.xMax / CoverCell); gx++)
+            for (int gz = Mathf.FloorToInt(bb.yMin / CoverCell); gz <= Mathf.FloorToInt(bb.yMax / CoverCell); gz++)
+            {
+                if (!hullGrid.TryGetValue(new Vector2Int(gx, gz), out var list)) continue;
+                foreach (int i in list)
+                {
+                    if (!seen.Add(i) || !hullBounds[i].Overlaps(bb)) continue;
+                    if (OsmData.PointInRing(c, hulls[i])) return true;
+                    foreach (var p in hulls[i]) if (OsmData.PointInRing(p, ring)) return true;
+                }
+            }
+            return false;
+        }
+
+        static void AddHull(List<Vector2> pts)
+        {
+            var hull = ConvexHull(pts);
+            if (hull.Count < 3) return;
+            int index = hulls.Count;
+            var bb = GeoUtil.Bounds(hull);
+            hulls.Add(hull);
+            hullBounds.Add(bb);
+            for (int gx = Mathf.FloorToInt(bb.xMin / CoverCell); gx <= Mathf.FloorToInt(bb.xMax / CoverCell); gx++)
+            for (int gz = Mathf.FloorToInt(bb.yMin / CoverCell); gz <= Mathf.FloorToInt(bb.yMax / CoverCell); gz++)
+            {
+                var key = new Vector2Int(gx, gz);
+                if (!hullGrid.TryGetValue(key, out var list)) hullGrid[key] = list = new List<int>();
+                list.Add(index);
+            }
+        }
+
+        /// <summary>Andrew's monotone chain.</summary>
+        static List<Vector2> ConvexHull(List<Vector2> pts)
+        {
+            var p = new List<Vector2>(pts);
+            p.Sort((a, b) => a.x != b.x ? a.x.CompareTo(b.x) : a.y.CompareTo(b.y));
+            if (p.Count < 3) return p;
+            float Cross(Vector2 o, Vector2 a, Vector2 b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+            var h = new List<Vector2>();
+            for (int pass = 0; pass < 2; pass++)
+            {
+                int start = h.Count;
+                for (int k = 0; k < p.Count; k++)
+                {
+                    var q = pass == 0 ? p[k] : p[p.Count - 1 - k];
+                    while (h.Count >= start + 2 && Cross(h[h.Count - 2], h[h.Count - 1], q) <= 0) h.RemoveAt(h.Count - 1);
+                    h.Add(q);
+                }
+                h.RemoveAt(h.Count - 1);
+            }
+            return h;
         }
 
         static List<Vector3> ReadRing(List<object> pts)

@@ -16,6 +16,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from area_bounds import latlon_bbox, local_bounds
+
 ROOT = Path(__file__).resolve().parents[2]
 AREAS_FILE = Path(__file__).with_name("areas.json")
 OUT_DIR = ROOT / "Data"
@@ -98,12 +100,13 @@ def main(argv):
     for a in areas:
         if wanted and a["id"] not in wanted:
             continue
-        s, w, n, e = bbox(a["lat"], a["lon"], a["size_m"])
+        s, w, n, e = latlon_bbox(a)
         print(f"[{a['id']}] bbox {s:.5f},{w:.5f},{n:.5f},{e:.5f} …", flush=True)
         result = fetch(build_query(s, w, n, e))
         result["legamez"] = {
             "id": a["id"], "name": a["name"], "center": [a["lat"], a["lon"]],
-            "bbox": [s, w, n, e], "size_m": a["size_m"], "vehicles": a["vehicles"], "ground": a.get("ground", "grass"),
+            "bbox": [s, w, n, e], "size_m": a["size_m"], "bounds": list(local_bounds(a)),
+            "vehicles": a["vehicles"], "ground": a.get("ground", "grass"),
             "attribution": "© OpenStreetMap contributors (ODbL)",
         }
         out = OUT_DIR / f"{a['id']}.osm.json"

@@ -47,6 +47,7 @@ namespace LeGamez.UI
         string pillText;
         float radius;
         float pixelsPerMeter;
+        Vector2 mapCenter;
         readonly List<(PoiEntry poi, Image dot)> dots = new List<(PoiEntry, Image)>();
         AreaInfo area;
 
@@ -76,8 +77,9 @@ namespace LeGamez.UI
 
             rotator = UiKit.Rect("Rotator", mask, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             var tex = area != null ? Resources.Load<Texture2D>("AreaMaps/" + area.areaId) : null;
-            float extent = area != null ? area.HalfSize + 60f : 560f;
-            map = UiKit.Rect("Map", rotator, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.one * extent * 2f * pixelsPerMeter);
+            mapCenter = area != null ? area.BoundsCenter : Vector2.zero;
+            Vector2 mapSize = area != null ? area.MapSize : new Vector2(1120f, 1120f);
+            map = UiKit.Rect("Map", rotator, new Vector2(0.5f, 0.5f), Vector2.zero, mapSize * pixelsPerMeter);
             var raw = map.gameObject.AddComponent<RawImage>();
             raw.texture = tex;
             raw.color = tex != null ? Color.white : new Color(0.6f, 0.75f, 0.55f);
@@ -87,7 +89,7 @@ namespace LeGamez.UI
             {
                 foreach (var poi in area.pois.entries)
                 {
-                    var d = UiKit.Rect("Poi", map, new Vector2(0.5f, 0.5f), new Vector2(poi.position.x, poi.position.z) * pixelsPerMeter, new Vector2(18, 18));
+                    var d = UiKit.Rect("Poi", map, new Vector2(0.5f, 0.5f), (new Vector2(poi.position.x, poi.position.z) - mapCenter) * pixelsPerMeter, new Vector2(18, 18));
                     var img = UiKit.Panel(d.gameObject, Color.white, UiKit.Circle);
                     img.raycastTarget = false;
                     dots.Add((poi, img));
@@ -134,7 +136,7 @@ namespace LeGamez.UI
 
             // Heading-up: rotate the world opposite to the camera.
             rotator.localRotation = Quaternion.Euler(0, 0, viewYaw);
-            map.anchoredPosition = -new Vector2(p.x, p.z) * pixelsPerMeter;
+            map.anchoredPosition = -(new Vector2(p.x, p.z) - mapCenter) * pixelsPerMeter;
             playerArrow.localRotation = Quaternion.Euler(0, 0, viewYaw - NavState.Player.eulerAngles.y);
 
             float pulse = 1f + Mathf.Sin(Time.time * 6f) * 0.25f;

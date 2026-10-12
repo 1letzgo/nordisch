@@ -56,6 +56,17 @@ namespace LeGamez.Editor.OsmImport
             AssetDatabase.SaveAssets();
         }
 
+        /// <summary>Re-imports one area (map editor): Unity -batchmode … -executeMethod …ImportAreaBatch -area &lt;id&gt;</summary>
+        public static void ImportAreaBatch()
+        {
+            var args = System.Environment.GetCommandLineArgs();
+            int i = System.Array.IndexOf(args, "-area");
+            if (i < 0 || i + 1 >= args.Length) throw new System.ArgumentException("missing -area <id>");
+            ImportArea(Path.Combine(DataDir, args[i + 1] + ".osm.json"));
+            SceneSnapshot.RenderThumbnails();
+            AssetDatabase.SaveAssets();
+        }
+
         const string MenuScenePath = "Assets/Scenes/MainMenu.unity";
 
         [MenuItem("LeGamez/Create Main Menu Scene")]
@@ -106,24 +117,31 @@ namespace LeGamez.Editor.OsmImport
             var sw = Stopwatch.StartNew();
             var data = OsmData.Load(jsonPath);
             var meta = data.meta;
-            float half = meta.sizeM * 0.5f;
+            var area = meta.bounds;
             var rng = new System.Random(meta.id.GetHashCode());
 
             var terrain = TerrainField.Load(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".dgm.bin"));
             var sink = new MeshSink();
-            GroundBuilder.BuildBase(sink, half, WorldStyle.GroundColor(meta.ground), terrain);
-            GroundBuilder.BuildAreas(data, sink, half);
-            int lines = GroundBuilder.BuildLines(data, sink, half);
+            GroundBuilder.BuildBase(sink, area, WorldStyle.GroundColor(meta.ground), terrain);
+            GroundBuilder.BuildAreas(data, sink, area);
+            int lines = GroundBuilder.BuildLines(data, sink, area);
             // Prefer official LGLN LoD2 buildings (real roof shapes); fall back to OSM extrusion.
             string lod2Path = Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".lod2.json");
             bool island = meta.ground == "sand";
-            bool hasLod2 = Lod2Builder.TryBuild(lod2Path, data, sink, half, island, out int buildings);
-            if (!hasLod2) buildings = BuildingBuilder.Build(data, sink, half, rng);
-            int trees = PropPlacer.PlaceTrees(data, sink, half, rng);
-            int lamps = PropPlacer.PlaceStreetLamps(data, sink, half);
-            int barriers = GroundBuilder.BuildBarriers(data, sink, half);
-            var furniture = FurniturePlacer.Place(data, sink, half, rng);
-            var pois = PoiExtractor.Extract(data, half);
+            BuildingOverrides.Load(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".buildings.json"));
+            bool hasLod2 = Lod2Builder.TryBuild(lod2Path, data, sink, area, island, out int buildings);
+            if (!hasLod2) buildings = BuildingBuilder.Build(data, sink, area, rng);
+            // LoD2 lags behind reality (new estates): extrude the OSM houses it doesn't have. Own random
+            // generator, so the shared sequence – and with it all generated object ids – stays unchanged.
+            int osmExtra = hasLod2 ? BuildingBuilder.Build(data, sink, area, new System.Random(meta.id.GetHashCode() ^ 0x0B5D), Lod2Builder.Covers) : 0;
+            BuildingOverrides.ReportUnused();
+            EditsPlacer.Begin(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".edits.json"));
+            int trees = PropPlacer.PlaceTrees(data, sink, area, rng);
+            int lamps = PropPlacer.PlaceStreetLamps(data, sink, area);
+            int barriers = GroundBuilder.BuildBarriers(data, sink, area);
+            var furniture = FurniturePlacer.Place(data, sink, area, rng);
+            int edits = EditsPlacer.PlaceNew(sink, area);
+            var pois = PoiExtractor.Extract(data, area);
             foreach (var poi in pois) poi.position.y = terrain.Height(poi.position.x, poi.position.z);
 
             // Fit everything onto the terrain: overlays are cut & draped, small objects lifted.
@@ -136,6 +154,7 @@ namespace LeGamez.Editor.OsmImport
 
             string areaDir = $"{GeneratedRoot}/{meta.id}";
             EnsureFolder(areaDir);
+            EditsPlacer.SaveRecords($"{areaDir}/{meta.id}_objects.json"); // object list for the map editor
             EnsureFolder(AreaScenesDir);
             var materials = EnsureMaterials();
 
@@ -185,7 +204,7 @@ namespace LeGamez.Editor.OsmImport
                 GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccluderStatic | StaticEditorFlags.OccludeeStatic);
             }
 
-            AddGroundAndBounds(worldRoot.transform, half);
+            AddGroundAndBounds(worldRoot.transform, area);
             AddLighting(EnsureSkyMaterial());
 
             // POI database asset.
@@ -200,7 +219,7 @@ namespace LeGamez.Editor.OsmImport
             EditorUtility.SetDirty(poiDb);
 
             var spawn = new GameObject("SpawnPoint").transform;
-            var spawnXZ = FindSpawn(data, half);
+            var spawnXZ = FindSpawn(data, area);
             spawn.position = new Vector3(spawnXZ.x, terrain.Height(spawnXZ.x, spawnXZ.z) + 0.2f, spawnXZ.z);
 
             var areaGo = new GameObject("Area");
@@ -208,11 +227,14 @@ namespace LeGamez.Editor.OsmImport
             info.areaId = meta.id;
             info.displayName = meta.name;
             info.projection = data.projection;
-            info.sizeMeters = meta.sizeM;
+            info.sizeMeters = Mathf.Max(area.Width, area.Height);
+            info.boundsMin = new Vector2(area.xMin, area.zMin);
+            info.boundsMax = new Vector2(area.xMax, area.zMax);
             info.allowedVehicles = new List<string>(meta.vehicles);
             info.pois = poiDb;
             info.spawnPoint = spawn;
-            info.bikeSpots = BikeSpots(data, half, terrain);
+            info.bikeSpots = BikeSpots(data, area, terrain);
+            info.carSpots = CarSpots(data, area, terrain);
             var spawn2 = new Vector2(spawn.position.x, spawn.position.z);
             var bikeSpot = FreeBikeSpot(data, spawn2, NearbyBuildings(data, spawn2, 15f));
             info.spawnBikeSpot = bikeSpot.HasValue
@@ -229,13 +251,13 @@ namespace LeGamez.Editor.OsmImport
             UpdateCatalog(meta, pois.Count);
             AssetDatabase.SaveAssets();
 
-            Debug.Log($"[OSM] {meta.name}: {buildings} buildings, {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, terrain {(terrain.IsFlat ? "flat" : "DGM1")}, " +
-                      $"furniture {furniture.mapped} mapped/{furniture.benches} benches/{furniture.planters} planters/{furniture.seating} café tables/{furniture.fountains} fountains, {pois.Count} POIs, " +
+            Debug.Log($"[OSM] {meta.name}: {buildings} buildings (+{osmExtra} OSM-only), {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, terrain {(terrain.IsFlat ? "flat" : "DGM1")}, " +
+                      $"furniture {furniture.mapped} mapped/{furniture.benches} benches/{furniture.planters} planters/{furniture.seating} café tables/{furniture.fountains} fountains, {edits} hand-placed/{EditsPlacer.ChangedCount} edited, {pois.Count} POIs, " +
                       $"{sink.Batches.Count()} meshes in {sw.ElapsedMilliseconds} ms -> {scenePath}");
             return scenePath;
         }
 
-        static Vector3 FindSpawn(OsmData data, float half)
+        static Vector3 FindSpawn(OsmData data, AreaRect area)
         {
             // Walkable way vertex near the centre with open space around it (no narrow alleys,
             // never inside a building). Wider street types are preferred.
@@ -333,15 +355,63 @@ namespace LeGamez.Editor.OsmImport
             return list;
         }
 
+        /// <summary>
+        /// Cars from "car_spots" ([{lat, lon}]) of this area in Tools/osm/areas.json – e.g. a house address.
+        /// Each is moved to the edge of the nearest drivable street and lined up with it.
+        /// </summary>
+        static List<Vector4> CarSpots(OsmData data, AreaRect area, TerrainField terrain)
+        {
+            var result = new List<Vector4>();
+            string areasPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Tools", "osm", "areas.json"));
+            if (!File.Exists(areasPath)) return result;
+            var root = (Dictionary<string, object>)MiniJson.Parse(File.ReadAllText(areasPath));
+            foreach (Dictionary<string, object> a in (List<object>)root["areas"])
+            {
+                if ((string)a["id"] != data.meta.id || !a.TryGetValue("car_spots", out var spotsObj)) continue;
+                foreach (Dictionary<string, object> spot in (List<object>)spotsObj)
+                {
+                    var want = data.projection.ToLocal((double)spot["lat"], (double)spot["lon"]);
+                    if (!area.Contains(want, 5f)) continue;
+                    // Nearest drivable street segment within 60 m.
+                    float best = 60f;
+                    Vector2 bestQ = want, bestDir = Vector2.up;
+                    float bestHalfWidth = 3f;
+                    foreach (var w in data.ways)
+                    {
+                        var hw = w.tags.Get("highway");
+                        if (hw != "residential" && hw != "unclassified" && hw != "living_street" && hw != "service" &&
+                            hw != "tertiary" && hw != "secondary") continue;
+                        float halfWidth = hw == "service" ? 2f : hw == "tertiary" || hw == "secondary" ? 4f : 3f;
+                        for (int i = 0; i < w.points.Count - 1; i++)
+                        {
+                            Vector2 p0 = w.points[i], p1 = w.points[i + 1], ab = p1 - p0;
+                            float t = Mathf.Clamp01(Vector2.Dot(want - p0, ab) / Mathf.Max(1e-5f, ab.sqrMagnitude));
+                            var q = p0 + ab * t;
+                            float d = Vector2.Distance(want, q);
+                            if (d < best) { best = d; bestQ = q; bestDir = ab.normalized; bestHalfWidth = halfWidth; }
+                        }
+                    }
+                    // Park at the kerb on the address' side of the street, nose along the street.
+                    var side = want - bestQ;
+                    var normal = new Vector2(-bestDir.y, bestDir.x);
+                    if (side.sqrMagnitude > 0.01f && Vector2.Dot(normal, side) < 0) normal = -normal;
+                    var pos = bestQ + normal * (bestHalfWidth - 1.0f);
+                    float yaw = Mathf.Atan2(bestDir.x, bestDir.y) * Mathf.Rad2Deg;
+                    result.Add(new Vector4(pos.x, terrain.Height(pos.x, pos.y), pos.y, yaw));
+                }
+            }
+            return result;
+        }
+
         /// <summary>Up to 40 bicycle parkings, at least 40 m apart, as places for parked bikes.</summary>
-        static List<Vector3> BikeSpots(OsmData data, float half, TerrainField terrain)
+        static List<Vector3> BikeSpots(OsmData data, AreaRect area, TerrainField terrain)
         {
             var spots = new List<Vector3>();
             foreach (var n in data.nodes)
             {
                 if (!n.tags.Is("amenity", "bicycle_parking")) continue;
                 var p = data.projection.ToLocal(n.lat, n.lon);
-                if (Mathf.Abs(p.x) > half - 5 || Mathf.Abs(p.y) > half - 5) continue;
+                if (!area.Contains(p, 5f)) continue;
                 bool near = false;
                 foreach (var s in spots) if ((new Vector2(s.x, s.z) - p).sqrMagnitude < 40f * 40f) { near = true; break; }
                 if (near) continue;
@@ -372,22 +442,23 @@ namespace LeGamez.Editor.OsmImport
             return min;
         }
 
-        static void AddGroundAndBounds(Transform root, float half)
+        static void AddGroundAndBounds(Transform root, AreaRect area)
         {
+            var c = area.Center;
             var ground = new GameObject("GroundCollider");
             ground.transform.SetParent(root, false);
             var box = ground.AddComponent<BoxCollider>();
-            box.size = new Vector3(half * 2f + 120f, 1f, half * 2f + 120f);
-            box.center = new Vector3(0f, -6f, 0f); // safety net below the terrain mesh collider
+            box.size = new Vector3(area.Width + 120f, 1f, area.Height + 120f);
+            box.center = new Vector3(c.x, -6f, c.y); // safety net below the terrain mesh collider
 
             var bounds = new GameObject("AreaBounds");
             bounds.transform.SetParent(root, false);
-            const float height = 60f, thickness = 2f;
-            float size = half * 2f;
-            AddWall(bounds.transform, new Vector3(0, height / 2, half + thickness / 2), new Vector3(size + thickness * 2, height, thickness));
-            AddWall(bounds.transform, new Vector3(0, height / 2, -half - thickness / 2), new Vector3(size + thickness * 2, height, thickness));
-            AddWall(bounds.transform, new Vector3(half + thickness / 2, height / 2, 0), new Vector3(thickness, height, size));
-            AddWall(bounds.transform, new Vector3(-half - thickness / 2, height / 2, 0), new Vector3(thickness, height, size));
+            const float height = 60f, t = 2f;
+            float w = area.Width, h = area.Height;
+            AddWall(bounds.transform, new Vector3(c.x, height / 2, area.zMax + t / 2), new Vector3(w + t * 2, height, t));
+            AddWall(bounds.transform, new Vector3(c.x, height / 2, area.zMin - t / 2), new Vector3(w + t * 2, height, t));
+            AddWall(bounds.transform, new Vector3(area.xMax + t / 2, height / 2, c.y), new Vector3(t, height, h));
+            AddWall(bounds.transform, new Vector3(area.xMin - t / 2, height / 2, c.y), new Vector3(t, height, h));
         }
 
         static void AddWall(Transform parent, Vector3 center, Vector3 size)

@@ -13,20 +13,20 @@ namespace LeGamez.Editor.OsmImport
             public string mat;
         }
 
-        public static void BuildAreas(OsmData data, MeshSink sink, float half)
+        public static void BuildAreas(OsmData data, MeshSink sink, AreaRect area)
         {
             foreach (var poly in data.polygons)
             {
                 if (poly.tags.Has("building") || poly.tags.Has("building:part")) continue;
                 if (!TryAreaStyle(poly.tags, out var style)) continue;
-                if (!GeoUtil.Overlaps(poly.outer, half)) continue;
+                if (!area.Overlaps(poly.outer)) continue;
 
-                var outer = GeoUtil.ClipToSquare(PolygonTriangulator.Clean(poly.outer), half);
+                var outer = area.Clip(PolygonTriangulator.Clean(poly.outer));
                 if (outer.Count < 3) continue;
                 var holes = new List<List<Vector2>>();
                 foreach (var h in poly.holes)
                 {
-                    var ch = GeoUtil.ClipToSquare(PolygonTriangulator.Clean(h), half);
+                    var ch = area.Clip(PolygonTriangulator.Clean(h));
                     if (ch.Count >= 3) holes.Add(ch);
                 }
                 if (!PolygonTriangulator.Triangulate(outer, holes, out var verts, out var tris)) continue;
@@ -84,19 +84,26 @@ namespace LeGamez.Editor.OsmImport
             public bool marking;
         }
 
-        public static int BuildLines(OsmData data, MeshSink sink, float half)
+        public static int BuildLines(OsmData data, MeshSink sink, AreaRect area)
         {
             int count = 0;
             foreach (var way in data.ways)
             {
                 if (way.tags.Is("area", "yes") || way.tags.Is("tunnel", "yes") || way.tags.Has("tunnel") && !way.tags.Is("tunnel", "no")) continue;
                 if (!TryLineStyle(way.tags, out var style)) continue;
-                if (!GeoUtil.Overlaps(way.points, half + 20f)) continue;
-                Ribbon(sink, way.points, style, half);
-                if (style.marking) DashedLine(sink, way.points, half, style.y + 0.012f);
+                if (!area.Overlaps(way.points, 20f)) continue;
+                Ribbon(sink, way.points, style, area);
+                if (style.marking) DashedLine(sink, way.points, area, style.y + 0.012f);
                 count++;
             }
             return count;
+        }
+
+        /// <summary>Drawn width of a road/path/rail/waterway ribbon (0 = not drawn), for keeping props off it.</summary>
+        public static float LineWidth(Dictionary<string, string> t)
+        {
+            if (t.Is("area", "yes") || t.Has("tunnel") && !t.Is("tunnel", "no")) return 0f;
+            return TryLineStyle(t, out var s) ? s.width : 0f;
         }
 
         static bool TryLineStyle(Dictionary<string, string> t, out LineStyle s)
@@ -145,13 +152,13 @@ namespace LeGamez.Editor.OsmImport
             return true;
         }
 
-        static void Ribbon(MeshSink sink, List<Vector2> pts, LineStyle style, float half)
+        static void Ribbon(MeshSink sink, List<Vector2> pts, LineStyle style, AreaRect area)
         {
             float hw = style.width * 0.5f;
             for (int i = 0; i < pts.Count - 1; i++)
             {
                 Vector2 a = pts[i], b = pts[i + 1];
-                if (!ClipSegment(ref a, ref b, half)) continue; // segment fully outside the area
+                if (!area.ClipSegment(ref a, ref b)) continue; // segment fully outside the area
                 Vector2 dir = b - a;
                 if (dir.sqrMagnitude < 1e-4f) continue;
                 dir.Normalize();
@@ -165,32 +172,8 @@ namespace LeGamez.Editor.OsmImport
             }
         }
 
-        /// <summary>Liang–Barsky clip of segment a-b to the square [-half, half]².</summary>
-        static bool ClipSegment(ref Vector2 a, ref Vector2 b, float half)
-        {
-            float t0 = 0f, t1 = 1f;
-            Vector2 d = b - a;
-            float[] p = { -d.x, d.x, -d.y, d.y };
-            float[] q = { a.x + half, half - a.x, a.y + half, half - a.y };
-            for (int k = 0; k < 4; k++)
-            {
-                if (Mathf.Approximately(p[k], 0f))
-                {
-                    if (q[k] < 0f) return false;
-                    continue;
-                }
-                float r = q[k] / p[k];
-                if (p[k] < 0f) { if (r > t1) return false; if (r > t0) t0 = r; }
-                else { if (r < t0) return false; if (r < t1) t1 = r; }
-            }
-            Vector2 start = a;
-            a = start + d * t0;
-            b = start + d * t1;
-            return true;
-        }
-
         /// <summary>Dashed centre line: 3 m dash, 4 m gap, continuous across vertices.</summary>
-        static void DashedLine(MeshSink sink, List<Vector2> pts, float half, float y)
+        static void DashedLine(MeshSink sink, List<Vector2> pts, AreaRect area, float y)
         {
             const float dash = 3f, gap = 4f, hw = 0.08f;
             float phase = 0f; // distance into the current dash+gap cycle
@@ -208,7 +191,7 @@ namespace LeGamez.Editor.OsmImport
                     {
                         float segLen = Mathf.Min(dash - inCycle, len - d);
                         Vector2 p0 = a + dir * d, p1 = a + dir * (d + segLen);
-                        if (Mathf.Abs(p0.x) < half && Mathf.Abs(p0.y) < half && Mathf.Abs(p1.x) < half && Mathf.Abs(p1.y) < half)
+                        if (area.Contains(p0) && area.Contains(p1))
                             MeshSink.Quad(sink.Get(WorldStyle.MatGround, p0), V(p0 + n, y), V(p1 + n, y), V(p1 - n, y), V(p0 - n, y), WorldStyle.LaneMarking);
                         d += segLen; phase += segLen;
                     }
@@ -222,7 +205,7 @@ namespace LeGamez.Editor.OsmImport
         }
 
         /// <summary>Hedges, walls and fences as thin extruded strips (with colliders via the Props bucket).</summary>
-        public static int BuildBarriers(OsmData data, MeshSink sink, float half)
+        public static int BuildBarriers(OsmData data, MeshSink sink, AreaRect area)
         {
             int count = 0;
             foreach (var w in data.ways)
@@ -241,7 +224,7 @@ namespace LeGamez.Editor.OsmImport
                 for (int i = 0; i < w.points.Count - 1; i++)
                 {
                     Vector2 a = w.points[i], b = w.points[i + 1];
-                    if (!ClipSegment(ref a, ref b, half)) continue;
+                    if (!area.ClipSegment(ref a, ref b)) continue;
                     Vector2 dir = b - a;
                     if (dir.sqrMagnitude < 1e-4f) continue;
                     Vector2 n = new Vector2(-dir.y, dir.x).normalized * (width * 0.5f);
@@ -279,16 +262,16 @@ namespace LeGamez.Editor.OsmImport
         /// split along the x0z0–x1z1 diagonal – the same split TerrainField.Height uses), with soft colour
         /// variation and a little extra shading on slopes.
         /// </summary>
-        public static void BuildBase(MeshSink sink, float half, Color32 color, TerrainField t)
+        public static void BuildBase(MeshSink sink, AreaRect area, Color32 color, TerrainField t)
         {
             float cs = TerrainField.CellSize;
-            float h = half + 60f;
-            int n = Mathf.CeilToInt(2f * h / cs);
-            float start = Mathf.Floor(-h / cs) * cs;
-            for (int ix = 0; ix < n; ix++)
-            for (int iz = 0; iz < n; iz++)
+            var g = area.Expand(60f);
+            float startX = Mathf.Floor(g.xMin / cs) * cs, startZ = Mathf.Floor(g.zMin / cs) * cs;
+            int nx = Mathf.CeilToInt((g.xMax - startX) / cs), nz = Mathf.CeilToInt((g.zMax - startZ) / cs);
+            for (int ix = 0; ix < nx; ix++)
+            for (int iz = 0; iz < nz; iz++)
             {
-                float x0 = start + ix * cs, z0 = start + iz * cs, x1 = x0 + cs, z1 = z0 + cs;
+                float x0 = startX + ix * cs, z0 = startZ + iz * cs, x1 = x0 + cs, z1 = z0 + cs;
                 float noise = Mathf.PerlinNoise(x0 * 0.012f + 31.7f, z0 * 0.012f + 11.3f) - 0.5f;
                 float f = 1f + noise * 0.14f;
                 var c = new Color32((byte)Mathf.Clamp(color.r * f, 0, 255), (byte)Mathf.Clamp(color.g * (f + noise * 0.04f), 0, 255),

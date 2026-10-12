@@ -16,120 +16,126 @@ MonoBehaviour:
   - id: way/24959207
     name: St.-Petri-Kirche
     category: 2
-    position: {x: 44.08541, y: 7.3792405, z: 58.729584}
+    position: {x: 44.08541, y: 7.8147984, z: 58.729584}
     lat: 53.25753113375423
     lon: 7.928161996816975
   - id: way/691606009
     name: Herz-Jesu-Kirche Westerstede
     category: 2
-    position: {x: -196.21773, y: 6.0102987, z: -173.78305}
+    position: {x: -196.21773, y: 6.4458566, z: -173.78305}
     lat: 53.25542835521427
     lon: 7.92455354882743
   - id: node/278829715
     name: "Stadtb\xFCcherei Westerstede"
     category: 8
-    position: {x: -119.064476, y: 5.9213257, z: -97.75848}
+    position: {x: -119.064476, y: 6.3568835, z: -97.75848}
     lat: 53.256115899974155
     lon: 7.925712100052619
   - id: node/1625905876
     name: "Ammerl\xE4nder Spielzeugmuseum"
     category: 1
-    position: {x: -359.34445, y: 5.4752803, z: -114.73158}
+    position: {x: -359.34445, y: 5.9108377, z: -114.73158}
     lat: 53.25596239999781
     lon: 7.922103999881711
   - id: node/277797259
     name: Ev.-Methodistische Kirche
     category: 2
-    position: {x: -151.7358, y: 4.0292883, z: 370.1354}
+    position: {x: -151.7358, y: 4.464846, z: 370.1354}
     lat: 53.260347399989996
     lon: 7.925221499919096
   - id: way/319390244
     name: Evangelisch-Freikirchliche Gemeinde (Baptisten), Westerstede
     category: 2
-    position: {x: -598.18445, y: 4.491996, z: -261.96936}
+    position: {x: -598.18445, y: 4.9275537, z: -261.96936}
     lat: 53.25463082315597
     lon: 7.918517522779695
   - id: node/11359645280
     name: "Ammerl\xE4nder Flora (Brunnenskulptur)"
     category: 5
-    position: {x: 130.29233, y: 4.714544, z: -276.09222}
+    position: {x: 130.29233, y: 5.1501017, z: -276.09222}
     lat: 53.254503099968154
     lon: 7.929456499990279
   - id: node/11359625646
     name: Marktfrau (Oma Apen)
     category: 5
-    position: {x: 4.2953515, y: 6.5514627, z: 57.55377}
+    position: {x: 4.2953515, y: 6.9870205, z: 57.55377}
     lat: 53.25752050001047
     lon: 7.927564500000231
-  - id: way/743132204
-    name: Neuapostolische Kirche Westerstede
-    category: 2
-    position: {x: -317.8197, y: 5.5780244, z: -44.20244}
-    lat: 53.25660024564224
-    lon: 7.922727545211011
+  - id: node/959120403
+    name: Draisinen-Bahnhof Westerstede
+    category: 0
+    position: {x: 172.9262, y: 3.593352, z: -885.2223}
+    lat: 53.24899429983505
+    lon: 7.930096700058173
   - id: node/303596844
     name: "Kirchenb\xFCro"
     category: 2
-    position: {x: 166.16684, y: 6.28515, z: 137.80838}
+    position: {x: 166.16684, y: 6.720708, z: 137.80838}
     lat: 53.25824630003551
     lon: 7.929995200027116
+  - id: way/743132204
+    name: Neuapostolische Kirche Westerstede
+    category: 2
+    position: {x: -317.8197, y: 6.0135818, z: -44.20244}
+    lat: 53.25660024564224
+    lon: 7.922727545211011
   - id: way/24958203
     name: Rathaus Zum Stadtpark
     category: 8
-    position: {x: -93.83231, y: 5.777679, z: -55.36126}
+    position: {x: -93.83231, y: 6.2132363, z: -55.36126}
     lat: 53.25649932841843
     lon: 7.926090992090556
   - id: way/305134713
     name: Rathaus Am Markt
     category: 8
-    position: {x: -25.545975, y: 6.3035316, z: 75.0413}
+    position: {x: -25.545975, y: 6.739089, z: 75.0413}
     lat: 53.257678652286366
     lon: 7.927116395684024
   - id: node/7430001240
     name: Brunnen
     category: 3
-    position: {x: -692.737, y: 3.2645466, z: -141.22511}
+    position: {x: -692.737, y: 3.7001045, z: -141.22511}
     lat: 53.255722799998956
     lon: 7.917097699612449
+  - id: node/11359618532
+    name: "Stein des Ansto\xDFes"
+    category: 5
+    position: {x: 189.3684, y: 4.5278726, z: -421.86194}
+    lat: 53.25318479987631
+    lon: 7.930343599964639
+  - id: node/7430001238
+    name: "Der Froschk\xF6nig"
+    category: 3
+    position: {x: -655.7836, y: 3.7551014, z: -168.20517}
+    lat: 53.25547879999206
+    lon: 7.9176526000240095
+  - id: node/11359625647
+    name: "Stehendes M\xE4dchen"
+    category: 5
+    position: {x: -130.73851, y: 6.0816298, z: -69.042404}
+    lat: 53.25637560001289
+    lon: 7.925536800032955
   - id: node/11359625648
     name: Trauernde
     category: 5
-    position: {x: -229.15866, y: 5.508981, z: -72.149536}
+    position: {x: -229.15866, y: 5.944539, z: -72.149536}
     lat: 53.25634749998975
     lon: 7.924058900089568
   - id: node/11359645279
     name: Musizierende
     category: 5
-    position: {x: 4.3552866, y: 5.337512, z: -112.27684}
+    position: {x: 4.3552866, y: 5.77307, z: -112.27684}
     lat: 53.255984599994484
     lon: 7.927565399999567
-  - id: node/7430001238
-    name: "Der Froschk\xF6nig"
-    category: 3
-    position: {x: -655.7836, y: 3.3195436, z: -168.20517}
-    lat: 53.25547879999206
-    lon: 7.9176526000240095
-  - id: node/11359647953
-    name: Tante Mieze
-    category: 5
-    position: {x: 5.514033, y: 4.7896976, z: -244.05893}
-    lat: 53.25479280003035
-    lon: 7.92758280000346
   - id: node/1384194807
     name: Ehrenmal WK I und II
     category: 3
-    position: {x: -241.13904, y: 5.4632015, z: -70.02651}
+    position: {x: -241.13904, y: 5.8987594, z: -70.02651}
     lat: 53.256366700018575
     lon: 7.92387899995077
-  - id: node/11359618532
-    name: "Stein des Ansto\xDFes"
+  - id: node/11359647953
+    name: Tante Mieze
     category: 5
-    position: {x: 189.3684, y: 4.0923147, z: -421.86194}
-    lat: 53.25318479987631
-    lon: 7.930343599964639
-  - id: node/11359625647
-    name: "Stehendes M\xE4dchen"
-    category: 5
-    position: {x: -130.73851, y: 5.646072, z: -69.042404}
-    lat: 53.25637560001289
-    lon: 7.925536800032955
+    position: {x: 5.514033, y: 5.2252555, z: -244.05893}
+    lat: 53.25479280003035
+    lon: 7.92758280000346

@@ -14,46 +14,65 @@ namespace LeGamez.Editor.OsmImport
         public const float CellSize = 5f;
 
         readonly float[] samples;
-        readonly int n;
-        readonly float extent, step;
+        readonly int nx, nz;
+        readonly float xMin, zMin, step;
         public float Base { get; }
         public bool IsFlat { get; }
 
         public static TerrainField Current { get; private set; } = Flat();
 
-        TerrainField(float[] samples, int n, float extent, float step, float baseHeight)
+        TerrainField(float[] samples, int nx, int nz, float xMin, float zMin, float step, float baseHeight)
         {
             this.samples = samples;
-            this.n = n;
-            this.extent = extent;
+            this.nx = nx;
+            this.nz = nz;
+            this.xMin = xMin;
+            this.zMin = zMin;
             this.step = step;
             Base = baseHeight;
             IsFlat = samples == null;
         }
 
-        static TerrainField Flat() => new TerrainField(null, 0, 0, 1, 0);
+        static TerrainField Flat() => new TerrainField(null, 0, 0, 0, 0, 1, 0);
 
         public static TerrainField Load(string path)
         {
             if (!File.Exists(path)) return Current = Flat();
             using var br = new BinaryReader(File.OpenRead(path));
-            int n = br.ReadInt32();
-            float extent = br.ReadSingle(), step = br.ReadSingle(), baseH = br.ReadSingle();
-            var s = new float[n * n];
+            int nx, nz;
+            float xMin, zMin, step, baseH;
+            var magic = br.ReadBytes(4);
+            if (magic[0] == 'D' && magic[1] == 'G' && magic[2] == 'M' && magic[3] == '2')
+            {
+                // Rectangular grid (current format).
+                nx = br.ReadInt32(); nz = br.ReadInt32();
+                xMin = br.ReadSingle(); zMin = br.ReadSingle();
+                step = br.ReadSingle(); baseH = br.ReadSingle();
+            }
+            else
+            {
+                // Legacy square grid: int32 n, float extent, step, base.
+                br.BaseStream.Position = 0;
+                nx = nz = br.ReadInt32();
+                float extent = br.ReadSingle();
+                xMin = zMin = -extent;
+                step = br.ReadSingle(); baseH = br.ReadSingle();
+            }
+            var s = new float[nx * nz];
             for (int i = 0; i < s.Length; i++) s[i] = br.ReadSingle();
-            return Current = new TerrainField(s, n, extent, step, baseH);
+            return Current = new TerrainField(s, nx, nz, xMin, zMin, step, baseH);
         }
 
         /// <summary>Smooth (bilinear) DGM height – used to build the faceted ground vertices.</summary>
         public float Raw(float x, float z)
         {
             if (IsFlat) return 0f;
-            float fx = Mathf.Clamp((x + extent) / step, 0, n - 1.001f);
-            float fz = Mathf.Clamp((z + extent) / step, 0, n - 1.001f);
+            float fx = Mathf.Clamp((x - xMin) / step, 0, nx - 1.001f);
+            float fz = Mathf.Clamp((z - zMin) / step, 0, nz - 1.001f);
             int ix = (int)fx, iz = (int)fz;
             float tx = fx - ix, tz = fz - iz;
-            float h00 = samples[iz * n + ix], h10 = samples[iz * n + ix + 1];
-            float h01 = samples[(iz + 1) * n + ix], h11 = samples[(iz + 1) * n + ix + 1];
+            float h00 = samples[iz * nx + ix], h10 = samples[iz * nx + ix + 1];
+            float h01 = samples[(iz + 1) * nx + ix], h11 = samples[(iz + 1) * nx + ix + 1];
             return Mathf.Lerp(Mathf.Lerp(h00, h10, tx), Mathf.Lerp(h01, h11, tx), tz);
         }
 

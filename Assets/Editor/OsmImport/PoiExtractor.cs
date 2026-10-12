@@ -16,7 +16,7 @@ namespace LeGamez.Editor.OsmImport
             public int score;
         }
 
-        public static List<PoiEntry> Extract(OsmData data, float half)
+        public static List<PoiEntry> Extract(OsmData data, AreaRect area)
         {
             var candidates = new List<Candidate>();
 
@@ -30,7 +30,7 @@ namespace LeGamez.Editor.OsmImport
             foreach (var c in candidates)
             {
                 var p = c.entry.position;
-                if (Mathf.Abs(p.x) > half - 10f || Mathf.Abs(p.z) > half - 10f) continue;
+                if (!area.Contains(p, 10f)) continue;
                 bool duplicate = false;
                 foreach (var r in result)
                 {

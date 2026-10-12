@@ -6,55 +6,6 @@ namespace LeGamez.Editor.OsmImport
 {
     public static class GeoUtil
     {
-        /// <summary>Sutherland–Hodgman clip of a ring against an axis-aligned square [-half, half]².</summary>
-        public static List<Vector2> ClipToSquare(List<Vector2> ring, float half)
-        {
-            var output = ring;
-            for (int edge = 0; edge < 4; edge++)
-            {
-                var input = output;
-                output = new List<Vector2>(input.Count + 4);
-                if (input.Count == 0) break;
-                Vector2 s = input[input.Count - 1];
-                foreach (var e in input)
-                {
-                    bool eIn = Inside(e, edge, half), sIn = Inside(s, edge, half);
-                    if (eIn)
-                    {
-                        if (!sIn) output.Add(Intersect(s, e, edge, half));
-                        output.Add(e);
-                    }
-                    else if (sIn) output.Add(Intersect(s, e, edge, half));
-                    s = e;
-                }
-            }
-            return output;
-        }
-
-        static bool Inside(Vector2 p, int edge, float h)
-        {
-            switch (edge)
-            {
-                case 0: return p.x >= -h;
-                case 1: return p.x <= h;
-                case 2: return p.y >= -h;
-                default: return p.y <= h;
-            }
-        }
-
-        static Vector2 Intersect(Vector2 a, Vector2 b, int edge, float h)
-        {
-            float t;
-            switch (edge)
-            {
-                case 0: t = (-h - a.x) / (b.x - a.x); break;
-                case 1: t = (h - a.x) / (b.x - a.x); break;
-                case 2: t = (-h - a.y) / (b.y - a.y); break;
-                default: t = (h - a.y) / (b.y - a.y); break;
-            }
-            return Vector2.Lerp(a, b, t);
-        }
-
         public static Rect Bounds(List<Vector2> pts)
         {
             float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;

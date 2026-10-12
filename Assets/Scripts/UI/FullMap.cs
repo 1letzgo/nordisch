@@ -20,7 +20,8 @@ namespace LeGamez.UI
         Button beamButton;
         Text hint;
         CanvasGroup group;
-        float extent;          // metres from centre to map edge
+        Vector2 mapCenter;     // world (x,z) at the map image centre
+        Vector2 mapHalf;       // metres from centre to map edge (x, z)
         Vector3? target;
         PoiEntry targetPoi;
         AreaInfo area;
@@ -44,17 +45,21 @@ namespace LeGamez.UI
             var fm = root.gameObject.AddComponent<FullMap>();
             fm.group = root.gameObject.AddComponent<CanvasGroup>();
             fm.area = AreaInfo.Current;
-            fm.extent = fm.area != null ? fm.area.HalfSize + 60f : 560f;
+            fm.mapCenter = fm.area != null ? fm.area.BoundsCenter : Vector2.zero;
+            fm.mapHalf = (fm.area != null ? fm.area.MapSize : new Vector2(1120f, 1120f)) * 0.5f;
 
-            // Square map, as large as the short screen side allows.
+            // Map fitted into a 940-unit box, keeping the area's aspect ratio.
             float size = 940f;
-            var frame = UiKit.Rect("Frame", root, new Vector2(0.5f, 0.5f), new Vector2(0, -10), new Vector2(size + 16, size + 16));
+            float aspect = fm.mapHalf.x / Mathf.Max(1f, fm.mapHalf.y);
+            var mapPx = aspect >= 1f ? new Vector2(size, size / aspect) : new Vector2(size * aspect, size);
+            var frame = UiKit.Rect("Frame", root, new Vector2(0.5f, 0.5f), new Vector2(0, -10), mapPx + Vector2.one * 16f);
             UiKit.DropShadow(frame, 24f, -8f, 0.45f);
             UiKit.Panel(frame.gameObject, Color.white);
-            var mask = UiKit.Rect("Mask", frame, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(size, size));
+            var mask = UiKit.Rect("Mask", frame, new Vector2(0.5f, 0.5f), Vector2.zero, mapPx);
             UiKit.Panel(mask.gameObject, Color.white);
             mask.gameObject.AddComponent<Mask>().showMaskGraphic = false;
-            fm.mapRect = UiKit.Rect("Map", mask, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(size, size));
+            fm.mapRect = UiKit.Rect("Map", mask, new Vector2(0.5f, 0.5f), Vector2.zero, mapPx);
+            fm.mapPixels = mapPx;
             var raw = fm.mapRect.gameObject.AddComponent<RawImage>();
             raw.texture = fm.area != null ? Resources.Load<Texture2D>("AreaMaps/" + fm.area.areaId) : null;
             raw.raycastTarget = true; // taps land here (handled by FullMap via bubbling)
@@ -91,12 +96,12 @@ namespace LeGamez.UI
 
             // Header + hint.
             UiKit.Label(root, fm.area != null ? fm.area.displayName : "Karte", 46, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold)
-                .Place(new Vector2(0.5f, 0.5f), new Vector2(0, size / 2 + 80), new Vector2(900, 60));
+                .Place(new Vector2(0.5f, 0.5f), new Vector2(0, mapPx.y / 2 + 80), new Vector2(900, 60));
             fm.hint = UiKit.Label(root, "", 30, new Color(1, 1, 1, 0.85f), TextAnchor.MiddleCenter)
-                .Place(new Vector2(0.5f, 0.5f), new Vector2(0, size / 2 + 34), new Vector2(940, 44));
+                .Place(new Vector2(0.5f, 0.5f), new Vector2(0, mapPx.y / 2 + 34), new Vector2(940, 44));
 
             // Close.
-            var close = UiKit.Rect("Close", root, new Vector2(0.5f, 0.5f), new Vector2(size / 2 - 30, size / 2 + 80), new Vector2(84, 84));
+            var close = UiKit.Rect("Close", root, new Vector2(0.5f, 0.5f), new Vector2(mapPx.x / 2 - 30, mapPx.y / 2 + 80), new Vector2(84, 84));
             var closeImg = UiKit.Panel(close.gameObject, new Color(1, 1, 1, 0.95f), UiKit.Circle);
             var closeBtn = close.gameObject.AddComponent<Button>();
             closeBtn.targetGraphic = closeImg;
@@ -104,7 +109,7 @@ namespace LeGamez.UI
             UiKit.Stretch(UiKit.Label(close, "×", 54, UiKit.Navy, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform);
 
             // Beam button.
-            var beam = UiKit.Rect("Beam", root, new Vector2(0.5f, 0.5f), new Vector2(0, -(size / 2 + 90)), new Vector2(520, 104));
+            var beam = UiKit.Rect("Beam", root, new Vector2(0.5f, 0.5f), new Vector2(0, -(mapPx.y / 2 + 90)), new Vector2(520, 104));
             UiKit.DropShadow(beam, 16f, -5f, 0.35f);
             var beamImg = UiKit.Panel(beam.gameObject, UiKit.Mustard);
             fm.beamButton = beam.gameObject.AddComponent<Button>();
@@ -116,12 +121,15 @@ namespace LeGamez.UI
             return fm;
         }
 
-        Vector2 WorldToMap(Vector3 w) => new Vector2(w.x, w.z) / extent * (mapRect.rect.width > 0 ? mapRect.rect.width * 0.5f : 470f);
+        Vector2 mapPixels;
+
+        Vector2 WorldToMap(Vector3 w) =>
+            Vector2.Scale((new Vector2(w.x, w.z) - mapCenter), new Vector2(mapPixels.x * 0.5f / mapHalf.x, mapPixels.y * 0.5f / mapHalf.y));
 
         Vector3 MapToWorld(Vector2 local)
         {
-            float halfPx = mapRect.rect.width * 0.5f;
-            return new Vector3(local.x / halfPx * extent, 0f, local.y / halfPx * extent);
+            var m = mapCenter + Vector2.Scale(local, new Vector2(mapHalf.x / (mapPixels.x * 0.5f), mapHalf.y / (mapPixels.y * 0.5f)));
+            return new Vector3(m.x, 0f, m.y);
         }
 
         void Show()
@@ -165,9 +173,7 @@ namespace LeGamez.UI
                 if (d < best) { best = d; snapped = poi; }
             }
             Vector3 world = snapped != null ? snapped.position : MapToWorld(local);
-            float lim = area != null ? area.HalfSize - 5f : 495f;
-            world.x = Mathf.Clamp(world.x, -lim, lim);
-            world.z = Mathf.Clamp(world.z, -lim, lim);
+            if (area != null) world = area.Clamp(world, 5f);
             target = world;
             targetPoi = snapped;
             pin.gameObject.SetActive(true);

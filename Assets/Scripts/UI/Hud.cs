@@ -73,13 +73,15 @@ namespace LeGamez.UI
             stick.handle = handle;
             hud.joystick = stick;
 
-            hud.jumpButton = CreateIconButton(hud.safeRoot, "Jump", UiKit.IconKind.Jump, new Vector2(-150, 175), 150);
+            // Action row along the bottom edge, right to left: jump, run, bike (bike only when available).
+            const float rowY = 120f, btn = 136f, gap = 22f;
+            hud.jumpButton = CreateIconButton(hud.safeRoot, "Jump", UiKit.IconKind.Jump, new Vector2(-40 - btn / 2, rowY), btn);
             hud.jumpButton.onPress = GameInput.QueueJump;
-            hud.runButton = CreateIconButton(hud.safeRoot, "Run", UiKit.IconKind.Run, new Vector2(-325, 110), 130);
+            hud.runButton = CreateIconButton(hud.safeRoot, "Run", UiKit.IconKind.Run, new Vector2(-40 - btn * 1.5f - gap, rowY), btn);
             hud.runButton.onPress = GameInput.ToggleRun;
             hud.runBackground = hud.runButton.GetComponent<Image>();
             // Context action (mount/dismount): round icon button like jump/run, above the jump button.
-            hud.interactButton = CreateIconButton(hud.safeRoot, "Interact", UiKit.IconKind.Bike, new Vector2(-150, 345), 130);
+            hud.interactButton = CreateIconButton(hud.safeRoot, "Interact", UiKit.IconKind.Bike, new Vector2(-40 - btn * 2.5f - gap * 2, rowY), btn);
             hud.interactIcon = hud.interactButton.transform.Find("Icon").GetComponent<Image>();
             hud.interactButton.GetComponent<Image>().color = new Color(UiKit.Mustard.r, UiKit.Mustard.g, UiKit.Mustard.b, 0.9f);
             hud.interactButton.onPress = GameInput.QueueInteract;

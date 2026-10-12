@@ -7,11 +7,12 @@ Usage:
     python3 Tools/dgm/fetch_dgm.py langeoog   # single area
 
 Output Data/<id>.dgm.bin (little endian):
-    int32  n          grid points per side
-    float  extent     metres from centre to grid edge (grid spans -extent..+extent on x and z)
+    char[4] "DGM2"
+    int32  nx, nz     grid points along x (west→east) and z (south→north)
+    float  xMin, zMin local position of sample [0, 0]
     float  step       metres between samples
     float  base       NHN height subtracted from all samples (area minimum)
-    float  h[n*n]     heights, row-major: row = z index (south→north), column = x index (west→east)
+    float  h[nx*nz]   heights, row-major: row = z index, column = x index
 
 Data: Digitales Geländemodell DGM1, © LGLN, CC BY 4.0.
 """
@@ -28,6 +29,7 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lod2"))
 from fetch_lod2 import LocalFrame  # noqa: E402  (same projection as the importer)
+from area_bounds import latlon_bbox, local_bounds  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 AREAS_FILE = ROOT / "Tools" / "osm" / "areas.json"
@@ -89,25 +91,26 @@ def load_tile(href):
 
 
 def process_area(area):
-    lat0, lon0, half = area["lat"], area["lon"], area["size_m"] / 2
+    lat0, lon0 = area["lat"], area["lon"]
     frame = LocalFrame(lat0, lon0)
-    extent = half + MARGIN
-    dlat = (extent + 30) / 111320
-    dlon = (extent + 30) / (111320 * math.cos(math.radians(lat0)))
-    tiles = find_tiles([lon0 - dlon, lat0 - dlat, lon0 + dlon, lat0 + dlat])
+    bx0, bx1, bz0, bz1 = local_bounds(area)
+    gx0, gz0 = bx0 - MARGIN, bz0 - MARGIN
+    s, w, nn_, e = latlon_bbox(area, MARGIN + 30)
+    tiles = find_tiles([w, s, e, nn_])
     print(f"[{area['id']}] {len(tiles)} DGM1 tiles", flush=True)
     loaded = {}
     for key, (year, href) in tiles.items():
         print(f"    {key} ({year})", flush=True)
         loaded[key] = load_tile(href)
 
-    n = int(round(2 * extent / STEP)) + 1
-    grid = np.zeros((n, n), dtype=np.float32)
+    nx = int(round((bx1 - bx0 + 2 * MARGIN) / STEP)) + 1
+    nz = int(round((bz1 - bz0 + 2 * MARGIN) / STEP)) + 1
+    grid = np.zeros((nz, nx), dtype=np.float32)
     missing = 0
-    for iz in range(n):
-        z = -extent + iz * STEP
-        for ix in range(n):
-            x = -extent + ix * STEP
+    for iz in range(nz):
+        z = gz0 + iz * STEP
+        for ix in range(nx):
+            x = gx0 + ix * STEP
             lat = lat0 + z / frame.m_lat
             lon = lon0 + x / frame.m_lon
             e, nn = latlon_to_utm(lat, lon)
@@ -136,9 +139,10 @@ def process_area(area):
 
     out = OUT_DIR / f"{area['id']}.dgm.bin"
     with open(out, "wb") as f:
-        f.write(struct.pack("<ifff", n, extent, STEP, base))
+        f.write(b"DGM2")
+        f.write(struct.pack("<iiffff", nx, nz, gx0, gz0, STEP, base))
         f.write(grid.astype("<f4").tobytes())
-    print(f"  -> {out.relative_to(ROOT)}: {n}x{n}, relief {grid.max():.1f} m (base {base:.1f} m NHN), "
+    print(f"  -> {out.relative_to(ROOT)}: {nx}x{nz}, relief {grid.max():.1f} m (base {base:.1f} m NHN), "
           f"{missing} samples outside tiles", flush=True)
 
 

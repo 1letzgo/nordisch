@@ -20,6 +20,9 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "osm"))
+from area_bounds import latlon_bbox, local_bounds  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 AREAS_FILE = ROOT / "Tools" / "osm" / "areas.json"
 OUT_DIR = ROOT / "Data"
@@ -128,12 +131,11 @@ def find_tiles(bbox):
 
 
 def process_area(area):
-    lat0, lon0, half = area["lat"], area["lon"], area["size_m"] / 2
+    lat0, lon0 = area["lat"], area["lon"]
     frame = LocalFrame(lat0, lon0)
-    limit = half + MARGIN_M
-    dlat = limit / 111320
-    dlon = limit / (111320 * math.cos(math.radians(lat0)))
-    tiles = find_tiles([lon0 - dlon, lat0 - dlat, lon0 + dlon, lat0 + dlat])
+    x0, x1, z0, z1 = local_bounds(area)
+    s, w, n, e = latlon_bbox(area, MARGIN_M)
+    tiles = find_tiles([w, s, e, n])
     print(f"[{area['id']}] {len(tiles)} tiles", flush=True)
 
     buildings = []
@@ -164,7 +166,7 @@ def process_area(area):
                     pts = [p for s in conv for p in s["r"]]
                     cx = sum(p[0] for p in pts) / len(pts)
                     cz = sum(p[2] for p in pts) / len(pts)
-                    if abs(cx) > limit or abs(cz) > limit:
+                    if not (x0 - MARGIN_M <= cx <= x1 + MARGIN_M and z0 - MARGIN_M <= cz <= z1 + MARGIN_M):
                         continue
                     seen.add(attrs["id"])
                     buildings.append({**{k: v for k, v in attrs.items() if v}, "s": conv})

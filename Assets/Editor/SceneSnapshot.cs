@@ -127,14 +127,18 @@ namespace LeGamez.Editor
                 RenderSettings.fog = fog;
 
                 // Minimap: orthographic top-down render of the whole area (+60 m margin), north up.
-                float extent = area.HalfSize + 60f;
+                // Covers the (possibly non-square, off-centre) area rectangle; ~1 px per metre up to 2048 px.
+                Vector2 mapSize = area.MapSize, mapCenter = area.BoundsCenter;
                 cam.orthographic = true;
-                cam.orthographicSize = extent;
-                camGo.transform.SetPositionAndRotation(new Vector3(0f, 500f, 0f), Quaternion.Euler(90f, 0f, 0f));
+                cam.orthographicSize = mapSize.y * 0.5f;
+                camGo.transform.SetPositionAndRotation(new Vector3(mapCenter.x, 500f, mapCenter.y), Quaternion.Euler(90f, 0f, 0f));
                 RenderSettings.fog = false;
                 OsmImport.OsmAreaImporter.EnsureFolder(MapDir);
                 string mapFile = Path.Combine(MapDir, area.areaId + ".png");
-                RenderTo(cam, mapFile, 1024, 1024);
+                float longest = Mathf.Max(mapSize.x, mapSize.y);
+                int texLong = longest > 1500f ? 2048 : 1024;
+                int texW = Mathf.RoundToInt(texLong * mapSize.x / longest), texH = Mathf.RoundToInt(texLong * mapSize.y / longest);
+                RenderTo(cam, mapFile, texW, texH); // camera aspect follows the render target
                 RenderSettings.fog = fog;
                 AssetDatabase.ImportAsset(mapFile);
                 if (AssetImporter.GetAtPath(mapFile) is TextureImporter mi)
@@ -142,7 +146,8 @@ namespace LeGamez.Editor
                     mi.textureType = TextureImporterType.Default;
                     mi.mipmapEnabled = true;
                     mi.wrapMode = TextureWrapMode.Clamp;
-                    mi.maxTextureSize = 1024;
+                    mi.maxTextureSize = 2048;
+                    mi.npotScale = TextureImporterNPOTScale.None;
                     mi.SaveAndReimport();
                 }
 
