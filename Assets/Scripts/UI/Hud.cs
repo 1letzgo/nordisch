@@ -12,6 +12,8 @@ namespace LeGamez.UI
         public Text toastLabel;
         public TapButton jumpButton;
         public TapButton interactButton;
+        public TapButton runButton;
+        Image runBackground;
         public Text interactLabel;
 
         RectTransform safeRoot;
@@ -71,9 +73,12 @@ namespace LeGamez.UI
             stick.handle = handle;
             hud.joystick = stick;
 
-            hud.jumpButton = CreateButton(hud.safeRoot, "Jump", "▲", new Vector2(-150, 170), 150);
+            hud.jumpButton = CreateIconButton(hud.safeRoot, "Jump", UiKit.IconKind.Jump, new Vector2(-150, 175), 150);
             hud.jumpButton.onPress = GameInput.QueueJump;
-            hud.interactButton = CreateButton(hud.safeRoot, "Interact", "", new Vector2(-330, 120), 130);
+            hud.runButton = CreateIconButton(hud.safeRoot, "Run", UiKit.IconKind.Run, new Vector2(-325, 110), 130);
+            hud.runButton.onPress = GameInput.ToggleRun;
+            hud.runBackground = hud.runButton.GetComponent<Image>();
+            hud.interactButton = CreateButton(hud.safeRoot, "Interact", "", new Vector2(-150, 360), 130);
             hud.interactLabel = hud.interactButton.GetComponentInChildren<Text>();
             hud.interactLabel.fontSize = 26;
             hud.interactButton.onPress = GameInput.QueueInteract;
@@ -109,6 +114,8 @@ namespace LeGamez.UI
             if (Screen.safeArea != appliedSafeArea) ApplySafeArea();
             if (portrait != IsPortrait) ApplyOrientation();
             if (toastLabel != null && toastLabel.text.Length > 0 && Time.time > toastUntil) toastLabel.text = "";
+            if (runBackground != null)
+                runBackground.color = GameInput.RunToggled ? new Color(UiKit.Mustard.r, UiKit.Mustard.g, UiKit.Mustard.b, 0.95f) : ButtonIdle;
         }
 
         public void ShowToast(string message, float seconds = 3f)
@@ -225,6 +232,27 @@ namespace LeGamez.UI
             img.sprite = CircleSprite();
             img.color = color;
             return img;
+        }
+
+        static readonly Color ButtonIdle = new Color(0.1f, 0.23f, 0.31f, 0.55f);
+
+        /// <summary>Round action button with a pictogram, navy glass background.</summary>
+        static TapButton CreateIconButton(Transform parent, string name, UiKit.IconKind icon, Vector2 pos, float size)
+        {
+            var rt = NewRect(name, parent);
+            rt.anchorMin = rt.anchorMax = new Vector2(1, 0);
+            rt.sizeDelta = new Vector2(size, size);
+            rt.anchoredPosition = pos;
+            AddCircle(rt.gameObject, ButtonIdle);
+            var ring = NewRect("Ring", rt);
+            ring.sizeDelta = new Vector2(size, size);
+            AddRing(ring.gameObject, new Color(1f, 1f, 1f, 0.7f)).raycastTarget = false;
+            var glyph = NewRect("Icon", rt);
+            glyph.sizeDelta = Vector2.one * size * 0.56f;
+            var img = glyph.gameObject.AddComponent<Image>();
+            img.sprite = UiKit.Icon(icon);
+            img.raycastTarget = false;
+            return rt.gameObject.AddComponent<TapButton>();
         }
 
         static TapButton CreateButton(Transform parent, string name, string glyph, Vector2 pos, float size)

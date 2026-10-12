@@ -95,8 +95,8 @@ namespace LeGamez.Editor
             tree.blendParameter = "Speed";
             tree.useAutomaticThresholds = false;
             tree.AddChild(Clip(fbxPath, "idle"), 0f);
-            tree.AddChild(Clip(fbxPath, "walk"), 2.6f);
-            tree.AddChild(Clip(fbxPath, "sprint"), 6f);
+            tree.AddChild(Clip(fbxPath, "walk"), 3.0f);
+            tree.AddChild(Clip(fbxPath, "sprint"), 6.5f);
             sm.defaultState = locomotion;
 
             var jump = sm.AddState("Jump");

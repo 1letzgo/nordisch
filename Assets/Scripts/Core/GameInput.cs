@@ -18,6 +18,23 @@ namespace LeGamez.Core
         static bool touchInteractQueued;
 
         public static void QueueJump() => touchJumpQueued = true;
+
+        /// <summary>Sprint toggle (on-screen button). Shift / left stick press also sprint while held.</summary>
+        public static bool RunToggled;
+        public static void ToggleRun() => RunToggled = !RunToggled;
+
+        public static bool Run
+        {
+            get
+            {
+                bool run = RunToggled;
+#if ENABLE_INPUT_SYSTEM
+                if (Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed) run = true;
+                if (Gamepad.current != null && Gamepad.current.leftStickButton.isPressed) run = true;
+#endif
+                return run;
+            }
+        }
         public static void QueueInteract() => touchInteractQueued = true;
 
         public static Vector2 Move
@@ -34,7 +51,7 @@ namespace LeGamez.Core
                     if (kb.sKey.isPressed || kb.downArrowKey.isPressed) k.y -= 1;
                     if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) k.x += 1;
                     if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) k.x -= 1;
-                    if (k != Vector2.zero) v = k.normalized * (kb.leftShiftKey.isPressed ? 1f : 0.6f);
+                    if (k != Vector2.zero) v = k.normalized;
                 }
                 var pad = Gamepad.current;
                 if (pad != null && pad.leftStick.ReadValue().sqrMagnitude > 0.02f) v = pad.leftStick.ReadValue();

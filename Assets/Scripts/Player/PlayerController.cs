@@ -8,10 +8,12 @@ namespace LeGamez.Player
     public class PlayerController : MonoBehaviour
     {
         [Header("Speed")]
-        public float walkSpeed = 2.6f;
-        public float runSpeed = 6f;
-        [Tooltip("Stick deflection where walking turns into running (speed blends continuously).")]
-        public float runBlendStart = 0.6f;
+        [Tooltip("Speed at full stick without sprint (brisk walk / jog).")]
+        public float walkSpeed = 3.0f;
+        [Tooltip("Speed at full stick with sprint enabled.")]
+        public float runSpeed = 6.5f;
+        [Tooltip("Seconds standing still before the sprint toggle switches itself off.")]
+        public float runAutoOffDelay = 1.2f;
         public float deadZone = 0.12f;
 
         [Header("Smoothing")]
@@ -35,6 +37,8 @@ namespace LeGamez.Player
         Vector2 smoothedInput;
         Vector2 smoothedInputRef;
         float yawVelocity;
+        float idleTime;
+        float sprintBlend;
 
         public float CurrentSpeed => planarVelocity.magnitude;
         public Vector2 SmoothedInput => smoothedInput;
@@ -61,6 +65,11 @@ namespace LeGamez.Player
             }
 
             float magnitude = Mathf.Clamp01(smoothedInput.magnitude);
+
+            // Sprint toggle: ease in/out so speed and animation don't jump, auto-off after stopping.
+            idleTime = magnitude < 0.05f ? idleTime + Time.deltaTime : 0f;
+            if (idleTime > runAutoOffDelay) GameInput.RunToggled = false;
+            sprintBlend = Mathf.MoveTowards(sprintBlend, InputEnabled && GameInput.Run ? 1f : 0f, Time.deltaTime * 3f);
             Vector3 wish = Vector3.zero;
             if (magnitude > 0.001f)
                 wish = (forward * smoothedInput.y + right * smoothedInput.x).normalized * SpeedFor(magnitude);
@@ -102,12 +111,10 @@ namespace LeGamez.Player
             return v / m * Mathf.InverseLerp(deadZone, 1f, Mathf.Min(m, 1f));
         }
 
-        /// <summary>Continuous speed curve: 0..runBlendStart walks, beyond blends into running.</summary>
-        float SpeedFor(float magnitude)
-        {
-            if (magnitude <= runBlendStart) return walkSpeed * (magnitude / runBlendStart);
-            return Mathf.Lerp(walkSpeed, runSpeed, Mathf.SmoothStep(0f, 1f, (magnitude - runBlendStart) / (1f - runBlendStart)));
-        }
+        /// <summary>Stick deflection scales speed linearly up to walk or sprint top speed.</summary>
+        float SpeedFor(float magnitude) => magnitude * Mathf.Lerp(walkSpeed, runSpeed, sprintBlend);
+
+        public bool IsSprinting => sprintBlend > 0.5f;
 
         public void Teleport(Vector3 position)
         {

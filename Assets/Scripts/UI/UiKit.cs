@@ -22,6 +22,70 @@ namespace LeGamez.UI
 
         public static Color Hex(int rgb) => new Color(((rgb >> 16) & 255) / 255f, ((rgb >> 8) & 255) / 255f, (rgb & 255) / 255f);
 
+        // ---------------------------------------------------------------- icons
+
+        public enum IconKind { Jump, Run }
+
+        static readonly System.Collections.Generic.Dictionary<IconKind, Sprite> icons = new System.Collections.Generic.Dictionary<IconKind, Sprite>();
+
+        /// <summary>White pictogram, drawn as anti-aliased strokes on a 128 px canvas (coords in 0..64).</summary>
+        public static Sprite Icon(IconKind kind)
+        {
+            if (icons.TryGetValue(kind, out var cached)) return cached;
+            var strokes = new System.Collections.Generic.List<(Vector2 a, Vector2 b, float w)>();
+            var dots = new System.Collections.Generic.List<(Vector2 c, float r)>();
+            void S(float x0, float y0, float x1, float y1, float w) => strokes.Add((new Vector2(x0, y0), new Vector2(x1, y1), w));
+            switch (kind)
+            {
+                case IconKind.Jump:
+                    // Up arrow lifting off a ground line.
+                    S(32, 20, 32, 52, 6.5f);
+                    S(32, 54, 19, 41, 6.5f);
+                    S(32, 54, 45, 41, 6.5f);
+                    S(14, 11, 50, 11, 5f);
+                    break;
+                case IconKind.Run:
+                    // Running figure leaning forward + speed lines.
+                    dots.Add((new Vector2(42, 53), 5.5f));
+                    S(38, 43, 31, 26, 6f);          // torso
+                    S(37, 40, 47, 33, 4.5f);        // front arm
+                    S(47, 33, 52, 38, 4.5f);
+                    S(36, 40, 26, 41, 4.5f);        // back arm
+                    S(26, 41, 22, 34, 4.5f);
+                    S(31, 26, 41, 18, 5f);          // front leg
+                    S(41, 18, 44, 8, 5f);
+                    S(31, 26, 23, 16, 5f);          // back leg
+                    S(23, 16, 13, 15, 5f);
+                    S(6, 34, 17, 34, 3.5f);         // speed lines
+                    S(3, 26, 14, 26, 3.5f);
+                    break;
+            }
+            const int size = 128;
+            const float scale = size / 64f;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                var p = new Vector2(x + 0.5f, y + 0.5f) / scale;
+                float d = float.MaxValue;
+                foreach (var (a, b, w) in strokes)
+                {
+                    Vector2 ab = b - a;
+                    float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(1e-5f, ab.sqrMagnitude));
+                    d = Mathf.Min(d, Vector2.Distance(p, a + ab * t) - w * 0.5f);
+                }
+                foreach (var (c, r) in dots) d = Mathf.Min(d, Vector2.Distance(p, c) - r);
+                float alpha = Mathf.Clamp01(0.5f - d * scale);
+                px[y * size + x] = new Color32(255, 255, 255, (byte)(alpha * 255));
+            }
+            tex.SetPixels32(px);
+            tex.Apply();
+            var sprite = Sprite.Create(tex, new UnityEngine.Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+            icons[kind] = sprite;
+            return sprite;
+        }
+
         static Sprite logoBadge;
 
         /// <summary>The mustard "NORDisch" badge cut out of Resources/Branding/logo.png (1024² app icon).</summary>
