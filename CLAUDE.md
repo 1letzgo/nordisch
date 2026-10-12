@@ -81,4 +81,4 @@ Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen sp�
 
 ## Assets & Lizenzen
 - Figuren: Kenney Mini Characters (CC0), `Assets/ThirdParty/KenneyMiniCharacters`.
-- Logo: `Branding/logo.png` (Kopie in `Assets/Resources/Branding/`), Farben Navy `#1A3A4E`, Senf `#E3A82B` (`UiKit`).
+- Logo „Kompass-N“: Quelle `Branding/concepts/make_concepts.py` (`python3 ... --final` schreibt `Branding/logo.png`, `wordmark.png`, Lockups). Danach beide nach `Assets/Resources/Branding/` kopieren und `ProjectSetup.Run`. Schrift Rockwell Bold/Regular, Farben Navy `#1A3A4E`, Senf `#E3A82B` (`UiKit`). Altes Logo: `Branding/logo_v1.png`.

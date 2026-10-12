@@ -74,7 +74,15 @@ namespace LeGamez.Editor
             else
                 Debug.LogWarning("[LeGamez] Logo missing at " + LogoPath);
 
-            if (logo != null) CreateWordmark(logo);
+            // Branding/wordmark.png is authored (Branding/concepts/make_concepts.py --final); only configure import.
+            if (AssetImporter.GetAtPath(WordmarkPath) is TextureImporter wi)
+            {
+                wi.textureType = TextureImporterType.Sprite;
+                wi.alphaIsTransparency = true;
+                wi.mipmapEnabled = false;
+                wi.textureCompression = TextureImporterCompression.Uncompressed;
+                wi.SaveAndReimport();
+            }
 
             var navy = new Color(0.102f, 0.227f, 0.306f);
             PlayerSettings.SplashScreen.showUnityLogo = false;
@@ -83,55 +91,6 @@ namespace LeGamez.Editor
         }
 
         const string WordmarkPath = "Assets/Resources/Branding/wordmark.png";
-
-        /// <summary>
-        /// Cuts the white "NORDisch" lettering out of the mustard badge: alpha comes from the blue
-        /// channel (white 255 vs mustard ~43), so anti-aliased edges survive. Cropped to the glyphs.
-        /// </summary>
-        static void CreateWordmark(Texture2D logo)
-        {
-            int w = logo.width, h = logo.height;
-            float s = w / 1024f;
-            // Search only inside the badge (x 112..912, y 362..662 of the 1024 px icon).
-            int x0 = Mathf.RoundToInt(130 * s), x1 = Mathf.RoundToInt(894 * s);
-            int y0 = Mathf.RoundToInt(380 * s), y1 = Mathf.RoundToInt(644 * s);
-            var src = logo.GetPixels32();
-            float Alpha(Color32 c) => Mathf.Clamp01((c.b - 43f) / (255f - 43f));
-
-            int minX = x1, maxX = x0, minY = y1, maxY = y0;
-            for (int y = y0; y < y1; y++)
-            for (int x = x0; x < x1; x++)
-            {
-                if (Alpha(src[y * w + x]) < 0.05f) continue;
-                minX = Mathf.Min(minX, x); maxX = Mathf.Max(maxX, x);
-                minY = Mathf.Min(minY, y); maxY = Mathf.Max(maxY, y);
-            }
-            if (maxX <= minX) { Debug.LogWarning("[LeGamez] Wordmark not found in logo"); return; }
-            const int pad = 4;
-            minX -= pad; minY -= pad; maxX += pad; maxY += pad;
-            int ow = maxX - minX + 1, oh = maxY - minY + 1;
-            var outTex = new Texture2D(ow, oh, TextureFormat.RGBA32, false);
-            var px = new Color32[ow * oh];
-            for (int y = 0; y < oh; y++)
-            for (int x = 0; x < ow; x++)
-            {
-                byte a = (byte)(Alpha(src[(minY + y) * w + (minX + x)]) * 255);
-                px[y * ow + x] = new Color32(255, 255, 255, a);
-            }
-            outTex.SetPixels32(px);
-            outTex.Apply();
-            System.IO.File.WriteAllBytes(WordmarkPath, outTex.EncodeToPNG());
-            Object.DestroyImmediate(outTex);
-            AssetDatabase.ImportAsset(WordmarkPath);
-            if (AssetImporter.GetAtPath(WordmarkPath) is TextureImporter ti)
-            {
-                ti.textureType = TextureImporterType.Sprite;
-                ti.alphaIsTransparency = true;
-                ti.mipmapEnabled = false;
-                ti.textureCompression = TextureImporterCompression.Uncompressed;
-                ti.SaveAndReimport();
-            }
-        }
 
         static void ConfigureUrp()
         {

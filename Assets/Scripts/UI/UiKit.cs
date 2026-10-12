@@ -86,23 +86,6 @@ namespace LeGamez.UI
             return sprite;
         }
 
-        static Sprite logoBadge;
-
-        /// <summary>The mustard "NORDisch" badge cut out of Resources/Branding/logo.png (1024² app icon).</summary>
-        public static Sprite LogoBadge
-        {
-            get
-            {
-                if (logoBadge != null) return logoBadge;
-                var tex = Resources.Load<Texture2D>("Branding/logo");
-                if (tex == null) return null;
-                // Badge occupies x 112..912, y 362..662 of the 1024 px icon (symmetric).
-                float s = tex.width / 1024f;
-                logoBadge = Sprite.Create(tex, new UnityEngine.Rect(112 * s, 362 * s, 800 * s, 300 * s), new Vector2(0.5f, 0.5f), 100f);
-                return logoBadge;
-            }
-        }
-
         /// <summary>White "NORDisch" lettering without the badge (Resources/Branding/wordmark.png), with a soft
         /// navy shadow for contrast on the sky. Falls back to a text label.</summary>
         public static RectTransform Wordmark(Transform parent, Vector2 anchor, Vector2 pos, float height)
@@ -126,34 +109,6 @@ namespace LeGamez.UI
                 t.gameObject.AddComponent<Shadow>().effectColor = new Color(Navy.r, Navy.g, Navy.b, 0.55f);
             }
             return rt;
-        }
-
-        /// <summary>Logo badge; falls back to a text recreation if the image is missing.</summary>
-        public static RectTransform Logo(Transform parent, Vector2 anchor, Vector2 pos, float height)
-        {
-            float width = height * 800f / 300f;
-            var badge = Rect("Logo", parent, anchor, pos, new Vector2(width, height));
-            DropShadow(badge, height * 0.12f, -height * 0.05f, 0.35f);
-            var sprite = LogoBadge;
-            if (sprite != null)
-            {
-                // Mask with our rounded sprite so the icon's navy corners don't show.
-                var img = Panel(badge.gameObject, Mustard);
-                badge.gameObject.AddComponent<Mask>().showMaskGraphic = true;
-                var pic = Rect("Image", badge);
-                Stretch(pic, -2f);
-                var picImg = pic.gameObject.AddComponent<Image>();
-                picImg.sprite = sprite;
-                picImg.raycastTarget = false;
-                img.raycastTarget = false;
-            }
-            else
-            {
-                Panel(badge.gameObject, Mustard);
-                var t = Label(badge, "<b>NORD</b>isch", Mathf.RoundToInt(height * 0.56f), Color.white, TextAnchor.MiddleCenter);
-                Stretch(t.rectTransform);
-            }
-            return badge;
         }
 
         static Sprite rounded, shadow, circle;
