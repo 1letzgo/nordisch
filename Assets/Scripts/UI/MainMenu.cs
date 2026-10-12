@@ -34,28 +34,45 @@ namespace LeGamez.UI
                 es.AddComponent<StandaloneInputModule>();
 #endif
             }
-            BuildUi(AreaCatalog.Load());
+            catalog = AreaCatalog.Load();
         }
 
-        void BuildUi(AreaCatalog catalog)
+        AreaCatalog catalog;
+        GameObject canvasGo;
+        bool? builtPortrait;
+
+        void Update()
         {
-            var canvasGo = new GameObject("Menu", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            // Rebuild on rotation so the map always fits the screen.
+            bool portrait = Screen.height > Screen.width;
+            if (builtPortrait == portrait) return;
+            builtPortrait = portrait;
+            if (canvasGo != null) Destroy(canvasGo);
+            BuildUi(catalog, portrait);
+        }
+
+        void BuildUi(AreaCatalog catalog, bool portrait)
+        {
+            canvasGo = new GameObject("Menu", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             canvasGo.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
             var scaler = canvasGo.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920, 1080);
-            scaler.matchWidthOrHeight = 1f;
+            scaler.referenceResolution = new Vector2(1080, 1080);
+            scaler.matchWidthOrHeight = portrait ? 0f : 1f; // short side = 1080 units
 
-            // Map panel: mainland lower half, islands along the top edge.
-            var map = Rect("Map", canvasGo.transform, new Vector2(0.5f, 0.5f), new Vector2(0, -20), new Vector2(1300, 860));
+            // Map panel: mainland lower half, islands along the top edge. Scaled down to fit portrait.
+            var map = Rect("Map", canvasGo.transform, new Vector2(0.5f, 0.5f), new Vector2(0, portrait ? -40 : -20), new Vector2(1300, 860));
+            if (portrait) map.localScale = Vector3.one * (1020f / 1300f);
             Image(map.gameObject, Sea);
             var mainland = Rect("Mainland", map, new Vector2(0.5f, 0f), Vector2.zero, new Vector2(1300, 560));
             mainland.pivot = new Vector2(0.5f, 0f);
             mainland.anchoredPosition = Vector2.zero;
             Image(mainland.gameObject, Land);
 
-            Label(canvasGo.transform, "LeGamez – Nordwest entdecken", 64, new Vector2(0.5f, 1f), new Vector2(0, -40), new Vector2(1600, 90));
-            Label(canvasGo.transform, "Kartendaten © OpenStreetMap-Mitwirkende (ODbL)", 22, new Vector2(1f, 0f), new Vector2(-30, 20), new Vector2(800, 30))
+            var title = Label(canvasGo.transform, portrait ? "LeGamez\n<size=44>Nordwest entdecken</size>" : "LeGamez – Nordwest entdecken", 64,
+                new Vector2(0.5f, 1f), new Vector2(0, portrait ? -120 : -40), new Vector2(1000, portrait ? 160 : 90));
+            title.horizontalOverflow = HorizontalWrapMode.Overflow;
+            Label(canvasGo.transform, "Kartendaten © OpenStreetMap-Mitwirkende (ODbL)", 22, new Vector2(1f, 0f), new Vector2(-30, portrait ? 60 : 20), new Vector2(800, 30))
                 .alignment = TextAnchor.LowerRight;
 
             if (catalog == null || catalog.areas.Count == 0)

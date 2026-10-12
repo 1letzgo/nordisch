@@ -17,6 +17,13 @@ namespace LeGamez.UI
         RectTransform safeRoot;
         Rect appliedSafeArea;
         float toastUntil;
+        CanvasScaler scaler;
+        RectTransform joystickZone;
+        VirtualJoystick joystick;
+        RectTransform toastRect;
+        bool? portrait;
+
+        public static bool IsPortrait => Screen.height > Screen.width;
 
         static Font uiFont;
         public static Font UiFont => uiFont != null ? uiFont : uiFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -29,38 +36,36 @@ namespace LeGamez.UI
             canvas.sortingOrder = 10;
             var scaler = canvasGo.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920, 1080);
-            scaler.matchWidthOrHeight = 1f;
+            // Layout is authored for a 1080-unit short side; ApplyOrientation picks the axis to match.
+            scaler.referenceResolution = new Vector2(1080, 1080);
 
             var hud = canvasGo.AddComponent<Hud>();
+            hud.scaler = scaler;
             hud.safeRoot = NewRect("SafeArea", canvasGo.transform);
             Stretch(hud.safeRoot);
 
-            // Look area: right 60 % of the screen, behind buttons.
+            // Look area: whole screen, behind everything else – any drag outside the joystick turns the camera.
             var look = NewRect("LookArea", hud.safeRoot);
-            look.anchorMin = new Vector2(0.4f, 0f);
-            look.anchorMax = Vector2.one;
-            look.offsetMin = look.offsetMax = Vector2.zero;
+            Stretch(look);
             AddRaycastTarget(look.gameObject);
             look.gameObject.AddComponent<TouchLookArea>();
 
-            // Joystick zone: left 40 %, lower 70 %.
+            // Joystick zone: lower-left region, sized per orientation in ApplyOrientation.
             var zone = NewRect("JoystickZone", hud.safeRoot);
-            zone.anchorMin = Vector2.zero;
-            zone.anchorMax = new Vector2(0.4f, 0.7f);
-            zone.offsetMin = zone.offsetMax = Vector2.zero;
             AddRaycastTarget(zone.gameObject);
+            hud.joystickZone = zone;
             var bg = NewRect("Base", zone);
             bg.anchorMin = bg.anchorMax = Vector2.zero;
             bg.sizeDelta = new Vector2(240, 240);
             bg.anchoredPosition = new Vector2(220, 220);
-            AddCircle(bg.gameObject, new Color(1f, 1f, 1f, 0.18f));
+            AddCircle(bg.gameObject, new Color(1f, 1f, 1f, 0.18f)).raycastTarget = false;
             var handle = NewRect("Handle", bg);
             handle.sizeDelta = new Vector2(110, 110);
-            AddCircle(handle.gameObject, new Color(1f, 1f, 1f, 0.55f));
+            AddCircle(handle.gameObject, new Color(1f, 1f, 1f, 0.55f)).raycastTarget = false;
             var stick = zone.gameObject.AddComponent<VirtualJoystick>();
             stick.background = bg;
             stick.handle = handle;
+            hud.joystick = stick;
 
             hud.jumpButton = CreateButton(hud.safeRoot, "Jump", "▲", new Vector2(-150, 170), 150);
             hud.jumpButton.onPress = GameInput.QueueJump;
@@ -78,22 +83,25 @@ namespace LeGamez.UI
             menuButton.onPress = () => UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(0);
 
             hud.titleLabel = CreateLabel(hud.safeRoot, "Title", areaName, 44, TextAnchor.UpperLeft,
-                new Vector2(0, 1), new Vector2(40, -30), new Vector2(900, 60));
+                new Vector2(0, 1), new Vector2(40, -30), new Vector2(860, 60));
             hud.infoLabel = CreateLabel(hud.safeRoot, "Info", "", 30, TextAnchor.UpperLeft,
-                new Vector2(0, 1), new Vector2(40, -90), new Vector2(900, 50));
+                new Vector2(0, 1), new Vector2(40, -90), new Vector2(860, 50));
             hud.toastLabel = CreateLabel(hud.safeRoot, "Toast", "", 40, TextAnchor.MiddleCenter,
-                new Vector2(0.5f, 1f), new Vector2(0, -120), new Vector2(1200, 70));
+                new Vector2(0.5f, 1f), new Vector2(0, -160), new Vector2(1000, 70));
+            hud.toastRect = hud.toastLabel.rectTransform;
             var credit = CreateLabel(hud.safeRoot, "Attribution", attribution, 20, TextAnchor.LowerRight,
                 new Vector2(1, 0), new Vector2(-20, 10), new Vector2(700, 30));
             credit.color = new Color(1, 1, 1, 0.75f);
 
             hud.ApplySafeArea();
+            hud.ApplyOrientation();
             return hud;
         }
 
         void Update()
         {
             if (Screen.safeArea != appliedSafeArea) ApplySafeArea();
+            if (portrait != IsPortrait) ApplyOrientation();
             if (toastLabel != null && toastLabel.text.Length > 0 && Time.time > toastUntil) toastLabel.text = "";
         }
 
@@ -108,6 +116,18 @@ namespace LeGamez.UI
             bool show = !string.IsNullOrEmpty(label);
             if (interactButton.gameObject.activeSelf != show) interactButton.gameObject.SetActive(show);
             if (show) interactLabel.text = label;
+        }
+
+        void ApplyOrientation()
+        {
+            portrait = IsPortrait;
+            bool p = portrait.Value;
+            scaler.matchWidthOrHeight = p ? 0f : 1f; // match the short side
+            joystickZone.anchorMin = Vector2.zero;
+            joystickZone.anchorMax = p ? new Vector2(0.6f, 0.4f) : new Vector2(0.4f, 0.7f);
+            joystickZone.offsetMin = joystickZone.offsetMax = Vector2.zero;
+            joystick.ResetRest(p ? new Vector2(200, 260) : new Vector2(220, 220));
+            toastRect.anchoredPosition = new Vector2(0, p ? -200 : -160);
         }
 
         void ApplySafeArea()

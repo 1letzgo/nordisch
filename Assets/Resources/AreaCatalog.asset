@@ -25,9 +25,9 @@ MonoBehaviour:
   - id: langeoog
     displayName: Langeoog
     sceneName: Langeoog
-    lat: 53.7465
+    lat: 53.7485
     lon: 7.479
-    poiCount: 14
+    poiCount: 15
     vehicles:
     - bicycle
     - carriage

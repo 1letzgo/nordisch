@@ -29,9 +29,17 @@ namespace LeGamez.Player
             currentDistance = distance;
         }
 
+        Camera cam;
+
         void LateUpdate()
         {
             if (target == null) return;
+
+            // Portrait screens are narrow: widen the vertical FOV and pull back a bit.
+            if (cam == null) cam = GetComponent<Camera>();
+            bool portrait = Screen.height > Screen.width;
+            if (cam != null) cam.fieldOfView = portrait ? 72f : 55f;
+            float distanceScale = portrait ? 1.15f : 1f;
 
             Vector2 look = GameInput.ConsumeLook();
             if (look.sqrMagnitude > 0.0001f) idleLookTime = 0f;
@@ -51,8 +59,8 @@ namespace LeGamez.Player
             Vector3 pivot = target.position + pivotOffset;
             Vector3 back = rotation * Vector3.back;
 
-            float wanted = distance;
-            if (Physics.SphereCast(pivot, collisionRadius, back, out var hit, distance, collisionMask, QueryTriggerInteraction.Ignore))
+            float wanted = distance * distanceScale;
+            if (Physics.SphereCast(pivot, collisionRadius, back, out var hit, wanted, collisionMask, QueryTriggerInteraction.Ignore))
                 wanted = Mathf.Max(0.5f, hit.distance - 0.1f);
             // Snap in fast (avoid clipping), ease out slowly.
             currentDistance = wanted < currentDistance ? wanted : Mathf.Lerp(currentDistance, wanted, 1f - Mathf.Exp(-4f * Time.deltaTime));
