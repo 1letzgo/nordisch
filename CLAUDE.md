@@ -69,6 +69,13 @@ python3 Tools/dgm/fetch_dgm.py <id>        # Gelände, nur Niedersachsen
 ```
 Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen später Scrollen.
 
+### Spielsysteme (Runtime, `Assets/Scripts/`)
+- `Vehicles/`: Fahrräder an OSM-Fahrradständern (`AreaInfo.bikeSpots`, beim Import gegen Brunnen/Bänke/Wasser/Gebäude geprüft)
+  plus eines am Startpunkt (`spawnBikeSpot`). Rennen-Knopf = zweiter Gang auf dem Rad.
+- `Core/PositionMemory`: letzte Position, Blickrichtung und Fahrstatus pro Gebiet (PlayerPrefs; Schlüssel enthält Größe+Zentrum,
+  wird also bei Gebietsänderung verworfen). Figurenwahl: `PlayerAvatar.SelectedIndex`.
+- `UI/FullMap`: Tipp auf Minikarte → große Karte, Beamen. `UI/Navigation`: Minikarte + Ziel-Pille.
+
 ## Bauen
 - Projekt-Setup (Player-Settings, URP, Materialien, Figuren, Logo/Icon): `-executeMethod LeGamez.Editor.ProjectSetup.Run`
 - Xcode-Export Gerät: `-executeMethod LeGamez.Editor.BuildScript.BuildIOS` → `Builds/iOS`

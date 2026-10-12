@@ -16,8 +16,8 @@
       "id": "westerstede",
       "name": "Westerstede",
       "lat": 53.257,
-      "lon": 7.927,
-      "size_m": 1000,
+      "lon": 7.9275,
+      "size_m": 1600,
       "vehicles": [
         "bicycle",
         "car"
@@ -27,9 +27,9 @@
     {
       "id": "langeoog",
       "name": "Langeoog",
-      "lat": 53.7485,
-      "lon": 7.479,
-      "size_m": 1200,
+      "lat": 53.7465,
+      "lon": 7.4825,
+      "size_m": 2000,
       "vehicles": [
         "bicycle",
         "carriage"

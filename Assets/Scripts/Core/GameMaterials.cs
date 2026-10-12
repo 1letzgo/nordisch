@@ -24,6 +24,7 @@ namespace LeGamez.Core
         public float characterScale = 1f;
         public float characterFootOffset;
         public Material pedestalMaterial;
+        public Material vehicleMaterial;
 
         static GameMaterials instance;
 

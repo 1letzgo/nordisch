@@ -79,6 +79,10 @@ namespace LeGamez.Editor
             {
                 wi.textureType = TextureImporterType.Sprite;
                 wi.spriteImportMode = SpriteImportMode.Single; // full texture, never a stale sub-rect
+                var tis = new TextureImporterSettings();
+                wi.ReadTextureSettings(tis);
+                tis.spriteMeshType = SpriteMeshType.FullRect; // tight meshes clip soft glyph edges
+                wi.SetTextureSettings(tis);
                 wi.npotScale = TextureImporterNPOTScale.None;
                 wi.alphaIsTransparency = true;
                 wi.mipmapEnabled = false;
@@ -242,6 +246,8 @@ namespace LeGamez.Editor
             gm.poiDone = Mat("Poi_Done", unlit, new Color(0.31f, 0.60f, 0.42f));
             gm.postProfile = CreatePostProfile();
             gm.pedestalMaterial = Mat("Pedestal", lit, new Color(0.93f, 0.89f, 0.80f));
+            gm.vehicleMaterial = Mat("Vehicle", Shader.Find("LeGamez/VertexColorLit"), Color.white);
+            gm.vehicleMaterial.SetColor("_Tint", Color.white);
             CharacterSetup.Run(gm);
             EditorUtility.SetDirty(gm);
         }

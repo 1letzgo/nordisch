@@ -160,7 +160,8 @@ def wordmark(height, color):
     x += d.textlength("NORD", font=f_bold)
     d.text((x, S(10)), "isch", font=f_reg, fill=color)
     bbox = tmp.getbbox()
-    tmp = tmp.crop(bbox)
+    pad = S(8)  # transparent margin so anti-aliased edges never touch the texture border
+    tmp = tmp.crop((bbox[0] - pad, bbox[1] - pad, bbox[2] + pad, bbox[3] + pad))
     return tmp.resize((tmp.width // SS, tmp.height // SS), Image.LANCZOS)
 
 

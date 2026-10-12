@@ -42,6 +42,9 @@ namespace LeGamez.UI
 
         RectTransform rotator, map, playerArrow, north, targetEdge;
         Text targetLabel;
+        RectTransform pillRect;
+        const float PillWidth = 400f;
+        string pillText;
         float radius;
         float pixelsPerMeter;
         readonly List<(PoiEntry poi, Image dot)> dots = new List<(PoiEntry, Image)>();
@@ -107,14 +110,16 @@ namespace LeGamez.UI
             te.raycastTarget = false;
 
             // Next target name + distance, as a pill under the map.
-            var pill = UiKit.Rect("TargetPill", root, new Vector2(0.5f, 0f), new Vector2(0, -60), new Vector2(size + 20, 50));
-            UiKit.Panel(pill.gameObject, new Color(UiKit.Navy.r, UiKit.Navy.g, UiKit.Navy.b, 0.88f));
+            // Right-aligned under the map, grows to the left and downwards for long names.
+            var pill = UiKit.Rect("TargetPill", root, new Vector2(1f, 0f), new Vector2(0, -12), new Vector2(PillWidth, 52));
+            pill.pivot = new Vector2(1f, 1f);
+            UiKit.Panel(pill.gameObject, new Color(UiKit.Navy.r, UiKit.Navy.g, UiKit.Navy.b, 0.9f));
             targetLabel = UiKit.Label(pill, "", 24, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
-            UiKit.Stretch(targetLabel.rectTransform, 6f);
+            UiKit.Stretch(targetLabel.rectTransform);
+            targetLabel.rectTransform.offsetMin = new Vector2(18, 8);
+            targetLabel.rectTransform.offsetMax = new Vector2(-18, -8);
             targetLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
-            targetLabel.resizeTextForBestFit = true;
-            targetLabel.resizeTextMinSize = 16;
-            targetLabel.resizeTextMaxSize = 24;
+            pillRect = pill;
 
             north = UiKit.Rect("North", root, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(40, 40));
             UiKit.Panel(north.gameObject, UiKit.Mustard, UiKit.Circle);
@@ -147,7 +152,21 @@ namespace LeGamez.UI
 
             var t = NavState.Target;
             targetLabel.transform.parent.gameObject.SetActive(t != null);
-            if (t != null) targetLabel.text = $"{t.name} · {Mathf.RoundToInt(NavState.DistanceTo(t.position))} m";
+            if (t != null)
+            {
+                string text = $"{t.name} · {Mathf.RoundToInt(NavState.DistanceTo(t.position))} m";
+                if (text != pillText)
+                {
+                    pillText = text;
+                    targetLabel.text = text;
+                    // Fit the pill: shrink to short names, wrap long ones onto a second line.
+                    var gen = targetLabel.cachedTextGeneratorForLayout;
+                    var settings = targetLabel.GetGenerationSettings(new Vector2(PillWidth - 36, 0));
+                    float w = gen.GetPreferredWidth(text, settings) / targetLabel.pixelsPerUnit + 40f;
+                    float h = gen.GetPreferredHeight(text, settings) / targetLabel.pixelsPerUnit + 18f;
+                    pillRect.sizeDelta = new Vector2(Mathf.Clamp(w, 180f, PillWidth), Mathf.Max(52f, h));
+                }
+            }
 
             if (NavState.Target != null && NavState.DistanceTo(NavState.Target.position) > metersVisible * 0.92f)
             {

@@ -36,3 +36,4 @@ MonoBehaviour:
   characterScale: 2.1143043
   characterFootOffset: 0.11029713
   pedestalMaterial: {fileID: 2100000, guid: 80ae7b7f04bb0457c8711c02f887b43b, type: 2}
+  vehicleMaterial: {fileID: 2100000, guid: 7ad31f8ae6d7c4cd980ac8a027768a44, type: 2}

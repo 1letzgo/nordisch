@@ -206,6 +206,12 @@ namespace LeGamez.Editor.OsmImport
             info.allowedVehicles = new List<string>(meta.vehicles);
             info.pois = poiDb;
             info.spawnPoint = spawn;
+            info.bikeSpots = BikeSpots(data, half, terrain);
+            var spawn2 = new Vector2(spawn.position.x, spawn.position.z);
+            var bikeSpot = FreeBikeSpot(data, spawn2, NearbyBuildings(data, spawn2, 15f));
+            info.spawnBikeSpot = bikeSpot.HasValue
+                ? new Vector3(bikeSpot.Value.x, terrain.Height(bikeSpot.Value.x, bikeSpot.Value.y), bikeSpot.Value.y)
+                : Vector3.zero;
             info.attribution = hasLod2 ? "© OpenStreetMap-Mitwirkende (ODbL) · 3D-Gebäude © LGLN (CC BY 4.0)" : "© OpenStreetMap-Mitwirkende (ODbL)";
             spawn.SetParent(areaGo.transform, true);
 
@@ -232,6 +238,8 @@ namespace LeGamez.Editor.OsmImport
                 if (p.tags.Has("building") && GeoUtil.Overlaps(p.outer, 200f))
                     buildings.Add(PolygonTriangulator.Clean(p.outer));
 
+            bool Blocked(Vector2 p) => IsObstructed(data, p, 0f);
+
             Vector2 best = Vector2.zero;
             float bestScore = float.MaxValue;
             foreach (var w in data.ways)
@@ -248,12 +256,97 @@ namespace LeGamez.Editor.OsmImport
                 {
                     if (p.magnitude > 200f) continue;
                     float clearance = Clearance(p, buildings);
-                    if (clearance < 6f) continue;
+                    if (clearance < 6f || Blocked(p)) continue;
                     float score = p.magnitude + penalty - Mathf.Min(clearance, 20f);
                     if (score < bestScore) { bestScore = score; best = p; }
                 }
             }
             return new Vector3(best.x, 0f, best.y);
+        }
+
+        static List<(Vector2 p, float r)> obstacleCache;
+        static List<List<Vector2>> waterCache;
+        static OsmData obstacleData;
+
+        /// <summary>
+        /// True if the point is inside/near street furniture (fountains, benches, statues, bike stands,
+        /// picnic tables) or inside a water area. <paramref name="extra"/> widens every radius.
+        /// </summary>
+        static bool IsObstructed(OsmData data, Vector2 p, float extra)
+        {
+            if (obstacleData != data)
+            {
+                obstacleData = data;
+                obstacleCache = new List<(Vector2, float)>();
+                waterCache = new List<List<Vector2>>();
+                foreach (var n in data.nodes)
+                {
+                    var t = n.tags;
+                    float r = t.Is("amenity", "fountain") ? 5f
+                            : t.Is("amenity", "bench") || t.Is("amenity", "bicycle_parking") || t.Is("tourism", "artwork")
+                              || t.Is("historic", "memorial") || t.Is("leisure", "picnic_table") || t.Is("amenity", "waste_basket") ? 2.5f : 0f;
+                    if (r > 0f) obstacleCache.Add((data.projection.ToLocal(n.lat, n.lon), r));
+                }
+                foreach (var poly in data.polygons)
+                {
+                    if (poly.tags.Is("amenity", "fountain"))
+                    {
+                        var bb = GeoUtil.Bounds(poly.outer);
+                        obstacleCache.Add((bb.center, Mathf.Max(bb.width, bb.height) * 0.5f + 3f));
+                    }
+                    if (poly.tags.Is("natural", "water") || poly.tags.Has("water") || poly.tags.Is("leisure", "swimming_pool"))
+                        waterCache.Add(PolygonTriangulator.Clean(poly.outer));
+                }
+            }
+            foreach (var (o, r) in obstacleCache) if ((o - p).sqrMagnitude < (r + extra) * (r + extra)) return true;
+            foreach (var o in FurniturePlacer.LastOccupied) if ((o - p).sqrMagnitude < (2f + extra) * (2f + extra)) return true;
+            foreach (var w in waterCache) if (w.Count > 2 && OsmData.PointInRing(p, w)) return true;
+            return false;
+        }
+
+        /// <summary>Free spot for a parked bike near <paramref name="around"/>: clear of furniture, water and buildings.</summary>
+        static Vector2? FreeBikeSpot(OsmData data, Vector2 around, List<List<Vector2>> buildings)
+        {
+            for (float r = 1.8f; r <= 10f; r += 1.2f)
+            for (int i = 0; i < 12; i++)
+            {
+                float a = i * Mathf.PI / 6f;
+                var p = around + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r;
+                if (IsObstructed(data, p, 0f) || Clearance(p, buildings) < 2f) continue;
+                return p;
+            }
+            return null;
+        }
+
+        static List<List<Vector2>> NearbyBuildings(OsmData data, Vector2 c, float radius)
+        {
+            var list = new List<List<Vector2>>();
+            foreach (var poly in data.polygons)
+                if (poly.tags.Has("building") && (GeoUtil.Centroid(poly.outer) - c).magnitude < radius + 60f)
+                    list.Add(PolygonTriangulator.Clean(poly.outer));
+            return list;
+        }
+
+        /// <summary>Up to 40 bicycle parkings, at least 40 m apart, as places for parked bikes.</summary>
+        static List<Vector3> BikeSpots(OsmData data, float half, TerrainField terrain)
+        {
+            var spots = new List<Vector3>();
+            foreach (var n in data.nodes)
+            {
+                if (!n.tags.Is("amenity", "bicycle_parking")) continue;
+                var p = data.projection.ToLocal(n.lat, n.lon);
+                if (Mathf.Abs(p.x) > half - 5 || Mathf.Abs(p.y) > half - 5) continue;
+                bool near = false;
+                foreach (var s in spots) if ((new Vector2(s.x, s.z) - p).sqrMagnitude < 40f * 40f) { near = true; break; }
+                if (near) continue;
+                // Beside the stands (not inside them, nor in a fountain or pond next to them).
+                var free = FreeBikeSpot(data, p, NearbyBuildings(data, p, 15f));
+                if (free == null) continue;
+                var q = free.Value;
+                spots.Add(new Vector3(q.x, terrain.Height(q.x, q.y), q.y));
+                if (spots.Count >= 40) break;
+            }
+            return spots;
         }
 
         static float Clearance(Vector2 p, List<List<Vector2>> rings)

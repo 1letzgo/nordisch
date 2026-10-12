@@ -24,10 +24,14 @@ namespace LeGamez.Editor.OsmImport
 
         public struct Stats { public int mapped, benches, planters, seating, fountains; }
 
+        /// <summary>Everything placed by the last <see cref="Place"/> call (used to keep bikes clear).</summary>
+        public static readonly List<Vector2> LastOccupied = new List<Vector2>();
+
         public static Stats Place(OsmData data, MeshSink sink, float half, System.Random rng)
         {
             var st = new Stats();
-            var occupied = new List<Vector2>();
+            var occupied = LastOccupied;
+            occupied.Clear();
             bool Free(Vector2 p, float r)
             {
                 foreach (var o in occupied) if ((o - p).sqrMagnitude < r * r) return false;

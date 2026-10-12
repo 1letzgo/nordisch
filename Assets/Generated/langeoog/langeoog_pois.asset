@@ -16,90 +16,126 @@ MonoBehaviour:
   - id: way/1137995698
     name: Motorrettungsboot Langeoog
     category: 0
-    position: {x: 77.37584, y: 7.964887, z: 96.626335}
-    lat: 53.74937386126164
-    lon: 7.4801754433501815
+    position: {x: -153.02544, y: 7.9733176, z: 317.7745}
+    lat: 53.749373862803324
+    lon: 7.480175447901165
   - id: way/124259507
     name: Wasserturm
     category: 4
-    position: {x: -161.76065, y: 19.261143, z: -124.13956}
-    lat: 53.74737731693811
-    lon: 7.476542637559819
+    position: {x: -392.17395, y: 19.271729, z: 97.00846}
+    lat: 53.74737731709985
+    lon: 7.476542632385351
   - id: way/109884101
     name: Evangelisch-Lutherische Inselkirche
     category: 2
-    position: {x: 178.65547, y: 7.3389626, z: -283.58844}
-    lat: 53.74593530631124
-    lon: 7.481714017558755
+    position: {x: -51.741047, y: 7.3625293, z: -62.44059}
+    lat: 53.745935304955005
+    lon: 7.481714021132639
   - id: way/108578040
     name: Sankt Nikolaus
     category: 2
-    position: {x: -283.93002, y: 8.444919, z: -377.46176}
-    lat: 53.7450863425265
-    lon: 7.474686720028035
+    position: {x: -514.3485, y: 8.466679, z: -156.31412}
+    lat: 53.74508633930733
+    lon: 7.47468672438847
+  - id: node/6680619224
+    name: Ehemalige Seenotbeobachtungsstation
+    category: 4
+    position: {x: 640.9611, y: 20.906284, z: 730.5182}
+    lat: 53.75310660000069
+    lon: 7.492236600353599
   - id: way/168678234
     name: Infohaus Altes Wasserwerk
     category: 1
-    position: {x: -237.20355, y: 6.0951047, z: -288.7277}
-    lat: 53.74588882837149
-    lon: 7.475396558138956
+    position: {x: -467.44962, y: 6.099107, z: -67.35476}
+    lat: 53.745890862596845
+    lon: 7.475399147943547
   - id: node/2866654401
     name: Schifffahrtsmuseum
     category: 1
-    position: {x: 62.976635, y: 9.003207, z: 148.45665}
-    lat: 53.74984259997631
-    lon: 7.479956700018204
+    position: {x: -167.42563, y: 9.015392, z: 369.60464}
+    lat: 53.74984259993104
+    lon: 7.47995669997317
   - id: way/221597469
     name: Seemannshus
     category: 1
-    position: {x: -69.659, y: 8.285245, z: -260.98877}
-    lat: 53.746139691342165
-    lon: 7.4779417858969435
+    position: {x: -300.0677, y: 8.332125, z: -39.840813}
+    lat: 53.746139690951914
+    lon: 7.47794178412224
+  - id: way/108578018
+    name: Friedhofskapelle
+    category: 2
+    position: {x: 479.5813, y: 8.624506, z: 693.7756}
+    lat: 53.75277431017898
+    lon: 7.4897851399150985
   - id: way/42265813
     name: "Aussichtspunkt D\xFCnenblick"
     category: 4
-    position: {x: -112.06159, y: 18.473305, z: 300.5115}
-    lat: 53.75121774110665
-    lon: 7.477297633285117
-  - id: node/971065532
-    name: "K\xF6 2"
-    category: 3
-    position: {x: 475.1191, y: 4.2079067, z: -271.2933}
-    lat: 53.74604650004121
-    lon: 7.486217700047622
+    position: {x: -342.4734, y: 18.512075, z: 521.66095}
+    lat: 53.75121775417102
+    lon: 7.477297615003401
   - id: node/9542853506
     name: LEGO Langeoog
     category: 0
-    position: {x: 77.28741, y: 9.447363, z: 171.32335}
-    lat: 53.7500493999403
-    lon: 7.480174099944098
+    position: {x: -153.11417, y: 9.47223, z: 392.47134}
+    lat: 53.75004939989504
+    lon: 7.480174100039114
+  - id: node/971065532
+    name: "K\xF6 2"
+    category: 3
+    position: {x: 244.73647, y: 4.2208195, z: -50.14531}
+    lat: 53.74604649999594
+    lon: 7.486217699996886
+  - id: node/7961950418
+    name: Lale-Andersen-Haus
+    category: 0
+    position: {x: 402.2744, y: 7.7462234, z: 664.2512}
+    lat: 53.75250730027586
+    lon: 7.488610799978796
   - id: way/41397790
     name: "Sp\xF6\xF6lstuv"
     category: 8
-    position: {x: 65.189186, y: 7.9277186, z: 259.15344}
-    lat: 53.750843710477895
-    lon: 7.479990311653608
+    position: {x: -165.21289, y: 7.92221, z: 480.30118}
+    lat: 53.7508437080867
+    lon: 7.479990312848057
   - id: way/179363192
     name: Rathaus
     category: 8
-    position: {x: 153.98059, y: 5.2900624, z: -174.0399}
-    lat: 53.74692603232466
-    lon: 7.481339172839092
+    position: {x: -74.28565, y: 5.2622705, z: 47.224354}
+    lat: 53.74692708370675
+    lon: 7.481371554476796
+  - id: node/7966283837
+    name: Baron von Schilling
+    category: 3
+    position: {x: 422.14853, y: 8.358913, z: 827.45844}
+    lat: 53.75398330018864
+    lon: 7.488912700217079
   - id: node/12100195883
     name: Heinrich de Heer
     category: 3
-    position: {x: -108.55521, y: 9.503488, z: -137.74203}
-    lat: 53.74725429997186
-    lon: 7.477350900014324
+    position: {x: -338.96564, y: 9.503072, z: 83.40597}
+    lat: 53.74725429999559
+    lon: 7.477350899942308
   - id: node/7954102138
     name: "Gro\xDFer Philosoph"
     category: 5
-    position: {x: 389.20178, y: 4.289972, z: -247.98431}
-    lat: 53.74625729996234
-    lon: 7.4849124999654855
+    position: {x: 158.81505, y: 4.3119254, z: -26.83631}
+    lat: 53.746257300003315
+    lon: 7.484912499923823
   - id: node/1351748727
     name: Lili Marleen
     category: 3
-    position: {x: -70.25051, y: 6.8913245, z: -155.64397}
-    lat: 53.74709239996134
-    lon: 7.47793279999262
+    position: {x: -300.65912, y: 6.8852377, z: 65.504036}
+    lat: 53.74709239998507
+    lon: 7.477932799920504
+  - id: node/975845132
+    name: "Grabst\xE4tte Lale Andersen"
+    category: 3
+    position: {x: 480.33572, y: 8.863574, z: 743.76495}
+    lat: 53.753226400000116
+    lon: 7.489796600103496
+  - id: node/975760183
+    name: "Baltengedenkst\xE4tte"
+    category: 3
+    position: {x: 392.4394, y: 5.973711, z: 770.9883}
+    lat: 53.75347260008004
+    lon: 7.4884613998430645

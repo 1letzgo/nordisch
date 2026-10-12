@@ -14,7 +14,7 @@ namespace LeGamez.UI
         public TapButton interactButton;
         public TapButton runButton;
         Image runBackground;
-        public Text interactLabel;
+        Image interactIcon;
 
         RectTransform safeRoot;
         Rect appliedSafeArea;
@@ -78,9 +78,10 @@ namespace LeGamez.UI
             hud.runButton = CreateIconButton(hud.safeRoot, "Run", UiKit.IconKind.Run, new Vector2(-325, 110), 130);
             hud.runButton.onPress = GameInput.ToggleRun;
             hud.runBackground = hud.runButton.GetComponent<Image>();
-            hud.interactButton = CreateButton(hud.safeRoot, "Interact", "", new Vector2(-150, 360), 130);
-            hud.interactLabel = hud.interactButton.GetComponentInChildren<Text>();
-            hud.interactLabel.fontSize = 26;
+            // Context action (mount/dismount): round icon button like jump/run, above the jump button.
+            hud.interactButton = CreateIconButton(hud.safeRoot, "Interact", UiKit.IconKind.Bike, new Vector2(-150, 345), 130);
+            hud.interactIcon = hud.interactButton.transform.Find("Icon").GetComponent<Image>();
+            hud.interactButton.GetComponent<Image>().color = new Color(UiKit.Mustard.r, UiKit.Mustard.g, UiKit.Mustard.b, 0.9f);
             hud.interactButton.onPress = GameInput.QueueInteract;
             hud.interactButton.gameObject.SetActive(false);
 
@@ -124,11 +125,15 @@ namespace LeGamez.UI
             toastUntil = Time.time + seconds;
         }
 
-        public void SetInteract(string label)
+        /// <summary>Swaps the sprint button pictogram (running figure on foot, fast bike while riding).</summary>
+        public void SetRunIcon(UiKit.IconKind icon) => runButton.transform.Find("Icon").GetComponent<Image>().sprite = UiKit.Icon(icon);
+
+        /// <summary>Shows the context action button with the given pictogram, or hides it (null).</summary>
+        public void SetInteract(UiKit.IconKind? icon)
         {
-            bool show = !string.IsNullOrEmpty(label);
+            bool show = icon.HasValue;
             if (interactButton.gameObject.activeSelf != show) interactButton.gameObject.SetActive(show);
-            if (show) interactLabel.text = label;
+            if (show) interactIcon.sprite = UiKit.Icon(icon.Value);
         }
 
         void ApplyOrientation()
@@ -252,6 +257,21 @@ namespace LeGamez.UI
             var img = glyph.gameObject.AddComponent<Image>();
             img.sprite = UiKit.Icon(icon);
             img.raycastTarget = false;
+            return rt.gameObject.AddComponent<TapButton>();
+        }
+
+        /// <summary>Mustard text pill for context actions ("Aufsteigen", "Absteigen").</summary>
+        static TapButton CreatePillButton(Transform parent, string name, Vector2 pos, Vector2 size)
+        {
+            var rt = NewRect(name, parent);
+            rt.anchorMin = rt.anchorMax = new Vector2(1, 0);
+            rt.pivot = new Vector2(1, 0.5f);
+            rt.sizeDelta = size;
+            rt.anchoredPosition = pos;
+            UiKit.DropShadow(rt, 14f, -4f, 0.3f);
+            UiKit.Panel(rt.gameObject, UiKit.Mustard);
+            var t = UiKit.Label(rt, "", 36, UiKit.Navy, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UiKit.Stretch(t.rectTransform);
             return rt.gameObject.AddComponent<TapButton>();
         }
 

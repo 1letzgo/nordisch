@@ -25,8 +25,20 @@ namespace LeGamez.Core
             Vector3 spawn = area != null && area.spawnPoint != null ? area.spawnPoint.position : Vector3.up;
 
             EnsureEventSystem();
+            // Resume where the player left this area (if the saved spot is still inside it).
+            bool resumed = false;
+            Vector3 saved = default;
+            float savedYaw = 0f;
+            if (area != null && PositionMemory.TryLoad(area.MemoryKey, out saved, out savedYaw)
+                && Mathf.Abs(saved.x) < area.HalfSize - 2f && Mathf.Abs(saved.z) < area.HalfSize - 2f)
+            {
+                spawn = saved + Vector3.up * 0.3f;
+                resumed = true;
+            }
             var player = CreatePlayer(spawn);
-            FaceNearestPoi(player.transform, area);
+            if (resumed) player.transform.rotation = Quaternion.Euler(0f, savedYaw, 0f);
+            else FaceNearestPoi(player.transform, area);
+            if (area != null) player.gameObject.AddComponent<PositionMemory>().areaId = area.MemoryKey;
             var cam = CreateCamera(player.transform);
             player.cameraTransform = cam.transform;
 
@@ -40,6 +52,10 @@ namespace LeGamez.Core
             var poiManager = new GameObject("POIs").AddComponent<PoiManager>();
             poiManager.player = player.transform;
             poiManager.hud = hud;
+
+            var vehicles = new GameObject("Vehicles").AddComponent<LeGamez.Vehicles.VehicleManager>();
+            vehicles.player = player;
+            vehicles.hud = hud;
         }
 
         /// <summary>Start looking at the closest stamp target instead of whatever wall happens to be north.</summary>
@@ -113,7 +129,7 @@ namespace LeGamez.Core
             var cam = existing != null ? existing : new GameObject("Main Camera", typeof(Camera), typeof(AudioListener)).GetComponent<Camera>();
             cam.tag = "MainCamera";
             cam.nearClipPlane = 0.2f;
-            cam.farClipPlane = 900f;
+            cam.farClipPlane = 750f; // fog ends at 650 m – nothing beyond needs drawing
             cam.fieldOfView = 55f;
             cam.clearFlags = RenderSettings.skybox != null ? CameraClearFlags.Skybox : CameraClearFlags.SolidColor;
             cam.backgroundColor = RenderSettings.fog ? RenderSettings.fogColor : new Color(0.7f, 0.82f, 0.95f);

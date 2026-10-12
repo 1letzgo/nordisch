@@ -25,9 +25,9 @@ MonoBehaviour:
   - id: langeoog
     displayName: Langeoog
     sceneName: Langeoog
-    lat: 53.7485
-    lon: 7.479
-    poiCount: 15
+    lat: 53.7465
+    lon: 7.4825
+    poiCount: 21
     vehicles:
     - bicycle
     - carriage
@@ -35,8 +35,8 @@ MonoBehaviour:
     displayName: Westerstede
     sceneName: Westerstede
     lat: 53.257
-    lon: 7.927
-    poiCount: 17
+    lon: 7.9275
+    poiCount: 20
     vehicles:
     - bicycle
     - car

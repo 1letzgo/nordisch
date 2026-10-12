@@ -24,7 +24,7 @@ namespace LeGamez.UI
 
         // ---------------------------------------------------------------- icons
 
-        public enum IconKind { Jump, Run }
+        public enum IconKind { Jump, Run, Bike, Walk, BikeFast }
 
         static readonly System.Collections.Generic.Dictionary<IconKind, Sprite> icons = new System.Collections.Generic.Dictionary<IconKind, Sprite>();
 
@@ -59,6 +59,43 @@ namespace LeGamez.UI
                     S(6, 34, 17, 34, 3.5f);         // speed lines
                     S(3, 26, 14, 26, 3.5f);
                     break;
+                case IconKind.Bike:
+                    // Bicycle: two wheels as rings, step-through frame, handlebar, saddle.
+                    Ring(strokes, new Vector2(16, 20), 10f, 4f);
+                    Ring(strokes, new Vector2(48, 20), 10f, 4f);
+                    S(16, 20, 28, 20, 4f);
+                    S(28, 20, 22, 36, 4f);
+                    S(28, 20, 42, 34, 4f);
+                    S(42, 34, 48, 20, 4f);
+                    S(42, 34, 40, 42, 4f);
+                    S(36, 42, 46, 42, 4f);
+                    S(18, 37, 27, 37, 5f);
+                    break;
+                case IconKind.BikeFast:
+                    // Bicycle shifted right + speed lines: "fast gear".
+                    Ring(strokes, new Vector2(24, 20), 10f, 4f);
+                    Ring(strokes, new Vector2(54, 20), 10f, 4f);
+                    S(24, 20, 35, 20, 4f);
+                    S(35, 20, 30, 36, 4f);
+                    S(35, 20, 48, 34, 4f);
+                    S(48, 34, 54, 20, 4f);
+                    S(48, 34, 46, 42, 4f);
+                    S(42, 42, 52, 42, 4f);
+                    S(26, 37, 34, 37, 5f);
+                    S(2, 34, 11, 34, 3.5f);
+                    S(4, 26, 12, 26, 3.5f);
+                    break;
+                case IconKind.Walk:
+                    // Walking figure (calm, upright) – "get off the bike".
+                    dots.Add((new Vector2(34, 54), 5.5f));
+                    S(33, 44, 31, 26, 6f);
+                    S(33, 41, 40, 32, 4.5f);
+                    S(32, 41, 25, 33, 4.5f);
+                    S(31, 26, 38, 16, 5f);
+                    S(38, 16, 40, 7, 5f);
+                    S(31, 26, 26, 16, 5f);
+                    S(26, 16, 20, 9, 5f);
+                    break;
             }
             const int size = 128;
             const float scale = size / 64f;
@@ -84,6 +121,16 @@ namespace LeGamez.UI
             var sprite = Sprite.Create(tex, new UnityEngine.Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
             icons[kind] = sprite;
             return sprite;
+        }
+
+        static void Ring(System.Collections.Generic.List<(Vector2 a, Vector2 b, float w)> strokes, Vector2 c, float r, float w)
+        {
+            const int seg = 20;
+            for (int i = 0; i < seg; i++)
+            {
+                float a0 = i * Mathf.PI * 2f / seg, a1 = (i + 1) * Mathf.PI * 2f / seg;
+                strokes.Add((c + new Vector2(Mathf.Cos(a0), Mathf.Sin(a0)) * r, c + new Vector2(Mathf.Cos(a1), Mathf.Sin(a1)) * r, w));
+            }
         }
 
         /// <summary>White "NORDisch" lettering without the badge (Resources/Branding/wordmark.png), with a soft

@@ -33,6 +33,9 @@ namespace LeGamez.Player
         [Tooltip("Seconds after a manual swipe before auto follow takes over again.")]
         public float manualLookHold = 0.6f;
         public float defaultPitch = 16f;
+        [Tooltip("Extra distance, e.g. while riding a bicycle.")]
+        public float distanceBonus;
+        float bonusSmoothed;
 
         float targetYaw, targetPitch = 16f;
         float yaw, pitch = 16f;
@@ -124,7 +127,8 @@ namespace LeGamez.Player
             var rotation = Quaternion.Euler(pitch, yaw, 0f);
             Vector3 back = rotation * Vector3.back;
 
-            float wanted = distance * distanceScale;
+            bonusSmoothed = Mathf.Lerp(bonusSmoothed, distanceBonus, 1f - Mathf.Exp(-3f * Time.deltaTime));
+            float wanted = distance * distanceScale + bonusSmoothed;
             if (Physics.SphereCast(pivot, collisionRadius, back, out var hit, wanted, collisionMask, QueryTriggerInteraction.Ignore))
                 wanted = Mathf.Max(0.8f, hit.distance - 0.1f);
             currentDistance = Mathf.SmoothDamp(currentDistance, wanted, ref distanceVel,

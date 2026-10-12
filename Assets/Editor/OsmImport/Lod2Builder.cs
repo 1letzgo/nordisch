@@ -219,15 +219,29 @@ namespace LeGamez.Editor.OsmImport
                 minU = Mathf.Min(minU, u); maxU = Mathf.Max(maxU, u);
                 minY = Mathf.Min(minY, p.y); maxY = Mathf.Max(maxY, p.y);
             }
-            // Eave = lowest of the "top" vertices (gable walls peak higher in the middle).
+            // Eave: if the top edge is flat (≥2 vertices at the maximum) it is the maximum; a single
+            // apex means a gable, so the eave is the next lower vertex height. Pure gable triangles
+            // (LoD2 often splits them off) therefore get eave == bottom → no windows.
             float eave = maxY;
-            foreach (var p in ring) if (p.y > minY + 2f) eave = Mathf.Min(eave, p.y);
+            int atMax = 0;
+            foreach (var p in ring) if (p.y > maxY - 0.15f) atMax++;
+            if (atMax < 2)
+            {
+                eave = minY;
+                foreach (var p in ring) if (p.y < maxY - 0.15f) eave = Mathf.Max(eave, p.y);
+            }
             float len = maxU - minU;
-            int windows = mode.w > 0.5f && eave - minY > 2.5f ? Mathf.FloorToInt((len - 0.6f) / WindowSpacing) : 0;
+            float wallH = eave - minY;
+            int windows = mode.w > 0.5f && wallH > 2.5f ? Mathf.FloorToInt((len - 0.6f) / WindowSpacing) : 0;
+            // Fit whole storeys under the eave: heights are rescaled so every storey is exactly 3 shader units.
+            int floors = Mathf.Max(1, Mathf.RoundToInt(wallH / 3f));
+            float k = wallH > 0.1f ? floors * 3f / wallH : 1f;
+            float baseY = minY;
+            float top = wallH * k;
             // No windows: still pass wall coordinates (span 0) so brick/plaster patterns line up.
-            if (windows <= 0) return p => new Vector4(Vector3.Dot(p, dir) - minU, p.y, eave, 0f);
+            if (windows <= 0) return p => new Vector4(Vector3.Dot(p, dir) - minU, (p.y - baseY) * k, top, 0f);
             float span = windows * WindowSpacing, offset = minU + (len - span) * 0.5f;
-            return p => new Vector4(Vector3.Dot(p, dir) - offset, p.y, eave, span);
+            return p => new Vector4(Vector3.Dot(p, dir) - offset, (p.y - baseY) * k, top, span);
         }
 
         static void Chimney(MeshSink.Batch b, Vector3 basePoint, System.Random rng)

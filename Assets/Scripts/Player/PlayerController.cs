@@ -46,6 +46,8 @@ namespace LeGamez.Player
         /// <summary>When false (e.g. sitting in a vehicle) input is ignored.</summary>
         public bool InputEnabled { get; set; } = true;
         public event System.Action Jumped;
+        /// <summary>False while riding a bicycle.</summary>
+        public bool CanJump { get; set; } = true;
 
         void Awake() => controller = GetComponent<CharacterController>();
 
@@ -88,7 +90,7 @@ namespace LeGamez.Player
             if (controller.isGrounded)
             {
                 verticalVelocity = -2f;
-                if (InputEnabled && GameInput.ConsumeJump())
+                if (InputEnabled && GameInput.ConsumeJump() && CanJump)
                 {
                     verticalVelocity = Mathf.Sqrt(2f * jumpHeight * -gravity);
                     Jumped?.Invoke();
