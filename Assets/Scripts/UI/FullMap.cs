@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using LeGamez.Core;
 using LeGamez.Player;
 using LeGamez.Quests;
 using LeGamez.World;
@@ -211,25 +212,11 @@ namespace LeGamez.UI
             player.InputEnabled = true;
         }
 
-        /// <summary>Ground near the wanted point: not on a roof and not inside a building.</summary>
-        static Vector3 FindFreeGround(Vector3 wanted)
+        /// <summary>Terrain surface near the wanted point with room for the character (see <see cref="Placement"/>).</summary>
+        Vector3 FindFreeGround(Vector3 wanted)
         {
-            const int mask = ~(1 << 2); // ignore player & thin props
-            for (float r = 0f; r <= 40f; r += 2f)
-            {
-                int steps = r == 0f ? 1 : Mathf.CeilToInt(2f * Mathf.PI * r / 2f);
-                for (int i = 0; i < steps; i++)
-                {
-                    float a = i * Mathf.PI * 2f / steps;
-                    var p = wanted + new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r);
-                    if (!Physics.Raycast(p + Vector3.up * 200f, Vector3.down, out var hit, 400f, mask, QueryTriggerInteraction.Ignore)) continue;
-                    if (hit.point.y > 0.6f) continue; // roof, wall top
-                    if (Physics.CheckCapsule(hit.point + Vector3.up * 0.5f, hit.point + Vector3.up * 1.5f, 0.45f, mask, QueryTriggerInteraction.Ignore))
-                        continue; // something solid right here
-                    return hit.point;
-                }
-            }
-            return wanted;
+            Placement.TryFindFreeGround(wanted, player != null ? player.transform : null, out var spot);
+            return spot;
         }
     }
 

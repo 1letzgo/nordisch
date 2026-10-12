@@ -176,6 +176,12 @@ namespace LeGamez.Editor.OsmImport
                     go.AddComponent<MeshCollider>().sharedMesh = mesh;
                 // Thin props (lamps, trunks, fences) block the player but not the camera probe.
                 if (mat == WorldStyle.MatProps || mat == WorldStyle.MatTreeTrunks) go.layer = 2;
+                // Water: collider on the built-in "Water" layer so placement can detect it; the player walks through.
+                if (mat == WorldStyle.MatWater)
+                {
+                    go.AddComponent<MeshCollider>().sharedMesh = mesh;
+                    go.layer = 4;
+                }
                 GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccluderStatic | StaticEditorFlags.OccludeeStatic);
             }
 

@@ -21,6 +21,8 @@ namespace LeGamez.Core
         void Start()
         {
             Application.targetFrameRate = 60;
+            // Player/props layer walks through water surfaces (they only exist for placement checks).
+            Physics.IgnoreLayerCollision(Placement.PlayerLayer, Placement.WaterLayer, true);
             var area = AreaInfo.Current;
             Vector3 spawn = area != null && area.spawnPoint != null ? area.spawnPoint.position : Vector3.up;
 
@@ -32,7 +34,9 @@ namespace LeGamez.Core
             if (area != null && PositionMemory.TryLoad(area.MemoryKey, out saved, out savedYaw)
                 && Mathf.Abs(saved.x) < area.HalfSize - 2f && Mathf.Abs(saved.z) < area.HalfSize - 2f)
             {
-                spawn = saved + Vector3.up * 0.3f;
+                // Re-validate: data may have changed since saving (new buildings, terrain, props).
+                Placement.TryFindFreeGround(saved, null, out var safe, 20f);
+                spawn = safe + Vector3.up * 0.15f;
                 resumed = true;
             }
             var player = CreatePlayer(spawn);

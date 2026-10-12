@@ -17,7 +17,7 @@ namespace LeGamez.Player
         public float minPitch = -10f;
         public float maxPitch = 70f;
         public float collisionRadius = 0.25f;
-        public LayerMask collisionMask = ~(1 << 2); // everything except "Ignore Raycast" (player)
+        public LayerMask collisionMask = ~((1 << 2) | (1 << 4)); // not player/props ("Ignore Raycast"), not water
 
         [Header("Smoothing")]
         public float lookSmoothTime = 0.07f;
