@@ -15,6 +15,7 @@ namespace LeGamez.Core
         public Material playerAccent;
         public Material poiOpen;
         public Material poiDone;
+        public UnityEngine.Rendering.VolumeProfile postProfile;
 
         static GameMaterials instance;
 

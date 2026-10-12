@@ -10,7 +10,15 @@ namespace LeGamez.Editor.OsmImport
         public const string MatBuildings = "Buildings"; // walls + roofs, MeshCollider
         public const string MatGround = "Ground";       // landuse / roads, no collider (base plane collides)
         public const string MatWater = "Water";
-        public const string MatTrees = "Trees";
+        public const string MatTrees = "Trees";             // crowns + bushes, no collider
+        public const string MatTreeTrunks = "TreeTrunks";   // same material as Trees, MeshCollider
+        public const string MatProps = "Props";             // lamps, hedges, walls, fences – MeshCollider
+
+        /// <summary>Which buckets get a MeshCollider.</summary>
+        public static bool HasCollider(string mat) => mat == MatBuildings || mat == MatTreeTrunks || mat == MatProps;
+
+        /// <summary>Buckets that share another bucket's material.</summary>
+        public static string MaterialOf(string mat) => mat == MatTreeTrunks ? MatTrees : mat == MatProps ? MatGround : mat;
 
         // Vertical layering to avoid z-fighting between overlapping flat surfaces.
         public const float YBase = 0f;
@@ -33,16 +41,23 @@ namespace LeGamez.Editor.OsmImport
         public static readonly Color32 Forest = Hex("#5E9A4E");
         public static readonly Color32 Residential = Hex("#C9C3B4");
         public static readonly Color32 Commercial = Hex("#D3C1BC");
-        public static readonly Color32 Pedestrian = Hex("#D9D2C5");
+        public static readonly Color32 Pedestrian = Hex("#BFB5A5");
         public static readonly Color32 Parking = Hex("#A9A9A9");
         public static readonly Color32 Water = Hex("#5AA9D6");
         public static readonly Color32 Asphalt = Hex("#5D6166");
-        public static readonly Color32 Paving = Hex("#BDB5A6");
+        public static readonly Color32 Paving = Hex("#ABA393");
         public static readonly Color32 Path = Hex("#D8C49A");
         public static readonly Color32 Cycleway = Hex("#B5574B");
         public static readonly Color32 Rail = Hex("#6E5A4A");
         public static readonly Color32 TreeLeaves = Hex("#4F8F3F");
         public static readonly Color32 TreeTrunk = Hex("#7A5638");
+        public static readonly Color32 Bush = Hex("#6E9A55");
+        public static readonly Color32 LampPole = Hex("#3E4247");
+        public static readonly Color32 LampGlow = Hex("#FFF4D6");
+        public static readonly Color32 Hedge = Hex("#55834A");
+        public static readonly Color32 StoneWall = Hex("#A69C8C");
+        public static readonly Color32 Fence = Hex("#8A8F94");
+        public static readonly Color32 LaneMarking = Hex("#E9E6DC");
 
         public static Color32 GroundColor(string ground) => ground == "sand" ? Sand : Grass;
 

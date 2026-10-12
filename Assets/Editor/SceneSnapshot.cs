@@ -3,6 +3,8 @@ using LeGamez.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace LeGamez.Editor
 {
@@ -31,8 +33,13 @@ namespace LeGamez.Editor
                 var cam = camGo.AddComponent<Camera>();
                 cam.fieldOfView = 55f;
                 cam.farClipPlane = 2000f;
-                cam.clearFlags = CameraClearFlags.SolidColor;
+                cam.clearFlags = RenderSettings.skybox != null ? CameraClearFlags.Skybox : CameraClearFlags.SolidColor;
                 cam.backgroundColor = RenderSettings.fogColor;
+                cam.GetUniversalAdditionalCameraData().renderPostProcessing = true;
+                var gm = LeGamez.Core.GameMaterials.Instance;
+                var volume = new GameObject("SnapshotVolume").AddComponent<Volume>();
+                volume.isGlobal = true;
+                if (gm != null) volume.sharedProfile = gm.postProfile;
 
                 // Aerial: from the south-west corner looking at the centre.
                 camGo.transform.position = new Vector3(-380f, 320f, -420f);
@@ -66,6 +73,17 @@ namespace LeGamez.Editor
                 camGo.transform.rotation = Quaternion.LookRotation(spawn + dir * 30f + Vector3.up * 1.5f - camGo.transform.position);
                 Render(cam, Path.Combine(outDir, $"{id}_street.png"));
 
+                // Landmark: the top-ranked POI seen from 35 m away at eye level.
+                if (area.pois != null && area.pois.entries.Count > 0)
+                {
+                    var poi = area.pois.entries[0].position;
+                    Vector3 from = poi + new Vector3(-22f, 0f, -28f);
+                    camGo.transform.position = from + Vector3.up * 2.5f;
+                    camGo.transform.rotation = Quaternion.LookRotation(poi + Vector3.up * 6f - camGo.transform.position);
+                    Render(cam, Path.Combine(outDir, $"{id}_landmark.png"));
+                }
+
+                Object.DestroyImmediate(volume.gameObject);
                 Object.DestroyImmediate(camGo);
                 Debug.Log($"[Snapshot] {id} -> {outDir}");
             }

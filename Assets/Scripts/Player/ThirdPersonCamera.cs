@@ -3,7 +3,10 @@ using UnityEngine;
 
 namespace LeGamez.Player
 {
-    /// <summary>Orbit camera with swipe/mouse look, auto-follow behind the target and wall collision.</summary>
+    /// <summary>
+    /// Smoothed orbit camera: swipe/mouse look with inertia, damped follow, gentle recentering
+    /// behind the player only when walking straight ahead, and soft wall collision.
+    /// </summary>
     public class ThirdPersonCamera : MonoBehaviour
     {
         public Transform target;
@@ -13,57 +16,75 @@ namespace LeGamez.Player
         public float maxDistance = 14f;
         public float minPitch = -10f;
         public float maxPitch = 70f;
-        public float collisionRadius = 0.3f;
+        public float collisionRadius = 0.25f;
         public LayerMask collisionMask = ~(1 << 2); // everything except "Ignore Raycast" (player)
-        [Tooltip("Degrees/second the camera drifts behind the moving target when not swiping.")]
-        public float autoFollowSpeed = 60f;
 
-        float yaw;
-        float pitch = 18f;
-        float currentDistance;
+        [Header("Smoothing")]
+        public float lookSmoothTime = 0.07f;
+        public float followSmoothTime = 0.08f;
+        public float collisionInTime = 0.05f;
+        public float collisionOutTime = 0.35f;
+        [Tooltip("Degrees/second the camera recenters behind the player while running straight.")]
+        public float recenterSpeed = 35f;
+        public float recenterDelay = 1.5f;
+
+        float targetYaw, targetPitch = 16f;
+        float yaw, pitch = 16f;
+        float yawVel, pitchVel;
+        Vector3 pivot, pivotVel;
+        float currentDistance, distanceVel;
         float idleLookTime;
+        Camera cam;
+        PlayerController player;
 
         void Start()
         {
-            if (target != null) yaw = target.eulerAngles.y;
+            if (target == null) return;
+            targetYaw = yaw = target.eulerAngles.y;
+            pivot = target.position + pivotOffset;
             currentDistance = distance;
+            player = target.GetComponent<PlayerController>();
+            cam = GetComponent<Camera>();
         }
-
-        Camera cam;
 
         void LateUpdate()
         {
             if (target == null) return;
 
             // Portrait screens are narrow: widen the vertical FOV and pull back a bit.
-            if (cam == null) cam = GetComponent<Camera>();
             bool portrait = Screen.height > Screen.width;
-            if (cam != null) cam.fieldOfView = portrait ? 72f : 55f;
+            if (cam != null) cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, portrait ? 70f : 55f, 1f - Mathf.Exp(-8f * Time.deltaTime));
             float distanceScale = portrait ? 1.15f : 1f;
 
             Vector2 look = GameInput.ConsumeLook();
             if (look.sqrMagnitude > 0.0001f) idleLookTime = 0f;
             else idleLookTime += Time.deltaTime;
 
-            yaw += look.x;
-            pitch = Mathf.Clamp(pitch - look.y, minPitch, maxPitch);
+            targetYaw += look.x;
+            targetPitch = Mathf.Clamp(targetPitch - look.y, minPitch, maxPitch);
             distance = Mathf.Clamp(distance - GameInput.Zoom() * 2f, minDistance, maxDistance);
 
-            // Drift behind the player while moving and the user is not steering the camera.
-            var player = target.GetComponent<PlayerController>();
-            float speed = player != null ? player.CurrentSpeed : 0f;
-            if (idleLookTime > 1.2f && speed > 0.5f)
-                yaw = Mathf.MoveTowardsAngle(yaw, target.eulerAngles.y, autoFollowSpeed * Time.deltaTime * Mathf.Clamp01(speed / 4f));
+            // Recenter only while the stick points forward – sideways input must not feed back into the camera.
+            if (player != null && idleLookTime > recenterDelay)
+            {
+                Vector2 input = player.SmoothedInput;
+                float straightness = Mathf.Clamp01((input.y - 0.5f) * 2f) * Mathf.Clamp01(1f - Mathf.Abs(input.x) * 2.5f);
+                if (straightness > 0f)
+                    targetYaw = Mathf.MoveTowardsAngle(targetYaw, target.eulerAngles.y, recenterSpeed * straightness * Time.deltaTime);
+            }
+
+            yaw = Mathf.SmoothDampAngle(yaw, targetYaw, ref yawVel, lookSmoothTime);
+            pitch = Mathf.SmoothDamp(pitch, targetPitch, ref pitchVel, lookSmoothTime);
+            pivot = Vector3.SmoothDamp(pivot, target.position + pivotOffset, ref pivotVel, followSmoothTime);
 
             var rotation = Quaternion.Euler(pitch, yaw, 0f);
-            Vector3 pivot = target.position + pivotOffset;
             Vector3 back = rotation * Vector3.back;
 
             float wanted = distance * distanceScale;
             if (Physics.SphereCast(pivot, collisionRadius, back, out var hit, wanted, collisionMask, QueryTriggerInteraction.Ignore))
-                wanted = Mathf.Max(0.5f, hit.distance - 0.1f);
-            // Snap in fast (avoid clipping), ease out slowly.
-            currentDistance = wanted < currentDistance ? wanted : Mathf.Lerp(currentDistance, wanted, 1f - Mathf.Exp(-4f * Time.deltaTime));
+                wanted = Mathf.Max(0.8f, hit.distance - 0.1f);
+            currentDistance = Mathf.SmoothDamp(currentDistance, wanted, ref distanceVel,
+                wanted < currentDistance ? collisionInTime : collisionOutTime);
 
             transform.SetPositionAndRotation(pivot + back * currentDistance, rotation);
         }

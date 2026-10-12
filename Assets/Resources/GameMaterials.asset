@@ -17,3 +17,4 @@ MonoBehaviour:
   playerAccent: {fileID: 2100000, guid: d45c3ecc1ac3247279ff965e777eb336, type: 2}
   poiOpen: {fileID: 2100000, guid: 335cd6ff3591d4f29b4d236436d9fca8, type: 2}
   poiDone: {fileID: 2100000, guid: dd901778af999458382f30f057319230, type: 2}
+  postProfile: {fileID: 11400000, guid: 93b24c28e0fbe4915a6937d3a541d321, type: 2}

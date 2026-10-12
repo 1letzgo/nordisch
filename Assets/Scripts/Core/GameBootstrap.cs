@@ -4,6 +4,8 @@ using LeGamez.UI;
 using LeGamez.World;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem.UI;
 #endif
@@ -88,8 +90,19 @@ namespace LeGamez.Core
             cam.nearClipPlane = 0.2f;
             cam.farClipPlane = 900f;
             cam.fieldOfView = 55f;
-            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.clearFlags = RenderSettings.skybox != null ? CameraClearFlags.Skybox : CameraClearFlags.SolidColor;
             cam.backgroundColor = RenderSettings.fog ? RenderSettings.fogColor : new Color(0.7f, 0.82f, 0.95f);
+            var urpCam = cam.GetUniversalAdditionalCameraData();
+            urpCam.renderPostProcessing = true;
+            urpCam.antialiasing = AntialiasingMode.None; // MSAA from the pipeline asset
+
+            var profile = GameMaterials.Instance != null ? GameMaterials.Instance.postProfile : null;
+            if (profile != null)
+            {
+                var volume = new GameObject("PostFX").AddComponent<Volume>();
+                volume.isGlobal = true;
+                volume.sharedProfile = profile;
+            }
             var follow = cam.gameObject.AddComponent<ThirdPersonCamera>();
             follow.target = target;
             return cam;

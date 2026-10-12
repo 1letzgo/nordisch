@@ -68,13 +68,115 @@ namespace LeGamez.Editor
             foreach (var rp in pipelines)
             {
                 if (rp is not UniversalRenderPipelineAsset urp) continue;
-                urp.shadowDistance = 120f;
+                urp.shadowDistance = 110f;
                 urp.shadowCascadeCount = 2;
                 urp.msaaSampleCount = 4;
                 urp.renderScale = 1f;
                 urp.supportsHDR = false;
+                var so = new SerializedObject(urp);
+                SetInt(so, "m_MainLightShadowmapResolution", 2048);
+                SetBool(so, "m_MainLightShadowsSupported", true);
+                SetBool(so, "m_SoftShadowsSupported", true);
+                so.ApplyModifiedPropertiesWithoutUndo();
                 EditorUtility.SetDirty(urp);
+
+                foreach (var data in RendererDatas(urp)) EnsureSsao(data);
             }
+        }
+
+        static void SetInt(SerializedObject so, string name, int v)
+        {
+            var p = so.FindProperty(name);
+            if (p != null) p.intValue = v; else Debug.LogWarning($"[LeGamez] URP property {name} not found");
+        }
+
+        static void SetBool(SerializedObject so, string name, bool v)
+        {
+            var p = so.FindProperty(name);
+            if (p != null) p.boolValue = v; else Debug.LogWarning($"[LeGamez] URP property {name} not found");
+        }
+
+        static System.Collections.Generic.IEnumerable<ScriptableRendererData> RendererDatas(UniversalRenderPipelineAsset urp)
+        {
+            var list = new SerializedObject(urp).FindProperty("m_RendererDataList");
+            for (int i = 0; list != null && i < list.arraySize; i++)
+                if (list.GetArrayElementAtIndex(i).objectReferenceValue is ScriptableRendererData d) yield return d;
+        }
+
+        /// <summary>Adds URP's Screen Space Ambient Occlusion feature (internal type, so via reflection).</summary>
+        static void EnsureSsao(ScriptableRendererData data)
+        {
+            foreach (var f in data.rendererFeatures)
+                if (f != null && f.GetType().Name == "ScreenSpaceAmbientOcclusion") return;
+            var type = typeof(UniversalRenderPipelineAsset).Assembly.GetType("UnityEngine.Rendering.Universal.ScreenSpaceAmbientOcclusion");
+            if (type == null) { Debug.LogWarning("[LeGamez] SSAO feature type not found"); return; }
+            var feature = (ScriptableRendererFeature)ScriptableObject.CreateInstance(type);
+            feature.name = "SSAO";
+            AssetDatabase.AddObjectToAsset(feature, data);
+            data.rendererFeatures.Add(feature);
+
+            // Keep the serialized feature map in sync (normally done by the renderer data inspector).
+            var so = new SerializedObject(data);
+            var map = so.FindProperty("m_RendererFeatureMap");
+            if (map != null && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(feature, out _, out long localId))
+            {
+                map.arraySize++;
+                map.GetArrayElementAtIndex(map.arraySize - 1).longValue = localId;
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            // Mobile-friendly settings: half resolution, moderate radius.
+            var settingsField = type.GetField("m_Settings", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var settings = settingsField?.GetValue(feature);
+            if (settings != null)
+            {
+                void Set(string field, object value)
+                {
+                    var fi = settings.GetType().GetField(field, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    if (fi != null && fi.FieldType == value.GetType()) fi.SetValue(settings, value);
+                }
+                Set("Intensity", 1.2f);
+                Set("Radius", 0.4f);
+                Set("Downsample", true);
+                settingsField.SetValue(feature, settings);
+            }
+            data.SetDirty();
+            EditorUtility.SetDirty(data);
+            Debug.Log($"[LeGamez] SSAO added to {data.name}");
+        }
+
+        static VolumeProfile CreatePostProfile()
+        {
+            string path = "Assets/Generated/PostFX.asset";
+            var profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(path);
+            if (profile == null)
+            {
+                profile = ScriptableObject.CreateInstance<VolumeProfile>();
+                AssetDatabase.CreateAsset(profile, path);
+            }
+            T Get<T>() where T : VolumeComponent
+            {
+                if (!profile.TryGet<T>(out var c))
+                {
+                    c = profile.Add<T>(true);
+                    c.name = typeof(T).Name;
+                    AssetDatabase.AddObjectToAsset(c, profile);
+                }
+                return c;
+            }
+            var tone = Get<Tonemapping>();
+            tone.mode.Override(TonemappingMode.Neutral);
+            var color = Get<ColorAdjustments>();
+            color.postExposure.Override(0.15f);
+            color.contrast.Override(10f);
+            color.saturation.Override(12f);
+            var wb = Get<WhiteBalance>();
+            wb.temperature.Override(6f);
+            var vignette = Get<Vignette>();
+            vignette.intensity.Override(0.18f);
+            vignette.smoothness.Override(0.45f);
+            EditorUtility.SetDirty(profile);
+            return profile;
         }
 
         static void CreateRuntimeMaterials()
@@ -95,6 +197,7 @@ namespace LeGamez.Editor
             gm.playerAccent = Mat("Player_Accent", lit, new Color(0.9f, 0.4f, 0.3f));
             gm.poiOpen = Mat("Poi_Open", unlit, new Color(1f, 0.78f, 0.15f));
             gm.poiDone = Mat("Poi_Done", unlit, new Color(0.35f, 0.85f, 0.45f));
+            gm.postProfile = CreatePostProfile();
             EditorUtility.SetDirty(gm);
         }
 

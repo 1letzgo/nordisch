@@ -66,20 +66,34 @@ namespace LeGamez.Editor.OsmImport
             var wallColor = WallStyleColor(tags, rng);
             var roofColor = WorldStyle.RoofColor(tags, rng, pitched);
             var batch = sink.Get(WorldStyle.MatBuildings, GeoUtil.Centroid(outer));
+            bool windowed = HasWindows(tags, wallTop - minHeight);
 
-            Walls(batch, outer, minHeight, wallTop, wallColor);
+            Walls(batch, outer, minHeight, wallTop, wallColor, windowed);
             var holes = new List<List<Vector2>>();
             foreach (var h in poly.holes)
             {
                 var ch = PolygonTriangulator.Clean(h);
                 if (ch.Count < 3) continue;
                 PolygonTriangulator.EnsureWinding(ch, false);
-                Walls(batch, ch, minHeight, wallTop, wallColor);
+                Walls(batch, ch, minHeight, wallTop, wallColor, windowed);
                 holes.Add(ch);
             }
 
-            if (pitched && outer.Count == 4 && roofShape != "pyramidal")
-                GabledRoof(batch, outer, wallTop, roofHeight, roofColor, wallColor, roofShape == "hipped");
+            List<Vector2> roofRect = null;
+            if (pitched && roofShape != "pyramidal")
+            {
+                if (outer.Count == 4) roofRect = outer;
+                else
+                {
+                    // Near-rectangular footprints (bay windows, small notches) get a ridge roof over
+                    // their minimum-area bounding rectangle – it reads as a slight eave overhang.
+                    var rect = MinAreaRect(outer, out float rectArea);
+                    if (rect != null && area / rectArea > 0.82f) roofRect = rect;
+                }
+            }
+
+            if (roofRect != null)
+                GabledRoof(batch, roofRect, wallTop, roofHeight, roofColor, wallColor, roofShape == "hipped");
             else if (pitched && GeoUtil.IsConvex(outer))
                 PyramidRoof(batch, outer, wallTop, roofHeight, roofColor);
             else
@@ -131,16 +145,73 @@ namespace LeGamez.Editor.OsmImport
             return 6.5f + (float)rng.NextDouble() * 2.5f;
         }
 
-        static void Walls(MeshSink.Batch b, List<Vector2> ring, float y0, float y1, Color32 color)
+        const float WindowSpacing = 2.6f;
+
+        static bool HasWindows(Dictionary<string, string> tags, float wallHeight)
+        {
+            if (wallHeight < 2.6f) return false;
+            switch (tags.Get("building"))
+            {
+                case "garage": case "garages": case "shed": case "carport": case "hut": case "roof":
+                case "barn": case "farm_auxiliary": case "warehouse": case "industrial": case "silo": case "storage_tank":
+                    return false;
+            }
+            return true;
+        }
+
+        static void Walls(MeshSink.Batch b, List<Vector2> ring, float y0, float y1, Color32 color, bool windowed)
         {
             for (int i = 0; i < ring.Count; i++)
             {
                 Vector2 p = ring[i], q = ring[(i + 1) % ring.Count];
+                // Facade data: windows are centred per wall segment so none straddle a corner.
+                Vector4 uvP = MeshSink.NoFacade, uvQ = MeshSink.NoFacade;
+                float len = Vector2.Distance(p, q);
+                int windows = windowed ? Mathf.FloorToInt((len - 0.6f) / WindowSpacing) : 0;
+                if (windows > 0)
+                {
+                    float span = windows * WindowSpacing;
+                    float offset = (len - span) * 0.5f;
+                    uvP = new Vector4(-offset, 0f, y1, span);
+                    uvQ = new Vector4(len - offset, 0f, y1, span);
+                }
+                Vector4 Bottom(Vector4 uv) => uv.y < 0 ? uv : new Vector4(uv.x, y0, uv.z, uv.w);
+                Vector4 Top(Vector4 uv) => uv.y < 0 ? uv : new Vector4(uv.x, y1, uv.z, uv.w);
+
                 // Ring CCW (outer) or CW (hole): wall faces the right-hand side of travel = outside.
                 MeshSink.Quad(b,
                     new Vector3(p.x, y0, p.y), new Vector3(p.x, y1, p.y),
-                    new Vector3(q.x, y1, q.y), new Vector3(q.x, y0, q.y), color);
+                    new Vector3(q.x, y1, q.y), new Vector3(q.x, y0, q.y), color,
+                    Bottom(uvP), Top(uvP), Top(uvQ), Bottom(uvQ));
             }
+        }
+
+        /// <summary>Minimum-area bounding rectangle (rotating edges). Returns CCW corners.</summary>
+        static List<Vector2> MinAreaRect(List<Vector2> ring, out float bestArea)
+        {
+            bestArea = float.MaxValue;
+            List<Vector2> best = null;
+            for (int i = 0; i < ring.Count; i++)
+            {
+                Vector2 e = ring[(i + 1) % ring.Count] - ring[i];
+                if (e.sqrMagnitude < 0.25f) continue;
+                Vector2 u = e.normalized, v = new Vector2(-u.y, u.x);
+                float minU = float.MaxValue, maxU = float.MinValue, minV = float.MaxValue, maxV = float.MinValue;
+                foreach (var p in ring)
+                {
+                    float a = Vector2.Dot(p, u), c = Vector2.Dot(p, v);
+                    minU = Mathf.Min(minU, a); maxU = Mathf.Max(maxU, a);
+                    minV = Mathf.Min(minV, c); maxV = Mathf.Max(maxV, c);
+                }
+                float area = (maxU - minU) * (maxV - minV);
+                if (area >= bestArea) continue;
+                bestArea = area;
+                best = new List<Vector2>
+                {
+                    u * minU + v * minV, u * maxU + v * minV, u * maxU + v * maxV, u * minU + v * maxV,
+                };
+            }
+            return best;
         }
 
         static void FlatRoof(MeshSink.Batch b, List<Vector2> outer, List<List<Vector2>> holes, float y, Color32 color)

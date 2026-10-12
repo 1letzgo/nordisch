@@ -111,6 +111,8 @@ namespace LeGamez.Editor.OsmImport
             int lines = GroundBuilder.BuildLines(data, sink, half);
             int buildings = BuildingBuilder.Build(data, sink, half, rng);
             int trees = PropPlacer.PlaceTrees(data, sink, half, rng);
+            int lamps = PropPlacer.PlaceStreetLamps(data, sink, half);
+            int barriers = GroundBuilder.BuildBarriers(data, sink, half);
             var pois = PoiExtractor.Extract(data, half);
 
             string areaDir = $"{GeneratedRoot}/{meta.id}";
@@ -148,15 +150,16 @@ namespace LeGamez.Editor.OsmImport
                 go.transform.SetParent(parent, false);
                 go.AddComponent<MeshFilter>().sharedMesh = mesh;
                 var mr = go.AddComponent<MeshRenderer>();
-                mr.sharedMaterial = materials[mat];
-                mr.shadowCastingMode = mat == WorldStyle.MatBuildings || mat == WorldStyle.MatTrees ? ShadowCastingMode.On : ShadowCastingMode.Off;
-                if (mat == WorldStyle.MatBuildings || mat == WorldStyle.MatTrees)
+                mr.sharedMaterial = materials[WorldStyle.MaterialOf(mat)];
+                bool casts = mat != WorldStyle.MatGround && mat != WorldStyle.MatWater;
+                mr.shadowCastingMode = casts ? ShadowCastingMode.On : ShadowCastingMode.Off;
+                if (WorldStyle.HasCollider(mat))
                     go.AddComponent<MeshCollider>().sharedMesh = mesh;
                 GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccluderStatic | StaticEditorFlags.OccludeeStatic);
             }
 
             AddGroundAndBounds(worldRoot.transform, half);
-            AddLighting();
+            AddLighting(EnsureSkyMaterial());
 
             // POI database asset.
             string poiPath = $"{areaDir}/{meta.id}_pois.asset";
@@ -192,7 +195,7 @@ namespace LeGamez.Editor.OsmImport
             UpdateCatalog(meta, pois.Count);
             AssetDatabase.SaveAssets();
 
-            Debug.Log($"[OSM] {meta.name}: {buildings} buildings, {lines} lines, {trees} trees, {pois.Count} POIs, " +
+            Debug.Log($"[OSM] {meta.name}: {buildings} buildings, {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, {pois.Count} POIs, " +
                       $"{sink.Batches.Count()} meshes in {sw.ElapsedMilliseconds} ms -> {scenePath}");
             return scenePath;
         }
@@ -273,8 +276,28 @@ namespace LeGamez.Editor.OsmImport
             go.AddComponent<BoxCollider>().size = size;
         }
 
-        static void AddLighting()
+        static Material EnsureSkyMaterial()
         {
+            string path = $"{MaterialsDir}/Sky.mat";
+            var sky = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (sky == null)
+            {
+                sky = new Material(Shader.Find("Skybox/Procedural")) { name = "Sky" };
+                AssetDatabase.CreateAsset(sky, path);
+            }
+            sky.SetFloat("_SunSize", 0.035f);
+            sky.SetFloat("_SunSizeConvergence", 6f);
+            sky.SetFloat("_AtmosphereThickness", 0.75f);
+            sky.SetColor("_SkyTint", new Color(0.52f, 0.66f, 0.86f));
+            sky.SetColor("_GroundColor", new Color(0.74f, 0.82f, 0.90f)); // = fog colour, hides the horizon seam
+            sky.SetFloat("_Exposure", 1.15f);
+            EditorUtility.SetDirty(sky);
+            return sky;
+        }
+
+        static void AddLighting(Material sky)
+        {
+            RenderSettings.skybox = sky;
             var sun = new GameObject("Sun").AddComponent<Light>();
             sun.type = LightType.Directional;
             sun.color = new Color(1f, 0.96f, 0.88f);
@@ -289,7 +312,7 @@ namespace LeGamez.Editor.OsmImport
             RenderSettings.ambientGroundColor = new Color(0.35f, 0.33f, 0.30f);
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = new Color(0.78f, 0.86f, 0.93f);
+            RenderSettings.fogColor = new Color(0.74f, 0.82f, 0.90f);
             RenderSettings.fogStartDistance = 220f;
             RenderSettings.fogEndDistance = 650f;
         }
@@ -314,6 +337,11 @@ namespace LeGamez.Editor.OsmImport
                 {
                     mat.SetFloat("_WaterAnim", 1f);
                     mat.EnableKeyword("_WATER_ANIM");
+                }
+                if (name == WorldStyle.MatBuildings)
+                {
+                    mat.SetFloat("_Facade", 1f);
+                    mat.EnableKeyword("_FACADE");
                 }
                 EditorUtility.SetDirty(mat);
                 result[name] = mat;
