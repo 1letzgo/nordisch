@@ -1,0 +1,52 @@
+{
+  "areas": [
+    {
+      "id": "oldenburg",
+      "name": "Oldenburg",
+      "lat": 53.1395,
+      "lon": 8.2145,
+      "size_m": 1000,
+      "vehicles": [
+        "bicycle",
+        "car"
+      ],
+      "ground": "grass"
+    },
+    {
+      "id": "westerstede",
+      "name": "Westerstede",
+      "lat": 53.257,
+      "lon": 7.927,
+      "size_m": 1000,
+      "vehicles": [
+        "bicycle",
+        "car"
+      ],
+      "ground": "grass"
+    },
+    {
+      "id": "langeoog",
+      "name": "Langeoog",
+      "lat": 53.7465,
+      "lon": 7.479,
+      "size_m": 1000,
+      "vehicles": [
+        "bicycle",
+        "carriage"
+      ],
+      "ground": "sand"
+    },
+    {
+      "id": "spiekeroog",
+      "name": "Spiekeroog",
+      "lat": 53.773,
+      "lon": 7.695,
+      "size_m": 1000,
+      "vehicles": [
+        "bicycle",
+        "carriage"
+      ],
+      "ground": "sand"
+    }
+  ]
+}
