@@ -50,6 +50,17 @@ namespace LeGamez.Editor.OsmImport
             b.triangles.Add(i); b.triangles.Add(i + 1); b.triangles.Add(i + 2);
         }
 
+        /// <summary>Triangle with explicit normal and per-vertex shader data.</summary>
+        public static void TriUv(Batch b, Vector3 a, Vector3 c1, Vector3 c2, Vector3 normal, Color32 color, Vector4 uvA, Vector4 uvB, Vector4 uvC)
+        {
+            int i = b.vertices.Count;
+            b.vertices.Add(a); b.vertices.Add(c1); b.vertices.Add(c2);
+            b.normals.Add(normal); b.normals.Add(normal); b.normals.Add(normal);
+            b.colors.Add(color); b.colors.Add(color); b.colors.Add(color);
+            b.uvs.Add(uvA); b.uvs.Add(uvB); b.uvs.Add(uvC);
+            b.triangles.Add(i); b.triangles.Add(i + 1); b.triangles.Add(i + 2);
+        }
+
         /// <summary>Quad a-b-c-d (clockwise seen from the front), shared flat normal.</summary>
         public static void Quad(Batch b, Vector3 a, Vector3 bb, Vector3 c, Vector3 d, Color32 color) =>
             Quad(b, a, bb, c, d, color, NoFacade, NoFacade, NoFacade, NoFacade);

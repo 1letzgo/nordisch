@@ -113,7 +113,11 @@ namespace LeGamez.Editor.OsmImport
             GroundBuilder.BuildBase(sink, half, WorldStyle.GroundColor(meta.ground));
             GroundBuilder.BuildAreas(data, sink, half);
             int lines = GroundBuilder.BuildLines(data, sink, half);
-            int buildings = BuildingBuilder.Build(data, sink, half, rng);
+            // Prefer official LGLN LoD2 buildings (real roof shapes); fall back to OSM extrusion.
+            string lod2Path = Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".lod2.json");
+            bool island = meta.ground == "sand";
+            bool hasLod2 = Lod2Builder.TryBuild(lod2Path, data, sink, half, island, out int buildings);
+            if (!hasLod2) buildings = BuildingBuilder.Build(data, sink, half, rng);
             int trees = PropPlacer.PlaceTrees(data, sink, half, rng);
             int lamps = PropPlacer.PlaceStreetLamps(data, sink, half);
             int barriers = GroundBuilder.BuildBarriers(data, sink, half);
@@ -190,7 +194,7 @@ namespace LeGamez.Editor.OsmImport
             info.allowedVehicles = new List<string>(meta.vehicles);
             info.pois = poiDb;
             info.spawnPoint = spawn;
-            info.attribution = "© OpenStreetMap-Mitwirkende (ODbL)";
+            info.attribution = hasLod2 ? "© OpenStreetMap-Mitwirkende (ODbL) · 3D-Gebäude © LGLN (CC BY 4.0)" : "© OpenStreetMap-Mitwirkende (ODbL)";
             spawn.SetParent(areaGo.transform, true);
 
             new GameObject("GameBootstrap").AddComponent<GameBootstrap>();

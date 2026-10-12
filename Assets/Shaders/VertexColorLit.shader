@@ -77,8 +77,10 @@ Shader "LeGamez/VertexColorLit"
                 return saturate((x - a) / w + 0.5) * saturate((b - x) / w + 0.5);
             }
 
-            // Procedural window grid. Returns (window mask, frame mask, glass vertical gradient).
-            float3 FacadeMask(float4 f)
+            float Hash21(float2 p) { return frac(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453); }
+
+            // Procedural window grid. Returns (window mask, frame mask, glass gradient, mullion mask).
+            float4 FacadeMask(float4 f)
             {
                 if (f.y < 0) return 0;
                 const float spacing = 2.6;
@@ -89,15 +91,49 @@ Shader "LeGamez/VertexColorLit"
                 // Ground floor of tall buildings: taller shop-style windows.
                 bool shop = floorIdx < 0.5 && top > 7.0;
                 float sill = shop ? 0.5 : 0.9;
-                float head = shop ? 2.6 : 2.3;
-                float halfW = shop ? 0.95 : 0.55;
+                float head = shop ? 2.6 : 2.25;
+                float halfW = shop ? 0.95 : 0.52;
+                float c = spacing * 0.5;
                 float inSpan = AABox(u, 0.0, span);
                 float notTop = step(floorIdx * _FloorHeight + head + 0.3, top); // skip partial top floor
-                float win = AABox(fx, spacing * 0.5 - halfW, spacing * 0.5 + halfW) * AABox(fy, sill, head);
-                float frame = AABox(fx, spacing * 0.5 - halfW - 0.09, spacing * 0.5 + halfW + 0.09)
-                            * AABox(fy, sill - 0.12, head + 0.06) - win;
+                float win = AABox(fx, c - halfW, c + halfW) * AABox(fy, sill, head);
+                float frame = AABox(fx, c - halfW - 0.08, c + halfW + 0.08) * AABox(fy, sill - 0.1, head + 0.06) - win;
+                // Sprossen: white cross bars in residential windows (not in shop fronts).
+                float mullion = shop ? 0 : saturate(AABox(fx, c - 0.03, c + 0.03) + AABox(fy, sill + (head - sill) * 0.62 - 0.03, sill + (head - sill) * 0.62 + 0.03)) * win;
                 float k = inSpan * notTop;
-                return float3(win * k, saturate(frame) * k, saturate((fy - sill) / (head - sill)));
+                return float4(win * k, saturate(frame) * k, saturate((fy - sill) / (head - sill)), mullion * k);
+            }
+
+            // Running-bond Klinker. Returns albedo multiplier (mortar lighter, per-brick variation).
+            half3 Brick(half3 albedo, float u, float h)
+            {
+                const float bw = 0.25, bh = 0.075, joint = 0.012;
+                float row = floor(h / bh);
+                float bx = u / bw + (fmod(row, 2) * 0.5);
+                float id = Hash21(float2(floor(bx), row));
+                float jx = (frac(bx) * bw), jy = h - row * bh;
+                float mortar = 1 - AABox(jx, joint, bw) * AABox(jy, joint, bh);
+                half3 brick = albedo * (0.9h + 0.2h * id);
+                half3 mortarCol = lerp(albedo, half3(0.78h, 0.76h, 0.72h), 0.75h);
+                half3 c = lerp(brick, mortarCol, mortar);
+                // Fade to the average colour once bricks get smaller than a few pixels.
+                float fade = saturate(1 - fwidth(h) / 0.025);
+                return lerp(albedo * 1.02h, c, fade);
+            }
+
+            // Pantile roof: rows with shaded lower lip, wavy tiles, per-tile variation.
+            half3 RoofTiles(half3 albedo, float u, float v)
+            {
+                const float rowH = 0.32, tileW = 0.28;
+                float row = floor(v / rowH);
+                float rf = v / rowH - row;
+                float col = u / tileW + fmod(row, 2) * 0.5;
+                float id = Hash21(float2(floor(col), row));
+                half lip = lerp(0.72h, 1.05h, smoothstep(0.0, 0.3, rf));
+                half wave = 0.94h + 0.08h * cos(frac(col) * 6.2831);
+                half3 c = albedo * lip * wave * (0.92h + 0.16h * id);
+                float fade = saturate(1 - fwidth(v) / 0.08);
+                return lerp(albedo * 0.95h, c, fade);
             }
 
             half4 frag (Varyings i) : SV_Target
@@ -113,17 +149,30 @@ Shader "LeGamez/VertexColorLit"
                 half3 albedo = i.color.rgb;
                 half3 extra = 0;
                 #if defined(_FACADE)
+                    // Surface material code in vertex alpha (see Lod2Builder): 230 brick, 200 plaster, 120 roof tiles.
+                    half code = i.color.a * 255.0h;
                     if (abs(n.y) < 0.3)
                     {
-                        float3 m = FacadeMask(i.facade);
-                        // Floor band: thin ledge line at every storey.
-                        float ledge = i.facade.y >= 0 ? AABox(frac(i.facade.y / _FloorHeight) * _FloorHeight, 0.0, 0.12) * step(_FloorHeight * 0.9, i.facade.y) : 0;
-                        albedo = lerp(albedo, albedo * 0.82h, ledge);
-                        albedo = lerp(albedo, min(albedo * 1.35h + 0.08h, 1.0h), m.y);
-                        half3 glass = lerp(_WindowColor.rgb * 0.7h, _WindowColor.rgb * 1.6h + half3(0.05h, 0.07h, 0.1h), m.z);
+                        if (i.facade.y >= 0)
+                        {
+                            if (code > 215.0h && code < 245.0h) albedo = Brick(albedo, i.facade.x, i.facade.y);
+                            else if (code > 185.0h && code < 215.0h) albedo *= lerp(0.88h, 1.0h, saturate(i.facade.y * 0.6)); // plaster, weathered base
+                        }
+                        float4 m = FacadeMask(i.facade);
+                        // Floor band: thin ledge line at every storey (plaster facades only read well with it).
+                        float ledge = (i.facade.y >= 0 && code < 215.0h) ? AABox(frac(i.facade.y / _FloorHeight) * _FloorHeight, 0.0, 0.12) * step(_FloorHeight * 0.9, i.facade.y) : 0;
+                        albedo = lerp(albedo, albedo * 0.85h, ledge);
+                        half3 frameCol = half3(0.93h, 0.92h, 0.88h); // white window frames
+                        albedo = lerp(albedo, frameCol, m.y);
+                        half3 glass = lerp(_WindowColor.rgb * 0.6h, _WindowColor.rgb * 1.5h + half3(0.05h, 0.07h, 0.1h), m.z);
                         albedo = lerp(albedo, glass, m.x);
+                        albedo = lerp(albedo, frameCol, m.w);
                         // Glass reflects a bit of sky regardless of light direction.
-                        extra += m.x * ambient * 0.25h;
+                        extra += (m.x - m.w) * ambient * 0.25h;
+                    }
+                    else if (code > 100.0h && code < 140.0h)
+                    {
+                        albedo = RoofTiles(albedo, i.facade.x, i.facade.y);
                     }
                 #endif
                 #if defined(_WATER_ANIM)
