@@ -274,23 +274,31 @@ namespace LeGamez.Editor.OsmImport
 
         static Vector3 V(Vector2 p, float y) => new Vector3(p.x, y, p.y);
 
-        /// <summary>Base ground slightly larger than the playable area, tiled with soft colour variation.</summary>
-        public static void BuildBase(MeshSink sink, float half, Color32 color)
+        /// <summary>
+        /// Faceted ground height field slightly larger than the playable area (TerrainField.CellSize cells,
+        /// split along the x0z0–x1z1 diagonal – the same split TerrainField.Height uses), with soft colour
+        /// variation and a little extra shading on slopes.
+        /// </summary>
+        public static void BuildBase(MeshSink sink, float half, Color32 color, TerrainField t)
         {
-            const float tile = 20f;
+            float cs = TerrainField.CellSize;
             float h = half + 60f;
-            int n = Mathf.CeilToInt(2f * h / tile);
-            var tris = new List<int> { 0, 1, 2, 0, 2, 3 };
+            int n = Mathf.CeilToInt(2f * h / cs);
+            float start = Mathf.Floor(-h / cs) * cs;
             for (int ix = 0; ix < n; ix++)
             for (int iz = 0; iz < n; iz++)
             {
-                float x0 = -h + ix * tile, z0 = -h + iz * tile;
+                float x0 = start + ix * cs, z0 = start + iz * cs, x1 = x0 + cs, z1 = z0 + cs;
                 float noise = Mathf.PerlinNoise(x0 * 0.012f + 31.7f, z0 * 0.012f + 11.3f) - 0.5f;
                 float f = 1f + noise * 0.14f;
                 var c = new Color32((byte)Mathf.Clamp(color.r * f, 0, 255), (byte)Mathf.Clamp(color.g * (f + noise * 0.04f), 0, 255),
                     (byte)Mathf.Clamp(color.b * f, 0, 255), 255);
-                var ring = new List<Vector2> { new Vector2(x0, z0), new Vector2(x0 + tile, z0), new Vector2(x0 + tile, z0 + tile), new Vector2(x0, z0 + tile) };
-                MeshSink.FlatPolygon(sink.Get(WorldStyle.MatGround, new Vector2(x0, z0)), ring, tris, WorldStyle.YBase, c);
+                Vector3 p00 = new Vector3(x0, t.Raw(x0, z0), z0), p10 = new Vector3(x1, t.Raw(x1, z0), z0);
+                Vector3 p01 = new Vector3(x0, t.Raw(x0, z1), z1), p11 = new Vector3(x1, t.Raw(x1, z1), z1);
+                var batch = sink.Get(WorldStyle.MatTerrain, new Vector2(x0, z0));
+                // Clockwise from above → facing up.
+                MeshSink.Tri(batch, p00, p01, p11, c);
+                MeshSink.Tri(batch, p00, p11, p10, c);
             }
         }
     }

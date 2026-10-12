@@ -16,180 +16,180 @@ MonoBehaviour:
   - id: way/28777483
     name: Prinzenpalais
     category: 1
-    position: {x: 211.87418, y: 0, z: -354.68774}
+    position: {x: 211.87418, y: 5.1162233, z: -354.68774}
     lat: 53.136292304301726
     lon: 8.217672842921946
   - id: way/32378823
     name: Augusteum
     category: 1
-    position: {x: 143.05136, y: 0, z: -372.13287}
+    position: {x: 143.05136, y: 5.433414, z: -372.13287}
     lat: 53.136134535482704
     lon: 8.216642212453657
   - id: way/24752350
     name: Lambertikirche
     category: 2
-    position: {x: 7.3020487, y: 0, z: -101.253876}
+    position: {x: 7.3020487, y: 6.5771694, z: -101.253876}
     lat: 53.13858428856935
     lon: 8.214609349114246
   - id: way/22981582
     name: Schloss Oldenburg
     category: 0
-    position: {x: 154.99318, y: 0, z: -198.34042}
+    position: {x: 154.99318, y: 6.321065, z: -198.34042}
     lat: 53.137706265274076
     lon: 8.216821042711219
   - id: way/24752270
     name: Altes Rathaus
     category: 0
-    position: {x: -22.977516, y: 0, z: -47.493053}
+    position: {x: -22.977516, y: 6.9592924, z: -47.493053}
     lat: 53.1390704862496
     lon: 8.214155908752424
   - id: way/32144438
     name: St. Peter
     category: 2
-    position: {x: -343.40964, y: 0, z: 416.90598}
+    position: {x: -343.40964, y: 5.776248, z: 416.90598}
     lat: 53.143270379794
     lon: 8.209357396696685
   - id: node/2758402872
     name: Landesmuseum Kunst & Kultur Oldenburg
     category: 1
-    position: {x: 124.22598, y: 0, z: -221.99942}
+    position: {x: 124.22598, y: 5.857172, z: -221.99942}
     lat: 53.13749229999669
     lon: 8.216360300000773
   - id: way/32381111
     name: Oldenburgisches Staatstheater
     category: 8
-    position: {x: -302.40683, y: 0, z: -45.458797}
+    position: {x: -302.40683, y: 5.1521807, z: -45.458797}
     lat: 53.13908888348568
     lon: 8.209971418992222
   - id: way/1320476593
     name: "Haus f\xFCr Medienkunst Oldenburg"
     category: 1
-    position: {x: -394.73245, y: 0, z: 453.90195}
+    position: {x: -394.73245, y: 6.517572, z: 453.90195}
     lat: 53.143604960904206
     lon: 8.208588830969724
   - id: way/34585972
     name: Pulverturm
     category: 0
-    position: {x: -33.00609, y: 0, z: -202.3376}
+    position: {x: -33.00609, y: 4.7403984, z: -202.3376}
     lat: 53.13767011593405
     lon: 8.21400572960107
   - id: node/4391346443
     name: Lappan
     category: 0
-    position: {x: -75.49852, y: 0, z: 384.29993}
+    position: {x: -75.49852, y: 6.2986507, z: 384.29993}
     lat: 53.14297549990737
     lon: 8.213369399994997
   - id: way/42524421
     name: Schlosswache
     category: 0
-    position: {x: 73.261246, y: 0, z: -140.25513}
+    position: {x: 73.261246, y: 5.0443964, z: -140.25513}
     lat: 53.13823157227781
     lon: 8.215597096537765
   - id: node/2143494007
     name: Kulturetage
     category: 8
-    position: {x: 349.73325, y: 0, z: 349.10425}
+    position: {x: 349.73325, y: 4.3940105, z: 349.10425}
     lat: 53.14265720013789
     lon: 8.219737300148982
   - id: node/2967124016
     name: Stadtbibliothek im PFL
     category: 8
-    position: {x: -477.3248, y: 0, z: 347.5783}
+    position: {x: -477.3248, y: 5.485199, z: 347.5783}
     lat: 53.14264339996839
     lon: 8.207352000007422
   - id: node/14220640319
     name: Blende 4
     category: 1
-    position: {x: -123.51147, y: 0, z: -12.76024}
+    position: {x: -123.51147, y: 6.3853927, z: -12.76024}
     lat: 53.139384599999985
     lon: 8.212650399963136
   - id: node/12848411175
     name: Staublau Galerie
     category: 1
-    position: {x: 77.88915, y: 0, z: 313.48834}
+    position: {x: 77.88915, y: 4.6503935, z: 313.48834}
     lat: 53.14233509995374
     lon: 8.21566640003481
   - id: node/9901239322
     name: Kissen
     category: 5
-    position: {x: 211.91138, y: 0, z: -153.95218}
+    position: {x: 211.91138, y: 4.820226, z: -153.95218}
     lat: 53.138107700011254
     lon: 8.217673400010604
   - id: node/9900184379
     name: Lebensbaum
     category: 5
-    position: {x: -66.85753, y: 0, z: 291.08606}
+    position: {x: -66.85753, y: 6.4017267, z: 291.08606}
     lat: 53.14213250004133
     lon: 8.213498799945084
   - id: node/9899053189
     name: "Menschens\xE4ule"
     category: 5
-    position: {x: -47.699093, y: 0, z: -155.15744}
+    position: {x: -47.699093, y: 5.5120397, z: -155.15744}
     lat: 53.13809679996938
     lon: 8.213785699975244
   - id: node/5006393376
     name: Hengst Donnerhall
     category: 5
-    position: {x: -68.60042, y: 0, z: 337.4387}
+    position: {x: -68.60042, y: 6.2167797, z: 337.4387}
     lat: 53.1425517001301
     lon: 8.213472699953032
   - id: node/9899053190
     name: Geteilter Baum
     category: 5
-    position: {x: -67.39842, y: 0, z: -237.72304}
+    position: {x: -67.39842, y: 4.4345894, z: -237.72304}
     lat: 53.13735010004413
     lon: 8.213490699994827
   - id: node/1587103627
     name: "Drei B\xE4ren"
     category: 5
-    position: {x: 141.72833, y: 0, z: -143.19333}
+    position: {x: 141.72833, y: 4.8526254, z: -143.19333}
     lat: 53.13820500001033
     lon: 8.216622399931456
   - id: node/2334454762
     name: "Gro\xDFe Danae"
     category: 5
-    position: {x: 167.01025, y: 0, z: -237.20334}
+    position: {x: 167.01025, y: 5.6124506, z: -237.20334}
     lat: 53.13735480005586
     lon: 8.217000999942227
   - id: node/3633883137
     name: "B\xFCste Theodor Goerlitz"
     category: 5
-    position: {x: -23.18511, y: 0, z: -69.68373}
+    position: {x: -23.18511, y: 6.43334, z: -69.68373}
     lat: 53.138869800033646
     lon: 8.214152800006916
   - id: node/2555346426
     name: "Draufg\xE4nger"
     category: 5
-    position: {x: 123.271065, y: 0, z: 180.44571}
+    position: {x: 123.271065, y: 2.6492589, z: 180.44571}
     lat: 53.14113189998759
     lon: 8.216345999982801
   - id: node/2745468225
     name: Hafenkran
     category: 0
-    position: {x: 385.6862, y: 0, z: 118.148315}
+    position: {x: 385.6862, y: 3.7821796, z: 118.148315}
     lat: 53.140568499967706
     lon: 8.220275700058556
   - id: node/2745476093
     name: Solarplastik
     category: 5
-    position: {x: 309.92725, y: 0, z: 84.14681}
+    position: {x: 309.92725, y: 4.779282, z: 84.14681}
     lat: 53.140260999985884
     lon: 8.21914120020445
   - id: node/2872335682
     name: Oldenburger Walk of Fame
     category: 0
-    position: {x: 256.5053, y: 0, z: 200.10577}
+    position: {x: 256.5053, y: 4.565678, z: 200.10577}
     lat: 53.141309700055395
     lon: 8.218341199870263
   - id: node/4590906189
     name: Kinderbibliothek am PFL
     category: 8
-    position: {x: -472.06274, y: 0, z: 283.04733}
+    position: {x: -472.06274, y: 4.90218, z: 283.04733}
     lat: 53.1420598000684
     lon: 8.207430799946653
   - id: way/1369576979
     name: Theater hof/19
     category: 8
-    position: {x: 248.8826, y: 0, z: 329.2529}
+    position: {x: 248.8826, y: 4.439898, z: 329.2529}
     lat: 53.14247767015003
     lon: 8.218227048794033

@@ -65,6 +65,12 @@ namespace LeGamez.Editor.OsmImport
             var use = Classify(b.TryGetValue("function", out var f) ? (string)f : null);
             var style = PickStyle(use, island, rng, maxY);
             var batch = sink.Get(WorldStyle.MatBuildings, new Vector2(centre.x, centre.z));
+            int firstVertex = batch.vertices.Count;
+            // Stand on the lowest ground point of the footprint (no floating on slopes).
+            var footprint = new List<Vector2>();
+            foreach (var (_, ring, _) in surfaces) foreach (var p in ring) if (p.y < 0.5f) footprint.Add(new Vector2(p.x, p.z));
+            if (footprint.Count == 0) footprint.Add(new Vector2(centre.x, centre.z));
+            float groundY = TerrainField.Current.MinUnder(footprint);
 
             // Some datasets wind wall rings inwards – detect per building and flip if needed.
             int agree = 0, walls = 0;
@@ -118,6 +124,7 @@ namespace LeGamez.Editor.OsmImport
 
             if (style.chimney && pitched && ridgeY > 4f && (ridgeB - ridgeA).magnitude > 4f)
                 Chimney(batch, Vector3.Lerp(ridgeA, ridgeB, 0.25f + (float)rng.NextDouble() * 0.5f), rng);
+            TerrainDrape.Offset(batch, firstVertex, groundY);
             return true;
         }
 

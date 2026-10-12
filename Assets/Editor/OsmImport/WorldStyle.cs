@@ -13,12 +13,13 @@ namespace LeGamez.Editor.OsmImport
         public const string MatTrees = "Trees";             // crowns + bushes, no collider
         public const string MatTreeTrunks = "TreeTrunks";   // same material as Trees, MeshCollider
         public const string MatProps = "Props";             // lamps, hedges, walls, fences – MeshCollider
+        public const string MatTerrain = "Terrain";         // faceted height field – MeshCollider, Ground material
 
         /// <summary>Which buckets get a MeshCollider.</summary>
-        public static bool HasCollider(string mat) => mat == MatBuildings || mat == MatTreeTrunks || mat == MatProps;
+        public static bool HasCollider(string mat) => mat == MatBuildings || mat == MatTreeTrunks || mat == MatProps || mat == MatTerrain;
 
         /// <summary>Buckets that share another bucket's material.</summary>
-        public static string MaterialOf(string mat) => mat == MatTreeTrunks ? MatTrees : mat == MatProps ? MatGround : mat;
+        public static string MaterialOf(string mat) => mat == MatTreeTrunks ? MatTrees : (mat == MatProps || mat == MatTerrain) ? MatGround : mat;
 
         // Vertical layering to avoid z-fighting between overlapping flat surfaces.
         public const float YBase = 0f;

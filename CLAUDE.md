@@ -27,6 +27,14 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
    gestreamt (nichts Rohes auf Platte), UTM32 → lokale Meter umgerechnet und auf das Gebiet zugeschnitten.
    Ohne diese Datei fällt der Importer auf OSM-Extrusion zurück (`BuildingBuilder`, geschätzte Höhen/Dächer).
    Andere Bundesländer haben eigene LoD2-Portale (NRW, Bayern, HH …) – dafür bräuchte es einen weiteren Fetcher mit gleichem JSON-Format.
+3b. **Gelände holen** (nur Niedersachsen, LGLN DGM1, 1-m-Raster, CC BY 4.0):
+   ```bash
+   python3 Tools/dgm/fetch_dgm.py jever
+   ```
+   → `Data/jever.dgm.bin` (2-m-Höhenraster im lokalen Rahmen, STAC `https://dgm.stac.lgln.niedersachsen.de`, neuester Befliegungsjahrgang).
+   Ohne Datei bleibt die Welt flach. Der Importer baut daraus einen facettierten Boden (5-m-Zellen, `TerrainField`),
+   schneidet Straßen/Flächen/Wasser entlang dieser Zellen und legt sie auf (`TerrainDrape.Drape`), hebt Bäume/Props an
+   (`Lift`) und stellt Gebäude auf den tiefsten Punkt ihres Grundrisses.
 4. **In Unity importieren** (baut alle Gebiete, Menü-Vorschaubilder, Minimap-Karten, Hauptmenü-Szene):
    ```bash
    /Applications/Unity/Hub/Editor/6000.3.26f1/Unity.app/Contents/MacOS/Unity -batchmode -quit -projectPath . -buildTarget iOS \
@@ -56,6 +64,7 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
 # 1. Eintrag in Tools/osm/areas.json
 python3 Tools/osm/fetch_area.py <id>
 python3 Tools/lod2/fetch_lod2.py <id>      # nur Niedersachsen
+python3 Tools/dgm/fetch_dgm.py <id>        # Gelände, nur Niedersachsen
 # 2. Unity ImportAllBatch (siehe oben), Snapshots prüfen, bauen
 ```
 Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen später Scrollen.

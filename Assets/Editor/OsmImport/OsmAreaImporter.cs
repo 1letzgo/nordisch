@@ -109,8 +109,9 @@ namespace LeGamez.Editor.OsmImport
             float half = meta.sizeM * 0.5f;
             var rng = new System.Random(meta.id.GetHashCode());
 
+            var terrain = TerrainField.Load(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".dgm.bin"));
             var sink = new MeshSink();
-            GroundBuilder.BuildBase(sink, half, WorldStyle.GroundColor(meta.ground));
+            GroundBuilder.BuildBase(sink, half, WorldStyle.GroundColor(meta.ground), terrain);
             GroundBuilder.BuildAreas(data, sink, half);
             int lines = GroundBuilder.BuildLines(data, sink, half);
             // Prefer official LGLN LoD2 buildings (real roof shapes); fall back to OSM extrusion.
@@ -123,6 +124,15 @@ namespace LeGamez.Editor.OsmImport
             int barriers = GroundBuilder.BuildBarriers(data, sink, half);
             var furniture = FurniturePlacer.Place(data, sink, half, rng);
             var pois = PoiExtractor.Extract(data, half);
+            foreach (var poi in pois) poi.position.y = terrain.Height(poi.position.x, poi.position.z);
+
+            // Fit everything onto the terrain: overlays are cut & draped, small objects lifted.
+            foreach (var kv in sink.Batches)
+            {
+                string m = kv.Key.mat;
+                if (m == WorldStyle.MatGround || m == WorldStyle.MatWater) TerrainDrape.Drape(kv.Value, terrain);
+                else if (m == WorldStyle.MatTrees || m == WorldStyle.MatTreeTrunks || m == WorldStyle.MatProps) TerrainDrape.Lift(kv.Value, terrain);
+            }
 
             string areaDir = $"{GeneratedRoot}/{meta.id}";
             EnsureFolder(areaDir);
@@ -184,7 +194,8 @@ namespace LeGamez.Editor.OsmImport
             EditorUtility.SetDirty(poiDb);
 
             var spawn = new GameObject("SpawnPoint").transform;
-            spawn.position = FindSpawn(data, half) + Vector3.up * 0.2f;
+            var spawnXZ = FindSpawn(data, half);
+            spawn.position = new Vector3(spawnXZ.x, terrain.Height(spawnXZ.x, spawnXZ.z) + 0.2f, spawnXZ.z);
 
             var areaGo = new GameObject("Area");
             var info = areaGo.AddComponent<AreaInfo>();
@@ -206,7 +217,7 @@ namespace LeGamez.Editor.OsmImport
             UpdateCatalog(meta, pois.Count);
             AssetDatabase.SaveAssets();
 
-            Debug.Log($"[OSM] {meta.name}: {buildings} buildings, {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, " +
+            Debug.Log($"[OSM] {meta.name}: {buildings} buildings, {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, terrain {(terrain.IsFlat ? "flat" : "DGM1")}, " +
                       $"furniture {furniture.mapped} mapped/{furniture.benches} benches/{furniture.planters} planters/{furniture.seating} café tables/{furniture.fountains} fountains, {pois.Count} POIs, " +
                       $"{sink.Batches.Count()} meshes in {sw.ElapsedMilliseconds} ms -> {scenePath}");
             return scenePath;
@@ -268,7 +279,7 @@ namespace LeGamez.Editor.OsmImport
             ground.transform.SetParent(root, false);
             var box = ground.AddComponent<BoxCollider>();
             box.size = new Vector3(half * 2f + 120f, 1f, half * 2f + 120f);
-            box.center = new Vector3(0f, -0.5f, 0f);
+            box.center = new Vector3(0f, -6f, 0f); // safety net below the terrain mesh collider
 
             var bounds = new GameObject("AreaBounds");
             bounds.transform.SetParent(root, false);

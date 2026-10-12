@@ -66,6 +66,7 @@ namespace LeGamez.Editor.OsmImport
             var wallColor = WallStyleColor(tags, rng);
             var roofColor = WorldStyle.RoofColor(tags, rng, pitched);
             var batch = sink.Get(WorldStyle.MatBuildings, GeoUtil.Centroid(outer));
+            int firstVertex = batch.vertices.Count;
             bool windowed = HasWindows(tags, wallTop - minHeight);
 
             Walls(batch, outer, minHeight, wallTop, wallColor, windowed);
@@ -106,6 +107,7 @@ namespace LeGamez.Editor.OsmImport
                 for (int t = 0; t < bt.Count; t += 3) { flipped.Add(bt[t]); flipped.Add(bt[t + 2]); flipped.Add(bt[t + 1]); }
                 MeshSink.FlatPolygon(batch, bv, flipped, minHeight, wallColor);
             }
+            TerrainDrape.Offset(batch, firstVertex, TerrainField.Current.MinUnder(outer));
             return true;
         }
 
