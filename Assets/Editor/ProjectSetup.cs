@@ -49,6 +49,35 @@ namespace LeGamez.Editor
             PlayerSettings.SetGraphicsAPIs(BuildTarget.iOS, new[] { GraphicsDeviceType.Metal });
             PlayerSettings.colorSpace = ColorSpace.Linear;
             PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.iOS, ManagedStrippingLevel.Low);
+            ConfigureBranding();
+        }
+
+        const string LogoPath = "Assets/Resources/Branding/logo.png";
+
+        /// <summary>App icon from the NORDisch logo, navy splash without the Unity logo.</summary>
+        static void ConfigureBranding()
+        {
+            if (AssetImporter.GetAtPath(LogoPath) is TextureImporter ti)
+            {
+                ti.textureType = TextureImporterType.Default;
+                ti.npotScale = TextureImporterNPOTScale.None;
+                ti.mipmapEnabled = false;
+                ti.isReadable = true; // runtime crops the badge as a sprite
+                ti.alphaSource = TextureImporterAlphaSource.None;
+                ti.textureCompression = TextureImporterCompression.Uncompressed;
+                ti.maxTextureSize = 1024;
+                ti.SaveAndReimport();
+            }
+            var logo = AssetDatabase.LoadAssetAtPath<Texture2D>(LogoPath);
+            if (logo != null)
+                PlayerSettings.SetIcons(NamedBuildTarget.Unknown, new[] { logo }, IconKind.Any);
+            else
+                Debug.LogWarning("[LeGamez] Logo missing at " + LogoPath);
+
+            var navy = new Color(0.102f, 0.227f, 0.306f);
+            PlayerSettings.SplashScreen.showUnityLogo = false;
+            PlayerSettings.SplashScreen.show = false;
+            PlayerSettings.SplashScreen.backgroundColor = navy;
         }
 
         static void ConfigureUrp()
