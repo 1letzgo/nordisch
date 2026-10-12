@@ -86,14 +86,46 @@ namespace LeGamez.Editor.OsmImport
             }
         }
 
-        public static int PlaceTrees(OsmData data, MeshSink sink, AreaRect area, System.Random rng)
+        /// <summary>
+        /// Trees detected from LGLN laser data (Tools/dgm/fetch_trees.py): x, z, height, crown radius.
+        /// When present they replace OSM single trees, tree rows and the scattered park/forest trees.
+        /// </summary>
+        public static List<Vector4> LoadLidarTrees(string path)
+        {
+            if (!System.IO.File.Exists(path)) return null;
+            var root = (Dictionary<string, object>)MiniJson.Parse(System.IO.File.ReadAllText(path));
+            var list = new List<Vector4>();
+            foreach (List<object> t in (List<object>)root["trees"])
+                list.Add(new Vector4((float)(double)t[0], (float)(double)t[1], (float)(double)t[2], (float)(double)t[3]));
+            return list;
+        }
+
+        public static int PlaceTrees(OsmData data, MeshSink sink, AreaRect area, System.Random rng, List<Vector4> lidar = null)
         {
             var clear = BuildClearance(data);
             int count = 0;
+            bool useLidar = lidar != null && lidar.Count > 0;
+
+            if (useLidar)
+            {
+                foreach (var t in lidar)
+                {
+                    var p = new Vector2(t.x, t.y);
+                    if (!area.Contains(p)) continue;
+                    if (t.z > 32f) continue; // church spires, masts, cranes – not trees
+                    // Crowns often hang over a street – move the trunk to the kerb instead of the carriageway.
+                    if (clear.IsBlocked(p, 0f) && !clear.PushOut(ref p, 0.2f)) continue;
+                    float h = Mathf.Clamp(t.z, 3f, 32f), r = Mathf.Clamp(t.w, 1f, 9f);
+                    float yaw = (float)rng.NextDouble() * 360f;
+                    EditsPlacer.Emit(sink, "tree", p, yaw, h / 8f, (s, q, y) => TreeSized(s, q, h, r, rng));
+                    count++;
+                }
+            }
 
             // 1. Mapped single trees and tree rows: real positions, but never on a carriageway.
             foreach (var n in data.nodes)
             {
+                if (useLidar) break;
                 if (!n.tags.Is("natural", "tree")) continue;
                 var p = data.projection.ToLocal(n.lat, n.lon);
                 if (!area.Contains(p) || clear.IsBlocked(p, 0f)) continue;
@@ -102,6 +134,7 @@ namespace LeGamez.Editor.OsmImport
             }
             foreach (var w in data.ways)
             {
+                if (useLidar) break;
                 if (!w.tags.Is("natural", "tree_row")) continue;
                 for (int i = 0; i < w.points.Count - 1; i++)
                 {
@@ -123,8 +156,8 @@ namespace LeGamez.Editor.OsmImport
             {
                 VegetationKind kind;
                 float spacing, coverage;
-                if (poly.tags.Is("landuse", "forest") || poly.tags.Is("natural", "wood")) { kind = VegetationKind.Tree; spacing = 8f; coverage = 0.85f; }
-                else if (poly.tags.Is("leisure", "park") || poly.tags.Is("landuse", "cemetery")) { kind = VegetationKind.Tree; spacing = 11f; coverage = 0.38f; }
+                if (poly.tags.Is("landuse", "forest") || poly.tags.Is("natural", "wood")) { if (useLidar) continue; kind = VegetationKind.Tree; spacing = 8f; coverage = 0.85f; }
+                else if (poly.tags.Is("leisure", "park") || poly.tags.Is("landuse", "cemetery")) { if (useLidar) continue; kind = VegetationKind.Tree; spacing = 11f; coverage = 0.38f; }
                 else if (poly.tags.Is("natural", "scrub")) { kind = VegetationKind.Bush; spacing = 7f; coverage = 0.55f; }
                 else if (poly.tags.Is("natural", "heath") || poly.tags.Is("natural", "dune")) { kind = VegetationKind.Bush; spacing = 9f; coverage = 0.3f; }
                 else continue;
@@ -210,6 +243,34 @@ namespace LeGamez.Editor.OsmImport
                 float a0 = rot + i * Mathf.PI * 2f / sides, a1 = rot + (i + 1) * Mathf.PI * 2f / sides;
                 var r0 = basePos + new Vector3(Mathf.Cos(a0) * crownR, midY, Mathf.Sin(a0) * crownR);
                 var r1 = basePos + new Vector3(Mathf.Cos(a1) * crownR, midY, Mathf.Sin(a1) * crownR);
+                MeshSink.Tri(crowns, r0, top, r1, leaves);
+                MeshSink.Tri(crowns, r1, bottom, r0, WorldStyle.Tint(leaves, rng, 0.05f));
+            }
+        }
+
+        /// <summary>Lean low-poly tree with measured height and crown radius (laser trees can be many).</summary>
+        static void TreeSized(MeshSink sink, Vector2 p, float height, float crownR, System.Random rng)
+        {
+            var crowns = sink.Get(WorldStyle.MatTrees, p);
+            var trunks = sink.Get(WorldStyle.MatTreeTrunks, p);
+            bool conifer = rng.NextDouble() < 0.2;
+            float trunkTop = height * (conifer ? 0.18f : 0.32f);
+            float trunkR = Mathf.Clamp(height * 0.022f, 0.12f, 0.45f);
+            float rot = (float)rng.NextDouble() * Mathf.PI * 2f;
+            var basePos = new Vector3(p.x, 0f, p.y);
+            Prism(trunks, basePos, trunkR, 0f, trunkTop + 0.3f, 4, rot, WorldStyle.TreeTrunk);
+
+            var leaves = WorldStyle.Tint(WorldStyle.TreeLeaves, rng, 0.14f);
+            float r = conifer ? crownR * 0.7f : crownR;
+            float midY = conifer ? trunkTop + (height - trunkTop) * 0.2f : trunkTop + (height - trunkTop) * 0.45f;
+            var top = basePos + Vector3.up * height;
+            var bottom = basePos + Vector3.up * trunkTop;
+            const int sides = 5;
+            for (int i = 0; i < sides; i++)
+            {
+                float a0 = rot + i * Mathf.PI * 2f / sides, a1 = rot + (i + 1) * Mathf.PI * 2f / sides;
+                var r0 = basePos + new Vector3(Mathf.Cos(a0) * r, midY, Mathf.Sin(a0) * r);
+                var r1 = basePos + new Vector3(Mathf.Cos(a1) * r, midY, Mathf.Sin(a1) * r);
                 MeshSink.Tri(crowns, r0, top, r1, leaves);
                 MeshSink.Tri(crowns, r1, bottom, r0, WorldStyle.Tint(leaves, rng, 0.05f));
             }

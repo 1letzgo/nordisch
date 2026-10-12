@@ -35,6 +35,13 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
    Ohne Datei bleibt die Welt flach. Der Importer baut daraus einen facettierten Boden (5-m-Zellen, `TerrainField`),
    schneidet Straßen/Flächen/Wasser entlang dieser Zellen und legt sie auf (`TerrainDrape.Drape`), hebt Bäume/Props an
    (`Lift`) und stellt Gebäude auf den tiefsten Punkt ihres Grundrisses.
+3c. **Bäume aus Laserscan** (nur Niedersachsen, LGLN DOM1 − DGM1, CC BY 4.0; braucht vorher `<id>.lod2.json` als Gebäudemaske):
+   ```bash
+   python3 Tools/dgm/fetch_trees.py jever
+   ```
+   → `Data/jever.trees.json` (`[x, z, Höhe, Kronenradius]`). nDOM = Oberfläche − Gelände, Gebäude (+1,5 m) ausmaskiert,
+   Kronenspitzen ≥ 3,5 m als lokale Maxima, Mindestabstand 3 m. Mit Datei ersetzt sie OSM-Bäume und Zufallsbäume in
+   Parks/Wäldern; Treffer > 32 m (Kirchtürme, Masten) verwirft der Importer. Ohne Datei: OSM-Bäume wie bisher.
 4. **In Unity importieren** (baut alle Gebiete, Menü-Vorschaubilder, Minimap-Karten, Hauptmenü-Szene):
    ```bash
    /Applications/Unity/Hub/Editor/6000.3.26f1/Unity.app/Contents/MacOS/Unity -batchmode -quit -projectPath . -buildTarget iOS \
@@ -56,7 +63,7 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
 - `BuildingOverrides`: Einzelhäuser anpassen über `Data/<id>.buildings.json` (Adresse oder `osmId`; Wandfarbe, Klinker,
   Giebelfenster pro Geschoss). Wirkt nur auf OSM-gebaute Häuser; nicht passende Einträge → Warnung im Import-Log.
 - `GroundBuilder`: Grund-Kacheln, Flächen (landuse/natural/leisure), Straßen-Bänder mit Mittellinie, Wasser, Hecken/Mauern/Zäune.
-- `PropPlacer`: OSM-Bäume, Baumgruppen in Parks/Wäldern (mit Abstand zu Wegen), Büsche auf Dünen/Heide, Straßenlaternen.
+- `PropPlacer`: LiDAR-Bäume (`<id>.trees.json`, Höhe/Krone echt) bzw. ohne Datei OSM-Bäume, Baumgruppen in Parks/Wäldern (mit Abstand zu Wegen), Büsche auf Dünen/Heide, Straßenlaternen.
 - `PoiExtractor`: benannte Sehenswürdigkeiten → Stempelheft.
 - `MeshSink`: Geometrie pro Material und 100-m-Chunk; Kollider für Gebäude, Stämme, Props
   (Stämme/Props liegen auf Layer 2, damit die Kamera sie ignoriert).
@@ -83,6 +90,7 @@ Draufsicht je Gebiet (Minimap + LoD2-Dachumrisse). Neue Objekte setzen, außerde
 python3 Tools/osm/fetch_area.py <id>
 python3 Tools/lod2/fetch_lod2.py <id>      # nur Niedersachsen
 python3 Tools/dgm/fetch_dgm.py <id>        # Gelände, nur Niedersachsen
+python3 Tools/dgm/fetch_trees.py <id>      # Bäume aus DOM1, nach lod2
 # 2. Unity ImportAllBatch (siehe oben), Snapshots prüfen, bauen
 ```
 Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen später Scrollen.
