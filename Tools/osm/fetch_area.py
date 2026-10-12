@@ -22,6 +22,8 @@ OUT_DIR = ROOT / "Data"
 ENDPOINTS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 ]
 USER_AGENT = "LeGamez-OSM-Fetcher/0.1 (game prototype)"
 
@@ -70,7 +72,7 @@ def fetch(query: str) -> dict:
     data = urllib.parse.urlencode({"data": query}).encode()
     last_err = None
     for url in ENDPOINTS:
-        for attempt in range(3):
+        for attempt in range(2):
             try:
                 req = urllib.request.Request(url, data=data, headers={"User-Agent": USER_AGENT})
                 with urllib.request.urlopen(req, timeout=180) as r:

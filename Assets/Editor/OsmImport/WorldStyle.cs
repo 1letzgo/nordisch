@@ -59,8 +59,6 @@ namespace LeGamez.Editor.OsmImport
         public static Color32 WallColor(Dictionary<string, string> tags, System.Random rng)
         {
             var b = tags.Get("building") ?? tags.Get("building:part");
-            var colour = tags.Get("building:colour");
-            if (colour != null && ColorUtility.TryParseHtmlString(colour, out var parsed)) return parsed;
             Color32 baseColor;
             switch (b)
             {
@@ -69,15 +67,20 @@ namespace LeGamez.Editor.OsmImport
                 case "commercial": case "retail": case "office": case "public": case "civic": baseColor = WallCommercial; break;
                 default: baseColor = rng.NextDouble() < 0.55 ? WallBrick : WallDefault; break;
             }
+            // Mapped colours ("black", "red", …) are often harsh – pull them halfway into the palette.
+            var colour = tags.Get("building:colour");
+            if (colour != null && ColorUtility.TryParseHtmlString(colour, out var parsed))
+                baseColor = Color32.Lerp(parsed, baseColor, 0.55f);
             return Tint(baseColor, rng, 0.08f);
         }
 
         public static Color32 RoofColor(Dictionary<string, string> tags, System.Random rng, bool pitched)
         {
+            Color32 baseColor = !pitched ? RoofGrey : rng.NextDouble() < 0.7 ? RoofRed : RoofDark;
             var colour = tags.Get("roof:colour");
-            if (colour != null && ColorUtility.TryParseHtmlString(colour, out var parsed)) return parsed;
-            if (!pitched) return Tint(RoofGrey, rng, 0.05f);
-            return Tint(rng.NextDouble() < 0.7 ? RoofRed : RoofDark, rng, 0.06f);
+            if (colour != null && ColorUtility.TryParseHtmlString(colour, out var parsed))
+                baseColor = Color32.Lerp(parsed, baseColor, 0.45f);
+            return Tint(baseColor, rng, 0.06f);
         }
 
         public static Color32 Tint(Color32 c, System.Random rng, float amount)

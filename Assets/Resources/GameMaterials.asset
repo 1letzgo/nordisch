@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4098e5e3fca0446298b6e06f848fd9c3, type: 3}
+  m_Name: GameMaterials
+  m_EditorClassIdentifier: Assembly-CSharp::LeGamez.Core.GameMaterials
+  playerBody: {fileID: 2100000, guid: c30fda7a28ee5441bb75cd4f286f65b7, type: 2}
+  playerSkin: {fileID: 2100000, guid: 3d78748d4dee245b4ba3e613f5a81219, type: 2}
+  playerAccent: {fileID: 2100000, guid: d45c3ecc1ac3247279ff965e777eb336, type: 2}
+  poiOpen: {fileID: 2100000, guid: 335cd6ff3591d4f29b4d236436d9fca8, type: 2}
+  poiDone: {fileID: 2100000, guid: dd901778af999458382f30f057319230, type: 2}

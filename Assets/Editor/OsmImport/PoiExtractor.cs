@@ -50,7 +50,7 @@ namespace LeGamez.Editor.OsmImport
         static void TryAdd(List<Candidate> list, Dictionary<string, string> tags, Vector2 local, string id, OsmData data)
         {
             var name = tags.Get("name");
-            if (string.IsNullOrEmpty(name)) return;
+            if (string.IsNullOrEmpty(name) || !HasLetter(name)) return;
             if (!Classify(tags, out var category, out int score)) return;
             if (tags.Has("wikipedia") || tags.Has("wikidata")) score += 3;
             if (tags.Has("heritage")) score += 2;
@@ -69,6 +69,12 @@ namespace LeGamez.Editor.OsmImport
                     lon = lon,
                 },
             });
+        }
+
+        static bool HasLetter(string s)
+        {
+            foreach (char c in s) if (char.IsLetter(c)) return true;
+            return false;
         }
 
         static bool Classify(Dictionary<string, string> t, out PoiCategory cat, out int score)

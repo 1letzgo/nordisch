@@ -27,9 +27,9 @@
     {
       "id": "langeoog",
       "name": "Langeoog",
-      "lat": 53.7465,
+      "lat": 53.7485,
       "lon": 7.479,
-      "size_m": 1000,
+      "size_m": 1200,
       "vehicles": [
         "bicycle",
         "carriage"

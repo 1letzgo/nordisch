@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97c05f41111e64aa0aa5d40039a433c7, type: 3}
+  m_Name: spiekeroog_pois
+  m_EditorClassIdentifier: Assembly-CSharp::LeGamez.Quests.PoiDatabase
+  entries:
+  - id: way/227210412
+    name: Alte Inselkirche
+    category: 2
+    position: {x: 27.36466, y: 0, z: -309.79965}
+    lat: 53.77019825951761
+    lon: 7.695415948692386
+  - id: node/6356149387
+    name: Inselmuseum
+    category: 1
+    position: {x: -73.30818, y: 0, z: -296.58157}
+    lat: 53.770317800084236
+    lon: 7.69388569994832
+  - id: node/11966298606
+    name: Kurioses Muschelmuseum
+    category: 1
+    position: {x: -164.72136, y: 0, z: -84.99824}
+    lat: 53.77223129996555
+    lon: 7.692496200086881
+  - id: node/1842505445
+    name: De Utkieker
+    category: 4
+    position: {x: 307.28516, y: 0, z: 412.60687}
+    lat: 53.77673149992366
+    lon: 7.699670800137949
+  - id: way/89429774
+    name: Rathaus Spiekeroog
+    category: 8
+    position: {x: -91.13405, y: 0, z: -300.09064}
+    lat: 53.77028606510385
+    lon: 7.693614742959529
+  - id: node/2329941881
+    name: Drinkeldodenkarkhof
+    category: 3
+    position: {x: 358.12653, y: 0, z: -143.09381}
+    lat: 53.77170590002139
+    lon: 7.700443599837011

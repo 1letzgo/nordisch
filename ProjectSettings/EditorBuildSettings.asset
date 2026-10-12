@@ -6,8 +6,23 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/MainMenu.unity
+    guid: 999ca7eb7a77a453394c6863bd5bf23b
+  - enabled: 1
     path: Assets/Scenes/SampleScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 1
+    path: Assets/Scenes/Areas/Langeoog.unity
+    guid: 9888ec3a45c8041759de52c99143123e
+  - enabled: 1
+    path: Assets/Scenes/Areas/Oldenburg.unity
+    guid: f0fca68dddc2a49a09c2350e5661d5fc
+  - enabled: 1
+    path: Assets/Scenes/Areas/Spiekeroog.unity
+    guid: e0ebe32e8bdd144f8a4a9fccf2831596
+  - enabled: 1
+    path: Assets/Scenes/Areas/Westerstede.unity
+    guid: 6bfa8c5addea14d7c8b23dd3bfefd826
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

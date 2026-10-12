@@ -15,7 +15,7 @@ namespace LeGamez.Editor
         [MenuItem("LeGamez/Build iOS (Xcode project)")]
         public static void BuildIOS()
         {
-            var scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
+            var scenes = EditorBuildSettings.scenes.Where(s => s.enabled && File.Exists(s.path)).Select(s => s.path).ToArray();
             if (scenes.Length == 0) throw new System.Exception("No scenes in build settings – run LeGamez/Import All Areas first.");
 
             string outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Builds", "iOS"));

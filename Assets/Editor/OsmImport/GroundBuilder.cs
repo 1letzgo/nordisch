@@ -143,13 +143,10 @@ namespace LeGamez.Editor.OsmImport
         static void Ribbon(MeshSink sink, List<Vector2> pts, LineStyle style, float half)
         {
             float hw = style.width * 0.5f;
-            var limit = half + 10f;
-            var areaRect = Rect.MinMaxRect(-limit, -limit, limit, limit);
             for (int i = 0; i < pts.Count - 1; i++)
             {
                 Vector2 a = pts[i], b = pts[i + 1];
-                var segRect = Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
-                if (!segRect.Overlaps(areaRect, true)) continue; // segment fully outside the area
+                if (!ClipSegment(ref a, ref b, half)) continue; // segment fully outside the area
                 Vector2 dir = b - a;
                 if (dir.sqrMagnitude < 1e-4f) continue;
                 dir.Normalize();
@@ -161,6 +158,30 @@ namespace LeGamez.Editor.OsmImport
                 Disc(batch, b, hw, style.y, style.color);
                 if (i == 0) Disc(batch, a, hw, style.y, style.color);
             }
+        }
+
+        /// <summary>Liang–Barsky clip of segment a-b to the square [-half, half]².</summary>
+        static bool ClipSegment(ref Vector2 a, ref Vector2 b, float half)
+        {
+            float t0 = 0f, t1 = 1f;
+            Vector2 d = b - a;
+            float[] p = { -d.x, d.x, -d.y, d.y };
+            float[] q = { a.x + half, half - a.x, a.y + half, half - a.y };
+            for (int k = 0; k < 4; k++)
+            {
+                if (Mathf.Approximately(p[k], 0f))
+                {
+                    if (q[k] < 0f) return false;
+                    continue;
+                }
+                float r = q[k] / p[k];
+                if (p[k] < 0f) { if (r > t1) return false; if (r > t0) t0 = r; }
+                else { if (r < t0) return false; if (r < t1) t1 = r; }
+            }
+            Vector2 start = a;
+            a = start + d * t0;
+            b = start + d * t1;
+            return true;
         }
 
         static void Disc(MeshSink.Batch batch, Vector2 c, float r, float y, Color32 color)

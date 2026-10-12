@@ -67,7 +67,7 @@ namespace LeGamez.Editor.OsmImport
             EditorSceneManager.SaveScene(scene, MenuScenePath);
 
             // Menu must be build index 0.
-            var scenes = EditorBuildSettings.scenes.Where(s => s.path != MenuScenePath).ToList();
+            var scenes = EditorBuildSettings.scenes.Where(s => s.path != MenuScenePath && File.Exists(s.path)).ToList();
             scenes.Insert(0, new EditorBuildSettingsScene(MenuScenePath, true));
             EditorBuildSettings.scenes = scenes.ToArray();
         }
@@ -199,21 +199,52 @@ namespace LeGamez.Editor.OsmImport
 
         static Vector3 FindSpawn(OsmData data, float half)
         {
-            // Nearest walkable way vertex to the area centre (keeps the player out of buildings).
+            // Walkable way vertex near the centre with open space around it (no narrow alleys,
+            // never inside a building). Wider street types are preferred.
+            var buildings = new List<List<Vector2>>();
+            foreach (var p in data.polygons)
+                if (p.tags.Has("building") && GeoUtil.Overlaps(p.outer, 200f))
+                    buildings.Add(PolygonTriangulator.Clean(p.outer));
+
             Vector2 best = Vector2.zero;
-            float bestDist = float.MaxValue;
+            float bestScore = float.MaxValue;
             foreach (var w in data.ways)
             {
-                var hw = w.tags.Get("highway");
-                if (hw != "pedestrian" && hw != "footway" && hw != "residential" && hw != "living_street" && hw != "path") continue;
+                float penalty;
+                switch (w.tags.Get("highway"))
+                {
+                    case "pedestrian": case "living_street": penalty = 0f; break;
+                    case "residential": case "footway": penalty = 40f; break;
+                    case "path": case "cycleway": penalty = 60f; break;
+                    default: continue;
+                }
                 foreach (var p in w.points)
                 {
-                    if (Mathf.Abs(p.x) > half - 20 || Mathf.Abs(p.y) > half - 20) continue;
-                    float d = p.sqrMagnitude;
-                    if (d < bestDist) { bestDist = d; best = p; }
+                    if (p.magnitude > 200f) continue;
+                    float clearance = Clearance(p, buildings);
+                    if (clearance < 6f) continue;
+                    float score = p.magnitude + penalty - Mathf.Min(clearance, 20f);
+                    if (score < bestScore) { bestScore = score; best = p; }
                 }
             }
             return new Vector3(best.x, 0f, best.y);
+        }
+
+        static float Clearance(Vector2 p, List<List<Vector2>> rings)
+        {
+            float min = float.MaxValue;
+            foreach (var ring in rings)
+            {
+                if (ring.Count < 3) continue;
+                if (OsmData.PointInRing(p, ring)) return 0f;
+                for (int i = 0, j = ring.Count - 1; i < ring.Count; j = i++)
+                {
+                    Vector2 a = ring[j], b = ring[i], ab = b - a;
+                    float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(1e-5f, ab.sqrMagnitude));
+                    min = Mathf.Min(min, Vector2.Distance(p, a + ab * t));
+                }
+            }
+            return min;
         }
 
         static void AddGroundAndBounds(Transform root, float half)
@@ -259,8 +290,8 @@ namespace LeGamez.Editor.OsmImport
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogColor = new Color(0.78f, 0.86f, 0.93f);
-            RenderSettings.fogStartDistance = 180f;
-            RenderSettings.fogEndDistance = 520f;
+            RenderSettings.fogStartDistance = 220f;
+            RenderSettings.fogEndDistance = 650f;
         }
 
         static Dictionary<string, Material> EnsureMaterials()

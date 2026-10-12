@@ -1,0 +1,99 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97c05f41111e64aa0aa5d40039a433c7, type: 3}
+  m_Name: langeoog_pois
+  m_EditorClassIdentifier: Assembly-CSharp::LeGamez.Quests.PoiDatabase
+  entries:
+  - id: way/108578040
+    name: Sankt Nikolaus
+    category: 2
+    position: {x: -283.94336, y: 0, z: -156.31401}
+    lat: 53.745086340273296
+    lon: 7.474686722759906
+  - id: way/109884101
+    name: Evangelisch-Lutherische Inselkirche
+    category: 2
+    position: {x: 178.66422, y: 0, z: -62.440605}
+    lat: 53.74593530481701
+    lon: 7.4817140211845565
+  - id: way/124259507
+    name: Wasserturm
+    category: 4
+    position: {x: -161.7683, y: 0, z: 97.00848}
+    lat: 53.74737731723784
+    lon: 7.476542638405875
+  - id: way/1137995698
+    name: Motorrettungsboot Langeoog
+    category: 0
+    position: {x: 77.37949, y: 0, z: 317.7737}
+    lat: 53.749373855627525
+    lon: 7.480175442911638
+  - id: node/2866654401
+    name: Schifffahrtsmuseum
+    category: 1
+    position: {x: 62.979633, y: 0, z: 369.60464}
+    lat: 53.74984259993104
+    lon: 7.479956700025087
+  - id: way/168678234
+    name: Infohaus Altes Wasserwerk
+    category: 1
+    position: {x: -237.04454, y: 0, z: -67.35484}
+    lat: 53.745890861837864
+    lon: 7.47539914515603
+  - id: way/221597469
+    name: Seemannshus
+    category: 1
+    position: {x: -69.66233, y: 0, z: -39.840794}
+    lat: 53.746139691124405
+    lon: 7.477941785622849
+  - id: node/971065532
+    name: "K\xF6 2"
+    category: 3
+    position: {x: 475.14172, y: 0, z: -50.14531}
+    lat: 53.74604649999594
+    lon: 7.486217699990855
+  - id: node/9542853506
+    name: LEGO Langeoog
+    category: 0
+    position: {x: 77.29109, y: 0, z: 392.47134}
+    lat: 53.75004939989504
+    lon: 7.480174100033084
+  - id: way/41397790
+    name: "Sp\xF6\xF6lstuv"
+    category: 8
+    position: {x: 65.19231, y: 0, z: 480.30167}
+    lat: 53.75084371250257
+    lon: 7.4799903119148645
+  - id: way/179363192
+    name: Rathaus
+    category: 8
+    position: {x: 156.11952, y: 0, z: 47.224346}
+    lat: 53.74692708363775
+    lon: 7.481371553195919
+  - id: node/1351748727
+    name: Lili Marleen
+    category: 3
+    position: {x: -70.25385, y: 0, z: 65.504036}
+    lat: 53.74709239998507
+    lon: 7.477932800030369
+  - id: node/7954102138
+    name: "Gro\xDFer Philosoph"
+    category: 5
+    position: {x: 389.2203, y: 0, z: -26.83631}
+    lat: 53.746257300003315
+    lon: 7.484912499917792
+  - id: node/12100195882
+    name: Margarethe de Heer
+    category: 3
+    position: {x: -108.15881, y: 0, z: 83.26222}
+    lat: 53.74725300000262
+    lon: 7.477356999968195
