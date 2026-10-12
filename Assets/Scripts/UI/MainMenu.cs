@@ -143,9 +143,9 @@ namespace LeGamez.UI
 
         static void Header(RectTransform root, Vector2 anchor, Vector2 pos, TextAnchor align)
         {
-            UiKit.Logo(root, anchor, pos, 120f);
+            UiKit.Wordmark(root, anchor, pos, 110f);
             var sub = UiKit.Label(root, "Entdecke den Nordwesten", 38, Color.white, align, FontStyle.Bold)
-                .Place(anchor, pos + new Vector2(0, -146), new Vector2(900, 50));
+                .Place(anchor, pos + new Vector2(0, -130), new Vector2(900, 50));
             sub.gameObject.AddComponent<Shadow>().effectColor = new Color(0.1f, 0.23f, 0.31f, 0.6f);
         }
 

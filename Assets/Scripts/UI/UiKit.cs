@@ -103,6 +103,31 @@ namespace LeGamez.UI
             }
         }
 
+        /// <summary>White "NORDisch" lettering without the badge (Resources/Branding/wordmark.png), with a soft
+        /// navy shadow for contrast on the sky. Falls back to a text label.</summary>
+        public static RectTransform Wordmark(Transform parent, Vector2 anchor, Vector2 pos, float height)
+        {
+            var sprite = Resources.Load<Sprite>("Branding/wordmark");
+            float width = sprite != null ? height * sprite.rect.width / sprite.rect.height : height * 5f;
+            var rt = Rect("Wordmark", parent, anchor, pos, new Vector2(width, height));
+            if (sprite != null)
+            {
+                var img = rt.gameObject.AddComponent<Image>();
+                img.sprite = sprite;
+                img.raycastTarget = false;
+                var sh = rt.gameObject.AddComponent<Shadow>();
+                sh.effectColor = new Color(Navy.r, Navy.g, Navy.b, 0.55f);
+                sh.effectDistance = new Vector2(0, -height * 0.05f);
+            }
+            else
+            {
+                var t = Label(rt, "<b>NORD</b>isch", Mathf.RoundToInt(height * 0.9f), Color.white, TextAnchor.MiddleCenter);
+                Stretch(t.rectTransform);
+                t.gameObject.AddComponent<Shadow>().effectColor = new Color(Navy.r, Navy.g, Navy.b, 0.55f);
+            }
+            return rt;
+        }
+
         /// <summary>Logo badge; falls back to a text recreation if the image is missing.</summary>
         public static RectTransform Logo(Transform parent, Vector2 anchor, Vector2 pos, float height)
         {
