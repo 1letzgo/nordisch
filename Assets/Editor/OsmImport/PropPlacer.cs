@@ -86,6 +86,65 @@ namespace LeGamez.Editor.OsmImport
             }
         }
 
+        const float MinTrunkToHouse = 1.5f;
+
+        /// <summary>Building footprints with a distance query (0 inside), bucketed in a coarse grid.</summary>
+        class Footprints
+        {
+            const float Cell = 25f;
+            readonly Dictionary<Vector2Int, List<(List<Vector2> ring, bool hole)>> grid = new Dictionary<Vector2Int, List<(List<Vector2>, bool)>>();
+
+            public static Footprints FromOsm(OsmData data)
+            {
+                var f = new Footprints();
+                foreach (var poly in data.polygons)
+                    if (poly.tags.Has("building") || poly.tags.Has("building:part"))
+                    {
+                        f.Add(PolygonTriangulator.Clean(poly.outer), false);
+                        foreach (var hole in poly.holes) f.Add(PolygonTriangulator.Clean(hole), true); // courtyards
+                    }
+                return f;
+            }
+
+            void Add(List<Vector2> ring, bool hole)
+            {
+                if (ring.Count < 3) return;
+                var b = GeoUtil.Bounds(ring);
+                for (int x = Mathf.FloorToInt(b.xMin / Cell); x <= Mathf.FloorToInt(b.xMax / Cell); x++)
+                for (int y = Mathf.FloorToInt(b.yMin / Cell); y <= Mathf.FloorToInt(b.yMax / Cell); y++)
+                {
+                    var key = new Vector2Int(x, y);
+                    if (!grid.TryGetValue(key, out var list)) grid[key] = list = new List<(List<Vector2>, bool)>();
+                    list.Add((ring, hole));
+                }
+            }
+
+            /// <summary>Distance from p to the nearest footprint (0 if inside); at most <paramref name="max"/>.</summary>
+            public float Distance(Vector2 p, float max)
+            {
+                float best = max;
+                bool inside = false, inHole = false;
+                var seen = new HashSet<List<Vector2>>();
+                for (int x = Mathf.FloorToInt((p.x - max) / Cell); x <= Mathf.FloorToInt((p.x + max) / Cell); x++)
+                for (int y = Mathf.FloorToInt((p.y - max) / Cell); y <= Mathf.FloorToInt((p.y + max) / Cell); y++)
+                {
+                    if (!grid.TryGetValue(new Vector2Int(x, y), out var list)) continue;
+                    foreach (var (ring, hole) in list)
+                    {
+                        if (!seen.Add(ring)) continue;
+                        if (OsmData.PointInRing(p, ring)) { if (hole) inHole = true; else inside = true; }
+                        for (int i = 0; i < ring.Count; i++)
+                        {
+                            Vector2 a = ring[i], ab = ring[(i + 1) % ring.Count] - a;
+                            float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(1e-5f, ab.sqrMagnitude));
+                            best = Mathf.Min(best, (p - (a + ab * t)).magnitude);
+                        }
+                    }
+                }
+                return inside && !inHole ? 0f : best;
+            }
+        }
+
         /// <summary>
         /// Trees detected from LGLN laser data (Tools/dgm/fetch_trees.py): x, z, height, crown radius.
         /// When present they replace OSM single trees, tree rows and the scattered park/forest trees.
@@ -105,9 +164,11 @@ namespace LeGamez.Editor.OsmImport
             var clear = BuildClearance(data);
             int count = 0;
             bool useLidar = lidar != null && lidar.Count > 0;
+            var houses = useLidar ? Footprints.FromOsm(data) : null;
 
             if (useLidar)
             {
+                int dropped = 0, shrunk = 0;
                 foreach (var t in lidar)
                 {
                     var p = new Vector2(t.x, t.y);
@@ -116,10 +177,21 @@ namespace LeGamez.Editor.OsmImport
                     // Crowns often hang over a street – move the trunk to the kerb instead of the carriageway.
                     if (clear.IsBlocked(p, 0f) && !clear.PushOut(ref p, 0.2f)) continue;
                     float h = Mathf.Clamp(t.z, 3f, 32f), r = Mathf.Clamp(t.w, 1f, 9f);
+                    // House beats tree: the laser scan can predate new-build estates (OSM-only houses), so no trunk
+                    // near a footprint and no crown reaching into a wall – the crown shrinks, the tree with it.
+                    float wall = houses.Distance(p, r);
+                    if (wall < MinTrunkToHouse) { dropped++; continue; }
+                    if (wall < r)
+                    {
+                        shrunk++;
+                        r = Mathf.Max(1f, wall);
+                        h = Mathf.Min(h, 3f + r * 3f);
+                    }
                     float yaw = (float)rng.NextDouble() * 360f;
                     EditsPlacer.Emit(sink, "tree", p, yaw, h / 8f, (s, q, y) => TreeSized(s, q, h, r, rng));
                     count++;
                 }
+                Debug.Log($"[Trees] LiDAR: {count} placed, {dropped} dropped at houses, {shrunk} crowns trimmed");
             }
 
             // 1. Mapped single trees and tree rows: real positions, but never on a carriageway.
