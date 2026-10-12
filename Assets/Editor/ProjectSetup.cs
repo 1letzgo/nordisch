@@ -78,6 +78,8 @@ namespace LeGamez.Editor
             if (AssetImporter.GetAtPath(WordmarkPath) is TextureImporter wi)
             {
                 wi.textureType = TextureImporterType.Sprite;
+                wi.spriteImportMode = SpriteImportMode.Single; // full texture, never a stale sub-rect
+                wi.npotScale = TextureImporterNPOTScale.None;
                 wi.alphaIsTransparency = true;
                 wi.mipmapEnabled = false;
                 wi.textureCompression = TextureImporterCompression.Uncompressed;

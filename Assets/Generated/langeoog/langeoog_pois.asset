@@ -40,9 +40,9 @@ MonoBehaviour:
   - id: way/168678234
     name: Infohaus Altes Wasserwerk
     category: 1
-    position: {x: -237.0333, y: 0, z: -288.50317}
-    lat: 53.74589085884721
-    lon: 7.475399144581036
+    position: {x: -237.20355, y: 0, z: -288.7277}
+    lat: 53.74588882837149
+    lon: 7.475396558138956
   - id: node/2866654401
     name: Schifffahrtsmuseum
     category: 1
@@ -73,18 +73,18 @@ MonoBehaviour:
     position: {x: 77.28741, y: 0, z: 171.32335}
     lat: 53.7500493999403
     lon: 7.480174099944098
-  - id: way/179363192
-    name: Rathaus
-    category: 8
-    position: {x: 156.11212, y: 0, z: -173.92363}
-    lat: 53.74692708385551
-    lon: 7.481371553666032
   - id: way/41397790
     name: "Sp\xF6\xF6lstuv"
     category: 8
     position: {x: 65.189186, y: 0, z: 259.15344}
     lat: 53.750843710477895
     lon: 7.479990311653608
+  - id: way/179363192
+    name: Rathaus
+    category: 8
+    position: {x: 153.98059, y: 0, z: -174.0399}
+    lat: 53.74692603232466
+    lon: 7.481339172839092
   - id: node/12100195883
     name: Heinrich de Heer
     category: 3

@@ -42,6 +42,20 @@ namespace LeGamez.Player
         float idleLookTime;
         float pivotY, pivotYVel;
 
+        /// <summary>Jump straight to the follow position (after a teleport) instead of flying there.</summary>
+        public void SnapToTarget()
+        {
+            if (target == null) return;
+            targetYaw = yaw = target.eulerAngles.y;
+            yawVel = pitchVel = 0f;
+            pivot = target.position + pivotOffset;
+            pivotVel = Vector3.zero;
+            pivotY = pivot.y;
+            pivotYVel = 0f;
+            currentDistance = distance;
+            distanceVel = 0f;
+        }
+
         /// <summary>
         /// Heading the camera is settling towards. Movement uses this instead of the smoothed
         /// transform so player and camera don't chase each other's lag (that caused the wobble).

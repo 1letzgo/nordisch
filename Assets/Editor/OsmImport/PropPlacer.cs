@@ -232,6 +232,19 @@ namespace LeGamez.Editor.OsmImport
                 if (p.tags.Has("building")) buildings.AddPolygon(PolygonTriangulator.Clean(p.outer));
 
             int count = 0;
+
+            // Mapped lamps (highway=street_lamp) at their real positions; the 30 m pattern fills the gaps.
+            var mapped = new Clearance();
+            foreach (var n in data.nodes)
+            {
+                if (!n.tags.Is("highway", "street_lamp")) continue;
+                var p = data.projection.ToLocal(n.lat, n.lon);
+                if (!Inside(p, half - 1f)) continue;
+                Lamp(sink.Get(WorldStyle.MatProps, p), p, Vector2.right);
+                mapped.AddLine(new List<Vector2> { p, p + Vector2.one * 0.01f }, 15f);
+                count++;
+            }
+
             foreach (var w in data.ways)
             {
                 float halfWidth;
@@ -255,7 +268,7 @@ namespace LeGamez.Editor.OsmImport
                     {
                         var p = a + dir * d + normal * side * (halfWidth + 0.7f);
                         side = -side;
-                        if (!Inside(p, half - 2f) || buildings.IsBlocked(p, 1.2f)) continue;
+                        if (!Inside(p, half - 2f) || buildings.IsBlocked(p, 1.2f) || mapped.IsBlocked(p, 0f)) continue;
                         Lamp(sink.Get(WorldStyle.MatProps, p), p, dir);
                         count++;
                     }

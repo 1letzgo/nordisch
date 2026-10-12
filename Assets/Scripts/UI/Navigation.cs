@@ -55,6 +55,9 @@ namespace LeGamez.UI
             UiKit.Panel(root.gameObject, new Color(1, 1, 1, 0.95f), UiKit.Circle);
             var mm = root.gameObject.AddComponent<MiniMap>();
             mm.Build(root, size);
+            // Tap the minimap to open the big map (overlay on the canvas root, outside the safe area).
+            var canvasRoot = parent.GetComponentInParent<Canvas>().transform;
+            root.gameObject.AddComponent<TapButton>().onPress = () => FullMap.Open(canvasRoot);
             return mm;
         }
 

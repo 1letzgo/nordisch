@@ -121,6 +121,20 @@ Shader "LeGamez/VertexColorLit"
                 return lerp(albedo * 1.02h, c, fade);
             }
 
+            // Paving stones (plazas, pedestrian streets): stretcher bond in world XZ, per-stone tint.
+            half3 Paving(half3 albedo, float2 xz)
+            {
+                const float sw = 0.6, sh = 0.3, joint = 0.02;
+                float row = floor(xz.y / sh);
+                float sx = xz.x / sw + fmod(row, 3) * 0.33;
+                float id = Hash21(float2(floor(sx), row));
+                float jx = frac(sx) * sw, jy = xz.y - row * sh;
+                float stone = AABox(jx, joint, sw) * AABox(jy, joint, sh);
+                half3 c = lerp(albedo * 0.72h, albedo * (0.9h + 0.2h * id), stone);
+                float fade = saturate(1 - max(fwidth(xz.x), fwidth(xz.y)) / 0.05);
+                return lerp(albedo * 0.95h, c, fade);
+            }
+
             // Pantile roof: rows with shaded lower lip, wavy tiles, per-tile variation.
             half3 RoofTiles(half3 albedo, float u, float v)
             {
@@ -173,6 +187,10 @@ Shader "LeGamez/VertexColorLit"
                     else if (code > 100.0h && code < 140.0h)
                     {
                         albedo = RoofTiles(albedo, i.facade.x, i.facade.y);
+                    }
+                    else if (code > 75.0h && code < 105.0h && n.y > 0.9)
+                    {
+                        albedo = Paving(albedo, i.positionWS.xz);
                     }
                 #endif
                 #if defined(_WATER_ANIM)

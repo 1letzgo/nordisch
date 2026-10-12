@@ -121,6 +121,7 @@ namespace LeGamez.Editor.OsmImport
             int trees = PropPlacer.PlaceTrees(data, sink, half, rng);
             int lamps = PropPlacer.PlaceStreetLamps(data, sink, half);
             int barriers = GroundBuilder.BuildBarriers(data, sink, half);
+            var furniture = FurniturePlacer.Place(data, sink, half, rng);
             var pois = PoiExtractor.Extract(data, half);
 
             string areaDir = $"{GeneratedRoot}/{meta.id}";
@@ -205,7 +206,8 @@ namespace LeGamez.Editor.OsmImport
             UpdateCatalog(meta, pois.Count);
             AssetDatabase.SaveAssets();
 
-            Debug.Log($"[OSM] {meta.name}: {buildings} buildings, {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, {pois.Count} POIs, " +
+            Debug.Log($"[OSM] {meta.name}: {buildings} buildings, {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, " +
+                      $"furniture {furniture.mapped} mapped/{furniture.benches} benches/{furniture.planters} planters/{furniture.seating} café tables/{furniture.fountains} fountains, {pois.Count} POIs, " +
                       $"{sink.Batches.Count()} meshes in {sw.ElapsedMilliseconds} ms -> {scenePath}");
             return scenePath;
         }
@@ -348,7 +350,7 @@ namespace LeGamez.Editor.OsmImport
                     mat.SetFloat("_WaterAnim", 1f);
                     mat.EnableKeyword("_WATER_ANIM");
                 }
-                if (name == WorldStyle.MatBuildings)
+                if (name == WorldStyle.MatBuildings || name == WorldStyle.MatGround)
                 {
                     mat.SetFloat("_Facade", 1f);
                     mat.EnableKeyword("_FACADE");

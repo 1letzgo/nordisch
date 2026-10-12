@@ -41,11 +41,11 @@ namespace LeGamez.Editor.OsmImport
         public static readonly Color32 Forest = Hex("#5E9A4E");
         public static readonly Color32 Residential = Hex("#C9C3B4");
         public static readonly Color32 Commercial = Hex("#D3C1BC");
-        public static readonly Color32 Pedestrian = Hex("#BFB5A5");
+        public static readonly Color32 Pedestrian = WithAlpha(Hex("#A89C88"), 90);
         public static readonly Color32 Parking = Hex("#A9A9A9");
         public static readonly Color32 Water = Hex("#5AA9D6");
         public static readonly Color32 Asphalt = Hex("#5D6166");
-        public static readonly Color32 Paving = Hex("#ABA393");
+        public static readonly Color32 Paving = WithAlpha(Hex("#A29A8A"), 90);
         public static readonly Color32 Path = Hex("#D8C49A");
         public static readonly Color32 Cycleway = Hex("#B5574B");
         public static readonly Color32 Rail = Hex("#6E5A4A");
@@ -58,6 +58,9 @@ namespace LeGamez.Editor.OsmImport
         public static readonly Color32 StoneWall = Hex("#A69C8C");
         public static readonly Color32 Fence = Hex("#8A8F94");
         public static readonly Color32 LaneMarking = Hex("#E9E6DC");
+
+        /// <summary>Alpha carries a shader material code (90 = paving stones, see VertexColorLit).</summary>
+        public static Color32 WithAlpha(Color32 c, byte a) => new Color32(c.r, c.g, c.b, a);
 
         public static Color32 GroundColor(string ground) => ground == "sand" ? Sand : Grass;
 

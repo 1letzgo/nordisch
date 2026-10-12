@@ -63,6 +63,14 @@ def build_query(s, w, n, e) -> str:
   way["name"]["tourism"]({b});
   way["name"]["historic"]({b});
   way["man_made"="lighthouse"]({b});
+  node["amenity"~"^(bench|fountain|bicycle_parking|waste_basket|cafe|restaurant|ice_cream|drinking_water|pub|bar|fast_food)$"]({b});
+  way["amenity"="fountain"]({b});
+  node["leisure"~"^(picnic_table|outdoor_seating)$"]({b});
+  node["tourism"="artwork"]({b});
+  node["historic"~"^(memorial|monument)$"]({b});
+  node["highway"="street_lamp"]({b});
+  node["man_made"="flagpole"]({b});
+  node["barrier"="bollard"]({b});
 );
 out geom tags;
 """
