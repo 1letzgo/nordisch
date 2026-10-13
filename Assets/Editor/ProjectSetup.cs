@@ -57,7 +57,6 @@ namespace LeGamez.Editor
         public static void ConfigureAndroid()
         {
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, BundleId);
-            PlayerSettings.Android.bundleVersionCode = 1;
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
             PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevelAuto;
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;

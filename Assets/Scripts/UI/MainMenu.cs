@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using LeGamez.Core;
 using LeGamez.Player;
 using LeGamez.Quests;
@@ -14,7 +15,7 @@ namespace LeGamez.UI
 {
     /// <summary>
     /// Main menu: 3D character preview (turntable, swipe/arrows to change) and area cards with
-    /// rendered thumbnails and stamp progress. Separate layouts for portrait and landscape.
+    /// rendered thumbnails and the ways to get around. Separate layouts for portrait and landscape.
     /// </summary>
     public class MainMenu : MonoBehaviour
     {
@@ -50,6 +51,7 @@ namespace LeGamez.UI
             }
             preview = new GameObject("CharacterPreview").AddComponent<CharacterPreview>();
             preview.Show(PlayerAvatar.SelectedIndex);
+            AppUpdater.CheckOnce();
         }
 
         void Update()
@@ -70,6 +72,7 @@ namespace LeGamez.UI
                 BuildUi(portrait);
             }
             PlacePreview(portrait);
+            RefreshUpdateUi();
         }
 
         /// <summary>Puts the character where the layout leaves room for it, sized to that region.</summary>
@@ -102,11 +105,35 @@ namespace LeGamez.UI
             float longSide = 1080f * Mathf.Max(Screen.width, Screen.height) / Mathf.Max(1, Mathf.Min(Screen.width, Screen.height));
             if (portrait) BuildPortrait(safe, longSide);
             else BuildLandscape(safe, longSide);
+            updateLabel = null;
+            updateBanner = null;
             if (BuildExpiry.IsExpired) ExpiredOverlay(canvasGo.transform);
+            else if (ShowsUpdate) UpdateBanner(safe, portrait);
         }
 
-        /// <summary>Release build past its date: covers the whole menu, only the download link works.</summary>
-        static void ExpiredOverlay(Transform canvas)
+        static bool ShowsUpdate => AppUpdater.Current >= AppUpdater.State.Available;
+
+        RectTransform updateBanner;
+        Text updateLabel;
+
+        /// <summary>Android release builds: "update available" pill under the header; tap downloads and installs.</summary>
+        void UpdateBanner(RectTransform root, bool portrait)
+        {
+            var anchor = portrait ? new Vector2(0.5f, 1f) : new Vector2(0f, 1f);
+            var pos = portrait ? new Vector2(0, -250) : new Vector2(60, -215);
+            updateBanner = UiKit.Rect("Update", root, anchor, pos, new Vector2(760, 96));
+            UiKit.DropShadow(updateBanner, 18f, -6f, 0.3f);
+            var img = UiKit.Panel(updateBanner.gameObject, UiKit.Mustard, UiKit.Rounded);
+            var button = updateBanner.gameObject.AddComponent<Button>();
+            button.targetGraphic = img;
+            button.onClick.AddListener(AppUpdater.Install);
+            updateLabel = UiKit.Label(updateBanner, AppUpdater.Label(), 34, UiKit.Navy, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UiKit.Stretch(updateLabel.rectTransform, 12f);
+        }
+
+        /// <summary>Release build past its date: covers the whole menu; the button installs the new version in place
+        /// (Android, once the update check found it) or opens the GitHub release page.</summary>
+        void ExpiredOverlay(Transform canvas)
         {
             var root = UiKit.Rect("Expired", canvas);
             UiKit.Stretch(root);
@@ -119,12 +146,29 @@ namespace LeGamez.UI
             UiKit.Label(card, $"Testversionen laufen 15 Tage (bis {date}).\nDie aktuelle Version gibt es auf GitHub.", 34, UiKit.InkSoft,
                     TextAnchor.UpperCenter)
                 .Place(new Vector2(0.5f, 1f), new Vector2(0, -160), new Vector2(780, 120));
-            var btn = UiKit.Rect("Download", card, new Vector2(0.5f, 0f), new Vector2(0, 110), new Vector2(560, 110));
+            var btn = UiKit.Rect("Download", card, new Vector2(0.5f, 0f), new Vector2(0, 110), new Vector2(680, 110));
             var img = UiKit.Panel(btn.gameObject, UiKit.Mustard, UiKit.Rounded);
             var button = btn.gameObject.AddComponent<Button>();
             button.targetGraphic = img;
-            button.onClick.AddListener(() => Application.OpenURL(BuildExpiry.ReleasesUrl));
-            UiKit.Stretch(UiKit.Label(btn, "Neue Version laden", 40, UiKit.Navy, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform);
+            button.onClick.AddListener(() =>
+            {
+                if (ShowsUpdate) AppUpdater.Install();
+                else Application.OpenURL(BuildExpiry.ReleasesUrl);
+            });
+            updateLabel = UiKit.Label(btn, ShowsUpdate ? AppUpdater.Label() : "Neue Version laden", 36, UiKit.Navy, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UiKit.Stretch(updateLabel.rectTransform, 12f);
+        }
+
+        /// <summary>Keeps banner/button text in step with the updater; adds the banner once the check found an update.</summary>
+        void RefreshUpdateUi()
+        {
+            if (!AppUpdater.Supported || canvasGo == null) return;
+            if (ShowsUpdate && updateLabel == null && !BuildExpiry.IsExpired)
+            {
+                var safe = (RectTransform)canvasGo.transform.Find("SafeArea");
+                if (safe != null) UpdateBanner(safe, builtPortrait ?? true);
+            }
+            if (updateLabel != null && ShowsUpdate) updateLabel.text = AppUpdater.Label();
         }
 
         // ---------------------------------------------------------------- layouts
@@ -302,16 +346,13 @@ namespace LeGamez.UI
             UiKit.Label(card, area.displayName, 40, UiKit.Ink, TextAnchor.UpperLeft, FontStyle.Bold)
                 .Place(new Vector2(0, 1), new Vector2(26, -textTop), new Vector2(size.x - 52, 50));
 
-            int stamps = StampBook.CountForArea(area.id);
-            float progress = area.poiCount > 0 ? (float)stamps / area.poiCount : 0f;
-            UiKit.Label(card, $"{stamps} / {area.poiCount} Stempel", 26, UiKit.InkSoft, TextAnchor.UpperLeft)
+            // How you get around there.
+            var ways = new List<string> { "zu Fuß" };
+            if (area.vehicles.Contains("bicycle")) ways.Add("Fahrrad");
+            if (area.vehicles.Contains("car")) ways.Add("Auto");
+            if (area.vehicles.Contains("carriage")) ways.Add("Kutsche");
+            UiKit.Label(card, string.Join(" · ", ways), 26, UiKit.InkSoft, TextAnchor.UpperLeft)
                 .Place(new Vector2(0, 1), new Vector2(26, -textTop - 54), new Vector2(size.x - 52, 34));
-
-            var track = UiKit.Rect("Track", card, new Vector2(0, 0), new Vector2(26, 24), new Vector2(size.x - 52, 14));
-            UiKit.Panel(track.gameObject, UiKit.Track);
-            var fill = UiKit.Rect("Fill", track, new Vector2(0, 0.5f), Vector2.zero, new Vector2(Mathf.Max(14, (size.x - 52) * progress), 14));
-            UiKit.Panel(fill.gameObject, progress >= 1f ? UiKit.Done : UiKit.Accent);
-            fill.gameObject.SetActive(progress > 0f);
         }
 
         /// <summary>Drag horizontally to spin the preview.</summary>
