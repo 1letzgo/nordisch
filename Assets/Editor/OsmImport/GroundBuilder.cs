@@ -333,26 +333,53 @@ namespace LeGamez.Editor.OsmImport
             new Color32((byte)Mathf.Clamp(color.r * f, 0, 255), (byte)Mathf.Clamp(color.g * (f + noise * 0.04f), 0, 255),
                 (byte)Mathf.Clamp(color.b * f, 0, 255), 255);
 
+        /// <summary>Largest merged terrain block in cells (8 × 5 m = 40 m), see <see cref="BuildBase"/>.</summary>
+        const int MaxBlock = 8;
+        /// <summary>Max. deviation (m) of any height sample from the block's plane for the block to be merged.</summary>
+        const float PlanarTolerance = 0.02f;
+
+        /// <summary>
+        /// Terrain cells are merged quadtree-wise (40 → 20 → 10 m) where the ground is planar and has one ground cover:
+        /// large flat areas (Watt, beach, fields, sea floor) cost two triangles per 40 m instead of 128. Heights of merged
+        /// blocks still match <see cref="TerrainField.Height"/> within <see cref="PlanarTolerance"/>.
+        /// </summary>
         public static void BuildBase(MeshSink sink, AreaRect area, Color32 color, TerrainField t)
         {
             float cs = TerrainField.CellSize;
             var g = area.Expand(60f);
             float startX = Mathf.Floor(g.xMin / cs) * cs, startZ = Mathf.Floor(g.zMin / cs) * cs;
             int nx = Mathf.CeilToInt((g.xMax - startX) / cs), nz = Mathf.CeilToInt((g.zMax - startZ) / cs);
-            for (int ix = 0; ix < nx; ix++)
-            for (int iz = 0; iz < nz; iz++)
+            var aerial = AerialImage.Current;
+            for (int bx = 0; bx < nx; bx += MaxBlock)
+            for (int bz = 0; bz < nz; bz += MaxBlock)
+                Block(sink, t, aerial, color, startX, startZ, bx, bz, MaxBlock, nx, nz);
+        }
+
+        static void Block(MeshSink sink, TerrainField t, AerialImage aerial, Color32 color, float startX, float startZ,
+            int ix, int iz, int n, int nx, int nz)
+        {
+            float cs = TerrainField.CellSize;
+            if (ix >= nx || iz >= nz) return;
+            if (n > 1 && (ix + n > nx || iz + n > nz || !Mergeable(t, aerial, startX, startZ, ix, iz, n)))
             {
-                float x0 = startX + ix * cs, z0 = startZ + iz * cs, x1 = x0 + cs, z1 = z0 + cs;
+                int h = n / 2;
+                Block(sink, t, aerial, color, startX, startZ, ix, iz, h, nx, nz);
+                Block(sink, t, aerial, color, startX, startZ, ix + h, iz, h, nx, nz);
+                Block(sink, t, aerial, color, startX, startZ, ix, iz + h, h, nx, nz);
+                Block(sink, t, aerial, color, startX, startZ, ix + h, iz + h, h, nx, nz);
+                return;
+            }
+            float x0 = startX + ix * cs, z0 = startZ + iz * cs, x1 = x0 + n * cs, z1 = z0 + n * cs;
+            Vector3 p00 = new Vector3(x0, t.Raw(x0, z0), z0), p10 = new Vector3(x1, t.Raw(x1, z0), z0);
+            Vector3 p01 = new Vector3(x0, t.Raw(x0, z1), z1), p11 = new Vector3(x1, t.Raw(x1, z1), z1);
+            var batch = sink.Get(WorldStyle.MatTerrain, new Vector2(x0, z0));
+            if (n == 1)
+            {
                 float noise = Mathf.PerlinNoise(x0 * 0.012f + 31.7f, z0 * 0.012f + 11.3f) - 0.5f;
                 float f = 1f + noise * 0.14f;
-                var c = new Color32((byte)Mathf.Clamp(color.r * f, 0, 255), (byte)Mathf.Clamp(color.g * (f + noise * 0.04f), 0, 255),
-                    (byte)Mathf.Clamp(color.b * f, 0, 255), 255);
-                Vector3 p00 = new Vector3(x0, t.Raw(x0, z0), z0), p10 = new Vector3(x1, t.Raw(x1, z0), z0);
-                Vector3 p01 = new Vector3(x0, t.Raw(x0, z1), z1), p11 = new Vector3(x1, t.Raw(x1, z1), z1);
-                var batch = sink.Get(WorldStyle.MatTerrain, new Vector2(x0, z0));
+                var c = Shade(color, f, noise);
                 // With an aerial image each triangle takes the measured ground cover (garden, yard, sand, field).
                 Color32 cUpper = c, cLower = c;
-                var aerial = AerialImage.Current;
                 if (aerial != null)
                 {
                     cUpper = Shade(AerialImage.CoverColor(aerial.CoverIn(x0, z0, cs, true), color), f, noise);
@@ -361,7 +388,51 @@ namespace LeGamez.Editor.OsmImport
                 // Clockwise from above → facing up.
                 MeshSink.Tri(batch, p00, p01, p11, cUpper);
                 MeshSink.Tri(batch, p00, p11, p10, cLower);
+                return;
             }
+            // Merged block: one cover, colour variation per corner (blends smoothly across the block).
+            var cover = aerial != null ? AerialImage.CoverColor(aerial.CoverIn(x0, z0, cs, true), color) : color;
+            Color32 C(Vector3 p)
+            {
+                float noise = Mathf.PerlinNoise(p.x * 0.012f + 31.7f, p.z * 0.012f + 11.3f) - 0.5f;
+                return Shade(cover, 1f + noise * 0.14f, noise);
+            }
+            Color32 c00 = C(p00), c10 = C(p10), c01 = C(p01), c11 = C(p11);
+            Tri3(batch, p00, p01, p11, c00, c01, c11);
+            Tri3(batch, p00, p11, p10, c00, c11, c10);
+        }
+
+        /// <summary>Block of n×n cells is planar (all samples within tolerance) and of a single ground cover.</summary>
+        static bool Mergeable(TerrainField t, AerialImage aerial, float startX, float startZ, int ix, int iz, int n)
+        {
+            float cs = TerrainField.CellSize;
+            float x0 = startX + ix * cs, z0 = startZ + iz * cs, size = n * cs;
+            float h00 = t.Raw(x0, z0), h10 = t.Raw(x0 + size, z0), h01 = t.Raw(x0, z0 + size);
+            float dx = (h10 - h00) / n, dz = (h01 - h00) / n;
+            for (int i = 0; i <= n; i++)
+            for (int k = 0; k <= n; k++)
+                if (Mathf.Abs(t.Raw(x0 + i * cs, z0 + k * cs) - (h00 + dx * i + dz * k)) > PlanarTolerance) return false;
+            if (aerial == null) return true;
+            var first = aerial.CoverIn(x0, z0, cs, true);
+            for (int i = 0; i < n; i++)
+            for (int k = 0; k < n; k++)
+            {
+                float cx = x0 + i * cs, cz = z0 + k * cs;
+                if (aerial.CoverIn(cx, cz, cs, true) != first || aerial.CoverIn(cx, cz, cs, false) != first) return false;
+            }
+            return true;
+        }
+
+        /// <summary>Flat-normal triangle with its own colour per corner.</summary>
+        static void Tri3(MeshSink.Batch b, Vector3 a, Vector3 c1, Vector3 c2, Color32 ca, Color32 cb, Color32 cc)
+        {
+            var nrm = Vector3.Cross(c1 - a, c2 - a).normalized;
+            int i = b.vertices.Count;
+            b.vertices.Add(a); b.vertices.Add(c1); b.vertices.Add(c2);
+            b.normals.Add(nrm); b.normals.Add(nrm); b.normals.Add(nrm);
+            b.colors.Add(ca); b.colors.Add(cb); b.colors.Add(cc);
+            b.uvs.Add(MeshSink.NoFacade); b.uvs.Add(MeshSink.NoFacade); b.uvs.Add(MeshSink.NoFacade);
+            b.triangles.Add(i); b.triangles.Add(i + 1); b.triangles.Add(i + 2);
         }
     }
 }

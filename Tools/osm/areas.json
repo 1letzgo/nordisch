@@ -54,12 +54,18 @@
       "name": "Spiekeroog",
       "lat": 53.773,
       "lon": 7.695,
-      "size_m": 1000,
+      "size_m": 10350,
       "vehicles": [
         "bicycle",
         "carriage"
       ],
-      "ground": "sand"
+      "ground": "sand",
+      "extent": {
+        "west": 2100,
+        "east": 8250,
+        "south": 2800,
+        "north": 1250
+      }
     }
   ]
 }

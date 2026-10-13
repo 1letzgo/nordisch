@@ -130,8 +130,9 @@ def process_area(area):
             v = (arr[r0, c0] * (1 - tx) * (1 - ty) + arr[r0, c0 + 1] * tx * (1 - ty)
                  + arr[r0 + 1, c0] * (1 - tx) * ty + arr[r0 + 1, c0 + 1] * tx * ty)
             grid[iz, ix] = v
-    # Nodata (< -100) and gaps: fill with the median of valid samples.
-    grid[grid < -100] = np.nan
+    # Nodata (-9999) and gaps: fill with the median of valid samples. Interpolation next to a nodata pixel yields
+    # values in between (e.g. -72 m at the coast) – nothing in Lower Saxony lies below -30 m NHN, so drop those too.
+    grid[grid < -30] = np.nan
     if np.isnan(grid).any():
         grid[np.isnan(grid)] = np.nanmedian(grid)
     base = float(grid.min())
