@@ -155,6 +155,18 @@ Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen sp�
   `Input.deviceOrientation` (respektiert Rotationssperre). Back-Taste = Escape (Predictive Back aus): schließt große Karte,
   sonst zurück ins Menü, im Menü App in den Hintergrund. `Assets/link.xml` hält Collider-Klassen fürs Engine-Stripping (`CreatePrimitive`).
 
+## Release (GitHub, öffentlich: https://github.com/1letzgo/nordisch)
+- Android: `Tools/release/release_android.sh` (Unity zu, versionierte Dateien sauber) → Version = Datum (`2026.10.13`, `.2` …),
+  versionCode = 10-Minuten-Schritte seit 2025, signiert mit `~/.config/nordisch/release.keystore`
+  (Passwort in `release.env`, **nicht im Repo – sichern, sonst lassen sich Updates nicht mehr über alte Versionen installieren**),
+  Tag `v<version>` + GitHub-Release mit `Nordisch-<version>.apk`. `--dry-run` = nur bauen.
+- Release-APKs laufen **15 Tage** nach dem Build ab: `BuildScript.BuildAndroidRelease` bettet `Resources/BuildInfo.txt`
+  (nur während des Builds) ein, `Core/BuildExpiry` + Sperrbildschirm im Hauptmenü mit Link auf das neueste Release.
+  Normale Builds (BuildAndroid/BuildIOS) laufen nie ab.
+- iOS/TestFlight: Skill `/testflight-build` auf `Builds/iOS` nach `BuildIOS`; vorher in `Builds/iOS/Info.plist`
+  `CFBundleShortVersionString` = Release-Version, `CFBundleVersion` = versionCode, `ITSAppUsesNonExemptEncryption` = false.
+- Generierte Meshes (`Assets/Generated/*/*_meshes.asset`) sind nicht im Repo (>100 MB) – nach dem Klonen `ImportAllBatch`.
+
 ## Stolperfallen
 - Unity schreibt Template-Pakete (purchasing, analytics, collab-proxy, multiplayer.center) zurück in `Packages/manifest.json` → wieder entfernen.
 - Unity-Batchmode stürzt gelegentlich mit Exit 139 beim Asset-Import ab → einfach erneut ausführen.
