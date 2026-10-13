@@ -23,6 +23,7 @@
         "car"
       ],
       "ground": "grass",
+      "starts": [{"name": "Westerstede"}, {"name": "Oldenburg", "lat": 53.1395, "lon": 8.2145}],
       "extent": {
         "west": 8850,
         "east": 20400,

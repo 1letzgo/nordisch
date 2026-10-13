@@ -35,6 +35,9 @@ namespace LeGamez.Core
 
         public static void Forget(string areaId) => PlayerPrefs.DeleteKey(Key(areaId));
 
+        /// <summary>Next start in this area is on foot (a fresh start at a default start point).</summary>
+        public static void ForgetRide(string areaId) => PlayerPrefs.DeleteKey(Key(areaId) + ".ride");
+
         void Save()
         {
             if (string.IsNullOrEmpty(areaId)) return;

@@ -91,7 +91,8 @@ namespace LeGamez.Editor
         }
 
         /// <summary>
-        /// Oblique bird's-eye thumbnails per area for the main menu cards, the sharp top-down image of every 1 km region
+        /// Oblique bird's-eye thumbnails per area for the main menu cards (one more per further default start point,
+        /// <see cref="AreaCatalog.ThumbPath(string, int)"/>), the sharp top-down image of every 1 km region
         /// (minimap, Generated/&lt;id&gt;/regions~/, into the region files on export) and the small overview of the whole area
         /// composed from them (full map, AreaData.mapTexture → area file). Only the tiles around the current view are
         /// loaded, so whole municipalities fit into memory. <paramref name="onlyId"/>: one area.
@@ -138,6 +139,7 @@ namespace LeGamez.Editor
                 RenderSettings.fog = false;
                 string file = AreaCatalog.ThumbPath(area.areaId);
                 RenderTo(cam, file, 768, 512);
+                var startThumbs = RenderStartThumbs(area, data, world, cam);
 
                 string mapFile = AreaCatalog.MapPath(area.areaId);
                 if (world != null) RenderMaps(area, data, world, cam, mapFile);
@@ -157,13 +159,17 @@ namespace LeGamez.Editor
 
                 Object.DestroyImmediate(volume.gameObject);
                 Object.DestroyImmediate(camGo);
-                AssetDatabase.ImportAsset(file);
-                if (AssetImporter.GetAtPath(file) is TextureImporter ti)
+                startThumbs.Insert(0, file);
+                foreach (var thumbFile in startThumbs)
                 {
-                    ti.textureType = TextureImporterType.Sprite;
-                    ti.mipmapEnabled = false;
-                    ti.maxTextureSize = 1024;
-                    ti.SaveAndReimport();
+                    AssetDatabase.ImportAsset(thumbFile);
+                    if (AssetImporter.GetAtPath(thumbFile) is TextureImporter ti)
+                    {
+                        ti.textureType = TextureImporterType.Sprite;
+                        ti.mipmapEnabled = false;
+                        ti.maxTextureSize = 1024;
+                        ti.SaveAndReimport();
+                    }
                 }
 
                 // Texture imports above reload assets – fetch the AreaData again before writing to it.
@@ -172,6 +178,35 @@ namespace LeGamez.Editor
                 EditorUtility.SetDirty(data);
                 AssetDatabase.SaveAssets();
             }
+        }
+
+        /// <summary>
+        /// Card images of the default start points after the first (the first uses the area thumbnail): same view as the
+        /// area thumbnail, centred between the start and the best POI near it. Removes images of starts that are gone.
+        /// Returns the files written.
+        /// </summary>
+        static System.Collections.Generic.List<string> RenderStartThumbs(AreaInfo area, AreaData data, WorldStreamer world, Camera cam)
+        {
+            var files = new System.Collections.Generic.List<string>();
+            var starts = data.StartList();
+            for (int k = 1; k < starts.Count; k++)
+            {
+                Vector3 at = starts[k].position, poi = at;
+                if (area.pois != null)
+                    foreach (var p in area.pois.entries) // ranked: the first one close enough
+                        if (Vector2.Distance(new Vector2(p.position.x, p.position.z), new Vector2(at.x, at.z)) < 600f) { poi = p.position; break; }
+                Vector3 focus = Vector3.Lerp(poi, at, 0.4f);
+                if (world != null) world.LoadAroundInEditor(focus, 2500f);
+                cam.transform.position = focus + new Vector3(-90f, 170f, -200f);
+                cam.transform.LookAt(focus);
+                string file = AreaCatalog.ThumbPath(area.areaId, k);
+                RenderTo(cam, file, 768, 512);
+                files.Add(file);
+                Debug.Log($"[Snapshot] {area.areaId}: start '{starts[k].name}' -> {file}");
+            }
+            for (int k = starts.Count; File.Exists(AreaCatalog.ThumbPath(area.areaId, k)); k++)
+                AssetDatabase.DeleteAsset(AreaCatalog.ThumbPath(area.areaId, k));
+            return files;
         }
 
         /// <summary>Longest side of the area overview (full map); sharp detail comes from the region images.</summary>

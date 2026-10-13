@@ -396,7 +396,17 @@ namespace LeGamez.UI
             flash.StartCoroutine(BeamRoutine(flash, p, wanted, poi));
         }
 
-        static IEnumerator BeamRoutine(BeamFlash flash, PlayerController player, Vector3 wanted, PoiEntry poi)
+        /// <summary>Beams the player to <paramref name="position"/> in the current area, facing <paramref name="yaw"/>
+        /// (start points of this area in "Andere Orte").</summary>
+        public static void BeamTo(Transform canvasRoot, Vector3 position, float yaw)
+        {
+            var player = NavState.Player != null ? NavState.Player.GetComponent<PlayerController>() : null;
+            if (player == null) return;
+            var flash = BeamFlash.Create(canvasRoot);
+            flash.StartCoroutine(BeamRoutine(flash, player, position, null, yaw));
+        }
+
+        static IEnumerator BeamRoutine(BeamFlash flash, PlayerController player, Vector3 wanted, PoiEntry poi, float? yaw = null)
         {
             player.InputEnabled = false;
             yield return flash.Fade(0f, 1f, 0.18f);
@@ -406,6 +416,7 @@ namespace LeGamez.UI
             Vector3 face = poi != null ? poi.position - spot : Vector3.zero;
             face.y = 0f;
             if (face.sqrMagnitude > 0.01f) player.transform.rotation = Quaternion.LookRotation(face);
+            else if (yaw.HasValue) player.transform.rotation = Quaternion.Euler(0f, yaw.Value, 0f);
             player.Teleport(spot + Vector3.up * 0.2f);
             var cam = NavState.View != null ? NavState.View.GetComponent<ThirdPersonCamera>() : null;
             if (cam != null) cam.SnapToTarget();
