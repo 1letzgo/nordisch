@@ -37,7 +37,7 @@ MonoBehaviour:
   carSpots: []
   pois: {fileID: 11400000, guid: 602fb089eb2454c2ba6e6f7034633cfe, type: 2}
   streets: {fileID: 11400000, guid: 1496b46cb6ae14e3ab534ac081ec54d3, type: 2}
-  mapTexture: {fileID: 2800000, guid: d90e1dcf8f58e4592b2c1106820b1700, type: 3}
+  mapTexture: {fileID: 2800000, guid: a7055d8c496394c9bb4e0dc654a493d8, type: 3}
   facade: {fileID: 4900000, guid: b50b1730ef8a74b9f83c51d81bec54e6, type: 3}
   tileKeys:
   - {x: -14, y: -18}

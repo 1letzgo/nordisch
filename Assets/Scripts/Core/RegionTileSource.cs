@@ -12,7 +12,8 @@ namespace LeGamez.Core
     /// Tiles for the <see cref="WorldStreamer"/> on devices: each 1 km region is one MapFormat file in the map folder,
     /// downloaded by <see cref="MapStore"/> the first time a tile of it is needed and prefetched when the player comes
     /// within <see cref="PrefetchRadius"/>. A tile is read and decompressed on a worker thread; only the mesh creation
-    /// runs on the main thread (the streamer spaces that out to one tile per frame).
+    /// runs on the main thread (the streamer spaces that out to one tile per frame). The region's extras (facade records,
+    /// minimap image) are read the same way once a tile of the region is in use.
     /// </summary>
     public class RegionTileSource : WorldStreamer.ITileSource
     {
@@ -81,6 +82,23 @@ namespace LeGamez.Core
         }
 
         public void Release(Vector2Int key, WorldTile tile) => MapFormat.DestroyTile(tile);
+
+        /// <summary>Facade records + minimap image of a region (its file is on the device: one of its tiles is loaded).</summary>
+        public IEnumerator LoadContent(string areaId, Vector2Int region, Action<RegionContent> done)
+        {
+            string rk = Key(region);
+            if (!MapStore.HasRegion(map.Id, rk)) { done(null); yield break; }
+            string path = MapStore.RegionPath(map.Id, rk);
+            var job = Task.Run(() => MapFormat.ReadRegionContent(path, region));
+            while (!job.IsCompleted) yield return null;
+            if (job.IsFaulted)
+            {
+                Debug.LogWarning($"[World] region {map.Id}/{rk} content: {job.Exception?.InnerException?.Message}");
+                done(null);
+                yield break;
+            }
+            done(job.Result);
+        }
 
         public void Prefetch(Vector3 focus)
         {

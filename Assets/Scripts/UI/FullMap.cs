@@ -14,7 +14,8 @@ namespace LeGamez.UI
     /// <summary>
     /// Full-screen north-up area map (opened by tapping the minimap). Tap a spot or a POI to place a
     /// target pin, then "Hierhin beamen" teleports the player to the nearest free ground there.
-    /// Zoom: two-finger pinch, mouse wheel or the +/− buttons; drag pans the zoomed map.
+    /// Zoom: two-finger pinch, mouse wheel or the +/− buttons; drag pans the zoomed map. The map image is a small overview
+    /// of the whole area; zoomed in, the sharp region images (<see cref="RegionMaps"/>) of loaded regions lie on top.
     /// </summary>
     public class FullMap : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
@@ -37,6 +38,12 @@ namespace LeGamez.UI
         AreaInfo area;
         PlayerController player;
         readonly List<(PoiEntry poi, Image dot)> dots = new List<(PoiEntry, Image)>();
+        RectTransform regionLayer;
+        readonly Dictionary<Vector2Int, RawImage> regionImages = new Dictionary<Vector2Int, RawImage>();
+        readonly HashSet<Vector2Int> wantedRegions = new HashSet<Vector2Int>();
+        float nextRegionCheck;
+        /// <summary>Region images only when the overview gets blurry (more than ~2.5 m per screen unit).</summary>
+        const float RegionZoomMetersPerUnit = 2.5f;
 
         static FullMap instance;
 
@@ -81,6 +88,7 @@ namespace LeGamez.UI
             var raw = fm.mapRect.gameObject.AddComponent<RawImage>();
             raw.texture = fm.area != null ? fm.area.mapTexture : null;
             raw.raycastTarget = true; // taps land here (handled by FullMap via bubbling)
+            fm.regionLayer = UiKit.Rect("Regions", fm.mapRect, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero); // under the markers
 
             // POIs with names.
             if (fm.area != null && fm.area.pois != null)
@@ -185,6 +193,7 @@ namespace LeGamez.UI
             hint.text = "Tippe auf einen Ort oder ein Ziel · zwei Finger zoomen";
             if (canvas == null) canvas = GetComponentInParent<Canvas>();
             SetZoom(1f, Vector2.zero);
+            UpdateRegions();
         }
 
         void Hide()
@@ -280,8 +289,41 @@ namespace LeGamez.UI
             playerMarker.localScale = inv;
         }
 
+        /// <summary>Region images of loaded regions inside the visible part of the map, once zoomed in far enough.</summary>
+        void UpdateRegions()
+        {
+            wantedRegions.Clear();
+            var streamer = WorldStreamer.Instance;
+            float metersPerUnit = mapHalf.x * 2f / Mathf.Max(1f, mapPixels.x * zoom);
+            if (streamer != null && metersPerUnit < RegionZoomMetersPerUnit)
+            {
+                // Visible map-local rectangle → world rectangle.
+                var half = mapPixels * 0.5f / zoom;
+                var c = -mapRect.anchoredPosition / zoom;
+                var a = MapToWorld(c - half);
+                var b = MapToWorld(c + half);
+                foreach (var r in streamer.Regions.Keys)
+                {
+                    var rb = RegionContent.Bounds(r);
+                    if (rb.xMax > a.x && rb.xMin < b.x && rb.yMax > a.z && rb.yMin < b.z) wantedRegions.Add(r);
+                }
+            }
+            var scale = new Vector2(mapPixels.x * 0.5f / mapHalf.x, mapPixels.y * 0.5f / mapHalf.y);
+            RegionMaps.Show(regionLayer, regionImages, wantedRegions, (r, rt) =>
+            {
+                var rb = RegionContent.Bounds(r);
+                rt.anchoredPosition = WorldToMap(new Vector3(rb.center.x, 0f, rb.center.y));
+                rt.sizeDelta = Vector2.Scale(rb.size, scale);
+            });
+        }
+
         void LateUpdate()
         {
+            if (Time.unscaledTime >= nextRegionCheck)
+            {
+                nextRegionCheck = Time.unscaledTime + 0.2f;
+                UpdateRegions();
+            }
             if (NavState.Player == null) return;
             playerMarker.anchoredPosition = WorldToMap(NavState.Player.position);
             playerMarker.localRotation = Quaternion.Euler(0, 0, -NavState.Player.eulerAngles.y);

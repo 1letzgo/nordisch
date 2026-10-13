@@ -37,7 +37,16 @@ namespace LeGamez.World
             void Release(Vector2Int key, WorldTile tile);
             /// <summary>Called with the focus a few times per second: fetch what will be needed soon.</summary>
             void Prefetch(Vector3 focus);
+            /// <summary>Facade records + minimap image of a region whose tiles are in use; done(null) if unavailable.</summary>
+            IEnumerator LoadContent(string areaId, Vector2Int region, System.Action<RegionContent> done);
         }
+
+        /// <summary>Extras (<see cref="RegionContent"/>) of every region with at least one tile in the scene – read by
+        /// FacadeDetails and the maps; <see cref="RegionsVersion"/> changes whenever a region comes or goes.</summary>
+        public readonly Dictionary<Vector2Int, RegionContent> Regions = new Dictionary<Vector2Int, RegionContent>();
+        public int RegionsVersion { get; private set; }
+        readonly Dictionary<Vector2Int, int> regionTiles = new Dictionary<Vector2Int, int>();
+        readonly HashSet<Vector2Int> contentLoading = new HashSet<Vector2Int>();
 
         public static string TileName(string id, Vector2Int k) => $"{id}_{k.x}_{k.y}";
         public static string EditorTilePath(string id, Vector2Int k) => $"Assets/Generated/{id}/tiles/{TileName(id, k)}.asset";
@@ -176,6 +185,49 @@ namespace LeGamez.World
                 yield break;
             }
             slot.root = Build(slot.tile, transform);
+            TileShown(k, false);
+        }
+
+        /// <summary>A tile is in the scene: the first one of a region brings in the region's content.</summary>
+        void TileShown(Vector2Int k, bool now)
+        {
+            var r = RegionOf(k);
+            regionTiles.TryGetValue(r, out int n);
+            regionTiles[r] = n + 1;
+            if (n > 0 || Regions.ContainsKey(r) || contentLoading.Contains(r)) return;
+#if UNITY_EDITOR
+            if (now || source == null)
+            {
+                SetContent(r, EditorContent(areaId, r));
+                return;
+            }
+#endif
+            if (source != null) StartCoroutine(LoadContent(r));
+        }
+
+        void TileGone(Vector2Int k)
+        {
+            var r = RegionOf(k);
+            if (!regionTiles.TryGetValue(r, out int n)) return;
+            if (n > 1) { regionTiles[r] = n - 1; return; }
+            regionTiles.Remove(r);
+            if (Regions.Remove(r)) RegionsVersion++;
+        }
+
+        IEnumerator LoadContent(Vector2Int r)
+        {
+            contentLoading.Add(r);
+            RegionContent content = null;
+            yield return source.LoadContent(areaId, r, c => content = c);
+            contentLoading.Remove(r);
+            if (regionTiles.ContainsKey(r)) SetContent(r, content); // still wanted
+        }
+
+        void SetContent(Vector2Int r, RegionContent c)
+        {
+            if (c == null) return;
+            Regions[r] = c;
+            RegionsVersion++;
         }
 
         GameObject Build(WorldTile tile, Transform parent, HideFlags hide = HideFlags.None)
@@ -200,7 +252,7 @@ namespace LeGamez.World
 
         void Release(Vector2Int key, Slot slot)
         {
-            if (slot.root != null) DestroyImmediate(slot.root);
+            if (slot.root != null) { DestroyImmediate(slot.root); TileGone(key); }
             slot.root = null;
             if (source != null && slot.tile != null) source.Release(key, slot.tile);
             slot.tile = null;
@@ -247,11 +299,15 @@ namespace LeGamez.World
         public void LoadAllInEditor()
         {
             UnloadAllInEditor();
-            foreach (var k in tileKeys)
-            {
-                var t = UnityEditor.AssetDatabase.LoadAssetAtPath<WorldTile>(EditorTilePath(areaId, k));
-                if (t != null) slots[k] = new Slot { tile = t, root = Build(t, transform, HideFlags.DontSave) };
-            }
+            foreach (var k in tileKeys) LoadInEditor(k);
+        }
+
+        void LoadInEditor(Vector2Int k)
+        {
+            var t = UnityEditor.AssetDatabase.LoadAssetAtPath<WorldTile>(EditorTilePath(areaId, k));
+            if (t == null) return;
+            slots[k] = new Slot { tile = t, root = Build(t, transform, HideFlags.DontSave) };
+            TileShown(k, true);
         }
 
         /// <summary>Editor tools: only the tiles within <paramref name="radius"/> (views into very large areas).</summary>
@@ -259,17 +315,58 @@ namespace LeGamez.World
         {
             UnloadAllInEditor();
             foreach (var k in tileKeys)
+                if (Distance(k, p) <= radius) LoadInEditor(k);
+        }
+
+        /// <summary>Editor tools walking a big area: keeps exactly the tiles touching <paramref name="rect"/> (x, z),
+        /// loading only the missing ones and unloading the rest.</summary>
+        public void KeepInEditor(Rect rect)
+        {
+            bool Touches(Vector2Int k) => k.x * TileSize < rect.xMax && (k.x + 1) * TileSize > rect.xMin &&
+                                          k.y * TileSize < rect.yMax && (k.y + 1) * TileSize > rect.yMin;
+            scratch.Clear();
+            foreach (var kv in slots) if (!Touches(kv.Key)) scratch.Add(kv.Key);
+            foreach (var k in scratch)
             {
-                if (Distance(k, p) > radius) continue;
-                var t = UnityEditor.AssetDatabase.LoadAssetAtPath<WorldTile>(EditorTilePath(areaId, k));
-                if (t != null) slots[k] = new Slot { tile = t, root = Build(t, transform, HideFlags.DontSave) };
+                var s = slots[k];
+                if (s.root != null) { DestroyImmediate(s.root); TileGone(k); }
+                if (s.tile != null) Resources.UnloadAsset(s.tile);
+                slots.Remove(k);
             }
+            foreach (var k in tileKeys)
+                if (!slots.ContainsKey(k) && Touches(k)) LoadInEditor(k);
         }
 
         public void UnloadAllInEditor()
         {
             foreach (var s in slots.Values) if (s.root != null) DestroyImmediate(s.root);
             slots.Clear();
+            regionTiles.Clear();
+            Regions.Clear();
+            RegionsVersion++;
+        }
+
+        /// <summary>Folder of the region minimap images (Unity skips folders ending in "~", so they are not imported).</summary>
+        public static string EditorRegionMapDir(string id) => $"Assets/Generated/{id}/regions~";
+        public static string EditorRegionMapPath(string id, Vector2Int r) => $"{EditorRegionMapDir(id)}/r{r.x}_{r.y}.jpg";
+        public static string EditorFacadePath(string id) => $"Assets/Generated/{id}/{id}_facade.bytes";
+
+        static string facadeCacheKey;
+        static Dictionary<Vector2Int, float[]> facadeCache;
+
+        /// <summary>Region content straight from Assets/Generated (what MapExport puts into the region file).</summary>
+        public static RegionContent EditorContent(string id, Vector2Int r)
+        {
+            string fp = EditorFacadePath(id);
+            string key = System.IO.File.Exists(fp) ? $"{id}@{System.IO.File.GetLastWriteTimeUtc(fp).Ticks}" : id;
+            if (key != facadeCacheKey)
+            {
+                facadeCache = RegionContent.SplitFacade(System.IO.File.Exists(fp) ? RegionContent.ToFloats(System.IO.File.ReadAllBytes(fp)) : null);
+                facadeCacheKey = key;
+            }
+            string mp = EditorRegionMapPath(id, r);
+            facadeCache.TryGetValue(r, out var facade);
+            return new RegionContent { key = r, facade = facade, mapImage = System.IO.File.Exists(mp) ? System.IO.File.ReadAllBytes(mp) : null };
         }
 #endif
     }

@@ -28,10 +28,10 @@ namespace LeGamez.World
         [Header("Content")]
         public PoiDatabase pois;
         public StreetIndex streets;
+        /// <summary>Overview of the whole area for the full map (small); the minimap uses the sharp region images.</summary>
         public Texture2D mapTexture;
+        /// <summary>All facade records (editor only – downloads carry them per region, see <see cref="RegionContent"/>).</summary>
         public TextAsset facade;
-        /// <summary>Facade records of a downloaded map (MapFormat area file) instead of <see cref="facade"/>.</summary>
-        [System.NonSerialized] public byte[] facadeBytes;
         public List<Vector2Int> tileKeys = new List<Vector2Int>();
         public List<TrafficLights.Head> trafficHeads = new List<TrafficLights.Head>();
         public List<TrafficLights.Signal> trafficSignals = new List<TrafficLights.Signal>();

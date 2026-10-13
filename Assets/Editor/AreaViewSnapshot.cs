@@ -54,6 +54,9 @@ namespace LeGamez.Editor
                 var n = System.Array.ConvertAll(parts[1].Split(','), s => float.Parse(s, CultureInfo.InvariantCulture));
                 var pos = new Vector3(n[0], 0f, n[1]);
                 if (world != null) world.LoadAroundInEditor(pos, 900f);
+                // Close-up facade details (window frames …) as the game builds them near the camera.
+                var facade = Object.FindAnyObjectByType<FacadeDetails>();
+                if (facade != null) facade.Refresh(pos, 1000);
                 // Ground height under the camera: ray down onto the loaded meshes (colliders are not built in edit mode).
                 float ground = GroundHeight(pos);
                 camGo.transform.position = new Vector3(pos.x, ground + n[3], pos.z);
