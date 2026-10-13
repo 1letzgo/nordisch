@@ -16,36 +16,120 @@ MonoBehaviour:
   - id: way/227210412
     name: Alte Inselkirche
     category: 2
-    position: {x: 27.36466, y: 3.4726005, z: -309.79965}
+    position: {x: 27.36466, y: 6.8124876, z: -309.79965}
     lat: 53.77019825951761
     lon: 7.695415948692386
+  - id: node/796187639
+    name: Wrack Verona
+    category: 0
+    position: {x: 6093.993, y: 4.1912394, z: 941.42706}
+    lat: 53.78151400024408
+    lon: 7.787630000286134
+  - id: way/226661728
+    name: Messstation
+    category: 0
+    position: {x: -1576.3109, y: 0.78231114, z: -2512.9214}
+    lat: 53.750273849307085
+    lon: 7.671039736770422
+  - id: way/23007475
+    name: Sankt Peter
+    category: 2
+    position: {x: -557.39166, y: 16.037308, z: -103.2309}
+    lat: 53.77206640888794
+    lon: 7.68652752743958
+  - id: node/867403534
+    name: "Nationalpark-Haus Wittb\xFClten"
+    category: 1
+    position: {x: 2102.6875, y: 7.1345663, z: -521.5333}
+    lat: 53.768283400028984
+    lon: 7.726961300001986
   - id: node/6356149387
     name: Inselmuseum
     category: 1
-    position: {x: -73.30818, y: 4.2701306, z: -296.58157}
+    position: {x: -73.30818, y: 7.6100206, z: -296.58157}
     lat: 53.770317800084236
     lon: 7.69388569994832
   - id: node/11966298606
     name: Kurioses Muschelmuseum
     category: 1
-    position: {x: -164.72136, y: 3.681313, z: -84.99824}
+    position: {x: -164.72136, y: 7.0212035, z: -84.99824}
     lat: 53.77223129996555
     lon: 7.692496200086881
+  - id: node/12050513930
+    name: Historischer Rettungsschuppen
+    category: 1
+    position: {x: -1524.0969, y: 7.672518, z: -1444.4171}
+    lat: 53.75993709991266
+    lon: 7.671833400581602
+  - id: node/796187659
+    name: HW
+    category: 4
+    position: {x: 1161.9968, y: 13.37969, z: 327.3654}
+    lat: 53.77596060002318
+    lon: 7.712662600439978
   - id: node/1842505445
     name: De Utkieker
     category: 4
-    position: {x: 307.28516, y: 14.977425, z: 412.60687}
+    position: {x: 307.28516, y: 18.317316, z: 412.60687}
     lat: 53.77673149992366
     lon: 7.699670800137949
+  - id: node/2359302868
+    name: Kleiner Utkieker
+    category: 0
+    position: {x: -1534.531, y: 5.772952, z: -1594.5765}
+    lat: 53.75857910052919
+    lon: 7.6716748003017
+  - id: node/4634119884
+    name: Nationalpark-Informationseinr.
+    category: 0
+    position: {x: 2098.319, y: 7.0519414, z: -527.48224}
+    lat: 53.7682295997362
+    lon: 7.726894899262403
+  - id: node/9441877773
+    name: Sternenkieker-Ort
+    category: 4
+    position: {x: 676.4181, y: 6.039181, z: 511.32736}
+    lat: 53.77762430012535
+    lon: 7.7052816997425815
   - id: way/89429774
     name: Rathaus Spiekeroog
     category: 8
-    position: {x: -91.13405, y: 3.5584238, z: -300.09064}
+    position: {x: -91.13405, y: 6.8983145, z: -300.09064}
     lat: 53.77028606510385
     lon: 7.693614742959529
+  - id: way/643162871
+    name: "Franzosenschanze Batterie-D\xFCnen"
+    category: 0
+    position: {x: -699.2518, y: 5.392381, z: -665.2743}
+    lat: 53.766983447356594
+    lon: 7.684371223446892
+  - id: node/12779869826
+    name: Museumspferdebahn Station am Historischen Rettungsschuppen
+    category: 0
+    position: {x: -1574.9647, y: 5.454591, z: -1424.0162}
+    lat: 53.76012159969476
+    lon: 7.6710601991679
   - id: node/2329941881
     name: Drinkeldodenkarkhof
     category: 3
-    position: {x: 358.12653, y: 3.5502815, z: -143.09381}
+    position: {x: 358.12653, y: 6.8901725, z: -143.09381}
     lat: 53.77170590002139
     lon: 7.700443599837011
+  - id: way/219044316
+    name: "Dalbenspro\xDF 1,2 & 3"
+    category: 5
+    position: {x: 16.423557, y: 7.9680142, z: -728.5345}
+    lat: 53.766411340054056
+    lon: 7.69524964158553
+  - id: node/13142485163
+    name: Mut zum Wagnis
+    category: 5
+    position: {x: 2016.6097, y: 6.947599, z: -516.071}
+    lat: 53.76833279989974
+    lon: 7.725652899646652
+  - id: node/11932591209
+    name: Lautlos
+    category: 5
+    position: {x: -371.06058, y: 17.344929, z: 520.98047}
+    lat: 53.7777116000936
+    lon: 7.689359799811929

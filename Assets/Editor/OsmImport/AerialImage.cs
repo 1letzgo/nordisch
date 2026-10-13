@@ -17,7 +17,7 @@ namespace LeGamez.Editor.OsmImport
         int w, h;
         float xMin, zMin, step;
 
-        public enum Cover : byte { Unknown, Grass, Paving, Sand, Soil }
+        public enum Cover : byte { Unknown, Grass, Paving, Sand, Soil, Mud, Marsh, DuneGrass, Scrub, Queller } // Mud… = islands (CoastBuilder)
 
         public static AerialImage Load(string dataDir, string id)
         {
@@ -55,7 +55,7 @@ namespace LeGamez.Editor.OsmImport
             }
         }
 
-        bool UnderCanopy(float x, float z)
+        public bool UnderCanopy(float x, float z)
         {
             if (canopy == null) return false;
             int ix = Mathf.FloorToInt((x - xMin) / step), iz = Mathf.FloorToInt((z - zMin) / step);
@@ -69,6 +69,9 @@ namespace LeGamez.Editor.OsmImport
             c = px[iz * w + ix];
             return c.r + c.g + c.b > 0; // outside the flown tiles
         }
+
+        /// <summary>RGB + NIR (alpha) pixel at a local position; false outside the flown tiles.</summary>
+        public bool TryColor(float x, float z, out Color32 c) => TryPixel(x, z, out c);
 
         static float Ndvi(Color32 c) => (c.a - c.r) / (c.a + c.r + 1f);
 
@@ -202,7 +205,8 @@ namespace LeGamez.Editor.OsmImport
         /// <summary>Majority ground cover in a triangle of a terrain cell (lower = below the x0z0–x1z1 diagonal).</summary>
         public Cover CoverIn(float x0, float z0, float size, bool upper, bool wide = false)
         {
-            var votes = new int[5];
+            if (CoastBuilder.Active && !wide) return CoastBuilder.CoverOf(this, x0, z0, size);
+            var votes = new int[10];
             int n = Mathf.Max(2, Mathf.RoundToInt(size / step));
             for (int i = 0; i < n; i++)
             for (int j = 0; j < n; j++)
@@ -210,7 +214,7 @@ namespace LeGamez.Editor.OsmImport
                 float u = (i + 0.5f) / n, t = (j + 0.5f) / n;
                 if ((t >= u) != upper) continue; // z-offset ≥ x-offset → triangle (p00, p01, p11)
                 float x = x0 + u * size, z = z0 + t * size;
-                if (!UnderCanopy(x, z) && TryPixel(x, z, out var c)) votes[(int)Classify(c)]++;
+                if (!UnderCanopy(x, z) && TryPixel(x, z, out var c)) votes[(int)(CoastBuilder.Active ? CoastBuilder.Classify(c, x, z) : Classify(c))]++;
             }
             int best = -1;
             for (int k = 1; k < votes.Length; k++) if (votes[k] > 0 && (best < 0 || votes[k] > votes[best])) best = k;
@@ -231,6 +235,11 @@ namespace LeGamez.Editor.OsmImport
             Cover.Paving => WorldStyle.Residential,
             Cover.Sand => WorldStyle.Sand,
             Cover.Soil => new Color32(150, 122, 90, 255),
+            Cover.Mud => CoastBuilder.MudColor,
+            Cover.Marsh => CoastBuilder.MarshColor,
+            Cover.DuneGrass => CoastBuilder.DuneGrassColor,
+            Cover.Scrub => CoastBuilder.ScrubColor,
+            Cover.Queller => CoastBuilder.QuellerColor,
             _ => fallback,
         };
     }

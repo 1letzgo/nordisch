@@ -37,9 +37,10 @@ namespace LeGamez.Editor.OsmImport
         static bool TryAreaStyle(Dictionary<string, string> t, out AreaStyle s)
         {
             s = new AreaStyle { mat = WorldStyle.MatGround, y = WorldStyle.YLanduse };
+            if (CoastBuilder.SkipArea(t)) { s = default; return false; } // islands: aerial cover + sea instead
             if (t.Is("natural", "water") || t.Has("water") || t.Is("waterway", "riverbank") || t.Is("landuse", "basin") || t.Is("leisure", "swimming_pool"))
             {
-                s.color = WorldStyle.Water; s.y = WorldStyle.YWater; s.mat = WorldStyle.MatWater; return true;
+                s.color = CoastBuilder.Active ? CoastBuilder.SeaColor : WorldStyle.Water; s.y = WorldStyle.YWater; s.mat = WorldStyle.MatWater; return true;
             }
             if (t.Is("highway", "pedestrian") && t.Is("area", "yes") || t.Is("place", "square") || t.Is("amenity", "marketplace"))
             {
@@ -215,7 +216,7 @@ namespace LeGamez.Editor.OsmImport
                 case "ditch": case "drain": s.width = 1.5f; break;
                 default: return false;
             }
-            s.color = WorldStyle.Water; s.y = WorldStyle.YWater; s.mat = WorldStyle.MatWater;
+            s.color = CoastBuilder.Active ? CoastBuilder.SeaColor : WorldStyle.Water; s.y = WorldStyle.YWater; s.mat = WorldStyle.MatWater;
             return true;
         }
 
@@ -407,11 +408,15 @@ namespace LeGamez.Editor.OsmImport
         {
             float cs = TerrainField.CellSize;
             float x0 = startX + ix * cs, z0 = startZ + iz * cs, size = n * cs;
-            float h00 = t.Raw(x0, z0), h10 = t.Raw(x0 + size, z0), h01 = t.Raw(x0, z0 + size);
-            float dx = (h10 - h00) / n, dz = (h01 - h00) / n;
+            float h00 = t.Raw(x0, z0), h10 = t.Raw(x0 + size, z0), h01 = t.Raw(x0, z0 + size), h11 = t.Raw(x0 + size, z0 + size);
+            // The block is two triangles split x0z0–x1z1 (like every cell), so each half only has to be planar.
             for (int i = 0; i <= n; i++)
             for (int k = 0; k <= n; k++)
-                if (Mathf.Abs(t.Raw(x0 + i * cs, z0 + k * cs) - (h00 + dx * i + dz * k)) > PlanarTolerance) return false;
+            {
+                float u = (float)i / n, v = (float)k / n;
+                float plane = u >= v ? h00 + (h10 - h00) * u + (h11 - h10) * v : h00 + (h11 - h01) * u + (h01 - h00) * v;
+                if (Mathf.Abs(t.Raw(x0 + i * cs, z0 + k * cs) - plane) > PlanarTolerance) return false;
+            }
             if (aerial == null) return true;
             var first = aerial.CoverIn(x0, z0, cs, true);
             for (int i = 0; i < n; i++)

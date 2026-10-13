@@ -122,6 +122,7 @@ namespace LeGamez.Editor.OsmImport
             var lidarTrees = PropPlacer.LoadLidarTrees(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".trees.json"));
             var aerial = AerialImage.Load(Path.GetDirectoryName(jsonPath), meta.id);
             aerial?.SetCanopy(lidarTrees);
+            CoastBuilder.Prepare(data, area, terrain, aerial); // islands: sea level, water, tidal flats (rewrites the terrain)
             var sink = new MeshSink();
             GroundBuilder.BuildBase(sink, area, WorldStyle.GroundColor(meta.ground), terrain);
             GroundBuilder.BuildAreas(data, sink, area);
@@ -156,6 +157,7 @@ namespace LeGamez.Editor.OsmImport
                 if (m == WorldStyle.MatGround || m == WorldStyle.MatWater) TerrainDrape.Drape(kv.Value, terrain);
                 else if (m == WorldStyle.MatTrees || m == WorldStyle.MatTreeTrunks || m == WorldStyle.MatProps) TerrainDrape.Lift(kv.Value, terrain);
             }
+            CoastBuilder.BuildSea(sink, area); // level sea surface, not draped
 
             string areaDir = $"{GeneratedRoot}/{meta.id}";
             EnsureFolder(areaDir);

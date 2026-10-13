@@ -18,7 +18,7 @@ MonoBehaviour:
     sceneName: Spiekeroog
     lat: 53.773
     lon: 7.695
-    poiCount: 6
+    poiCount: 20
     vehicles:
     - bicycle
     - carriage
@@ -27,7 +27,7 @@ MonoBehaviour:
     sceneName: Langeoog
     lat: 53.7465
     lon: 7.4825
-    poiCount: 21
+    poiCount: 23
     vehicles:
     - bicycle
     - carriage

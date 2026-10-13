@@ -18,6 +18,8 @@ Details zu jedem Baustein stehen in `CLAUDE.md` (Abschnitt „Wie eine Karte ent
   Straßenenden festmachen: Endpunkt per Overpass/Nominatim holen und in lokale Meter umrechnen
   (x = (lon−lon0)·111320·cos(lat0), z = (lat−lat0)·110574).
 - **Insel?** → `"ground": "sand"`, `"vehicles": ["bicycle", "carriage"]` (autofrei, Menü-Badge „Insel“).
+  Inseln als Ganzes: `extent` aus der OSM-Küstenlinie (`natural=coastline`) + ~200 m Rand, Mittelpunkt (Dorf) beibehalten;
+  Meer/Watt/Strand baut `CoastBuilder` aus DGM + Luftbild (DOP ~100 MB für 12 × 5 km – nicht committen).
   Festland → `"ground": "grass"`, `"vehicles": ["bicycle", "car"]`, optional `car_spots` (lat/lon, note).
 - **Bundesland**: LGLN-Daten (LoD2, DGM1, DOM1, DOP20, ALKIS-Flurstücke) gibt es nur für **Niedersachsen**. Bremen/NRW/… → nur OSM
   (Häuser aus OSM extrudiert, flaches Gelände, OSM-Bäume) – dem Nutzer vorher sagen.
