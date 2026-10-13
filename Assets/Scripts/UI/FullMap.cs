@@ -125,6 +125,15 @@ namespace LeGamez.UI
             closeBtn.onClick.AddListener(fm.Hide);
             UiKit.Stretch(UiKit.Label(close, "×", 54, UiKit.Navy, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform);
 
+            // Other areas ("Andere Orte"): beam into another area (downloads it first if needed).
+            var places = UiKit.Rect("Places", root, new Vector2(0.5f, 0.5f), new Vector2(-mapPx.x / 2 + 150, mapPx.y / 2 + 180), new Vector2(300, 84)); // above title + hint
+            UiKit.DropShadow(places, 12f, -4f, 0.3f);
+            var placesImg = UiKit.Panel(places.gameObject, new Color(1, 1, 1, 0.95f));
+            var placesBtn = places.gameObject.AddComponent<Button>();
+            placesBtn.targetGraphic = placesImg;
+            placesBtn.onClick.AddListener(() => { fm.Hide(); PlaceSwitcher.Open(canvasRoot); });
+            UiKit.Stretch(UiKit.Label(places, "Andere Orte", 34, UiKit.Navy, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform);
+
             // Zoom buttons at the right edge of the map.
             for (int i = 0; i < 2; i++)
             {

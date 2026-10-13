@@ -23,9 +23,11 @@ namespace LeGamez.World
         public float unloadRadius = 960f;
 
         public static WorldStreamer Instance { get; private set; }
-        /// <summary>Where tiles come from on devices (Core/RegionTileSource: region bundles, downloaded on demand).
-        /// Null in the editor: tiles load straight from Assets/Generated.</summary>
+        /// <summary>Where the NEXT streamer gets its tiles on devices (Core/RegionTileSource: region bundles, downloaded on
+        /// demand); taken over in Awake, so an area switch can't mix up old and new tiles. Null in the editor: tiles load
+        /// straight from Assets/Generated.</summary>
         public static ITileSource Source;
+        ITileSource source;
 
         public interface ITileSource
         {
@@ -71,6 +73,8 @@ namespace LeGamez.World
         {
             Instance = this;
             exists = new HashSet<Vector2Int>(tileKeys);
+            source = Source;
+            Source = null;
         }
 
         void OnDestroy()
@@ -114,7 +118,7 @@ namespace LeGamez.World
             foreach (var kv in slots)
                 if (!kv.Value.loading && Distance(kv.Key, p) > unloadRadius) scratch.Add(kv.Key);
             foreach (var k in scratch) { Release(k, slots[k]); slots.Remove(k); }
-            Source?.Prefetch(p);
+            source?.Prefetch(p);
 
             // Wanted tiles, nearest first.
             scratch.Clear();
@@ -140,10 +144,10 @@ namespace LeGamez.World
         {
             inFlight++;
             string name = TileName(areaId, k);
-            if (Source != null)
+            if (source != null)
             {
                 WorldTile loadedTile = null;
-                yield return Source.Load(areaId, k, t => loadedTile = t);
+                yield return source.Load(areaId, k, t => loadedTile = t);
                 slot.tile = loadedTile;
             }
 #if UNITY_EDITOR
@@ -156,7 +160,7 @@ namespace LeGamez.World
             slot.loading = false;
             if (slot.tile == null)
             {
-                if (Source != null) retryAt[k] = Time.unscaledTime + 10f; // region not downloadable right now (offline)
+                if (source != null) retryAt[k] = Time.unscaledTime + 10f; // region not downloadable right now (offline)
                 else
                 {
                     Debug.LogWarning($"[World] tile {name} missing");
@@ -198,7 +202,7 @@ namespace LeGamez.World
         {
             if (slot.root != null) DestroyImmediate(slot.root);
             slot.root = null;
-            if (Source != null && slot.tile != null) Source.Release(key, slot.tile);
+            if (source != null && slot.tile != null) source.Release(key, slot.tile);
             slot.tile = null;
         }
 

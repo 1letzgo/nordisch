@@ -230,6 +230,9 @@ Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen sp�
   plus eines am Startpunkt (`spawnBikeSpot`). Rennen-Knopf = zweiter Gang auf dem Rad.
 - `Core/PositionMemory`: letzte Position, Blickrichtung und Fahrstatus pro Gebiet (PlayerPrefs; Schlüssel enthält Größe+Zentrum,
   wird also bei Gebietsänderung verworfen). Figurenwahl: `PlayerAvatar.SelectedIndex`.
+- `UI/PlaceSwitcher` („Andere Orte“ in der großen Karte): alle Gebiete mit Status; Tipp = hinbeamen (fehlt das Gebiet,
+  erst Start-Download). `MapStore.Play` lädt dafür die Welt-Szene mit dem neuen Gebiet neu und gibt das alte erst danach
+  frei; jeder `WorldStreamer` übernimmt seine eigene Kachelquelle (`WorldStreamer.Source` → Instanz).
 - `UI/FullMap`: Tipp auf Minikarte → große Karte, Beamen. Zoom bis 6× per Zwei-Finger-Pinch, Mausrad oder ＋/−, Ziehen verschiebt;
   Marker behalten ihre Bildschirmgröße. Kartentextur `AreaInfo.mapTexture` (`Generated/<id>/<id>_map.png`) ~2 px/m (max. 4096). `UI/Navigation`: Minikarte.
 

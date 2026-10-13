@@ -187,6 +187,7 @@ namespace LeGamez.Core
         static bool initialized;
         static Runner runner;
         static AssetBundle loaded;
+        static RegionTileSource loadedSource;
         static readonly Queue<Map> queue = new Queue<Map>();
         static bool working;
         static bool starting; // a map is being loaded – ignore further taps
@@ -246,7 +247,8 @@ namespace LeGamez.Core
             Changed();
         }
 
-        /// <summary>Loads the area data and enters the world scene (regions follow on demand).</summary>
+        /// <summary>Loads the area data and enters the world scene (regions follow on demand). Also switches areas while
+        /// playing: the world scene is reloaded with the new area, the old one is released afterwards.</summary>
         public static void Play(Map m)
         {
             if (m == null || !m.Playable || starting) return;
@@ -261,13 +263,18 @@ namespace LeGamez.Core
         /// <summary>Releases the bundles of the map that was played (the menu scene has replaced the world by now).</summary>
         public static void UnloadLoaded()
         {
-            if (World.WorldStreamer.Source is RegionTileSource src) src.UnloadAll();
             World.WorldStreamer.Source = null;
             Current = null;
-            if (loaded == null) return;
-            loaded.Unload(true);
-            loaded = null;
+            Release(ref loaded, ref loadedSource);
             SaveUsage();
+        }
+
+        static void Release(ref AssetBundle bundle, ref RegionTileSource source)
+        {
+            source?.UnloadAll();
+            source = null;
+            if (bundle != null) bundle.Unload(true);
+            bundle = null;
         }
 
         // ------------------------------------------------------------------ regions on demand (RegionTileSource)
@@ -618,28 +625,38 @@ namespace LeGamez.Core
         static IEnumerator PlayRoutine(Map m)
         {
             starting = true;
-            UnloadLoaded();
+            // Area switch while playing: the current area stays loaded until the new world scene has replaced it.
+            var oldBundle = loaded;
+            var oldSource = loadedSource;
+            loaded = null;
+            loadedSource = null;
             var req = AssetBundle.LoadFromFileAsync(FilePath(m.Id, AreaFile));
             yield return req;
-            loaded = req.assetBundle;
+            var bundle = req.assetBundle;
             World.AreaData data = null;
-            if (loaded != null)
+            if (bundle != null)
             {
-                var areq = loaded.LoadAllAssetsAsync<World.AreaData>();
+                var areq = bundle.LoadAllAssetsAsync<World.AreaData>();
                 yield return areq;
                 data = areq.asset as World.AreaData;
             }
             if (data == null)
             {
                 starting = false;
-                UnloadLoaded();
+                if (bundle != null) bundle.Unload(true);
+                loaded = oldBundle;
+                loadedSource = oldSource;
                 Fail(m, "Karte beschädigt – bitte löschen und neu laden", "bundle without AreaData");
                 yield break;
             }
             Current = m;
-            World.WorldStreamer.Source = new RegionTileSource(m);
+            loaded = bundle;
+            loadedSource = new RegionTileSource(m);
+            World.WorldStreamer.Source = loadedSource;
             World.AreaLoader.Pending = data;
             yield return SceneManager.LoadSceneAsync(World.AreaLoader.WorldSceneIndex);
+            Release(ref oldBundle, ref oldSource);
+            SaveUsage();
             starting = false;
         }
 

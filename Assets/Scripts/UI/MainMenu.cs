@@ -290,7 +290,7 @@ namespace LeGamez.UI
 
         void AreaGrid(RectTransform sheet, Vector2 size, float padding)
         {
-            UiKit.Label(sheet, "Wohin geht's?", 50, UiKit.Ink, TextAnchor.UpperLeft, FontStyle.Bold)
+            UiKit.Label(sheet, "Wo startest du?", 50, UiKit.Ink, TextAnchor.UpperLeft, FontStyle.Bold)
                 .Place(new Vector2(0, 1), new Vector2(padding, -padding * 0.8f), new Vector2(size.x - 2 * padding, 64));
             UiKit.Label(sheet, "Karte © OpenStreetMap-Mitwirkende · 3D-Gebäude © LGLN · Figuren: Kenney (CC0)", 20, UiKit.InkSoft, TextAnchor.LowerCenter)
                 .Place(new Vector2(0.5f, 0f), new Vector2(0, 74), new Vector2(size.x, 30));

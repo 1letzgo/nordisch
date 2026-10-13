@@ -126,7 +126,7 @@ namespace LeGamez.UI
             if (Screen.safeArea != appliedSafeArea) ApplySafeArea();
             // Android back button arrives as Escape: close the big map first, otherwise back to the menu.
             var kb = UnityEngine.InputSystem.Keyboard.current;
-            if (kb != null && kb.escapeKey.wasPressedThisFrame && !FullMap.CloseIfOpen())
+            if (kb != null && kb.escapeKey.wasPressedThisFrame && !FullMap.CloseIfOpen() && !PlaceSwitcher.CloseIfOpen())
                 UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(0);
             if (portrait != IsPortrait) ApplyOrientation();
             if (toastLabel != null && toastLabel.text.Length > 0 && Time.time > toastUntil) toastLabel.text = "";
