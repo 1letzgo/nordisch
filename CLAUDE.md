@@ -15,6 +15,8 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    ```
    - `lat/lon` = Mittelpunkt (Marktplatz/Altstadt wählen), `size_m` = Kantenlänge (1000; Inseln 1000–1200).
    - Inseln: `"ground": "sand"`, `"vehicles": ["bicycle", "carriage"]` (autofrei). Das Badge „Insel“ im Menü kommt von `carriage`.
+   - Mehrere Startpunkte (optional): `"starts": [{"name": "Westerstede"}, {"name": "Oldenburg", "lat": 53.1395, "lon": 8.2145}]`
+     – ohne lat/lon = Mittelpunkt, optional `yaw`; ohne Liste = ein Start mit Gebietsnamen. Siehe „Startpunkte“.
 2. **OSM-Daten holen** (Straßen, Flächen, Wasser, Bäume, Barrieren, POIs):
    ```bash
    python3 Tools/osm/fetch_area.py jever
@@ -99,6 +101,11 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
 - **Starten**: Startpunkt antippen (`MapStore.Start`) → nur `area.bin` holen/auffrischen, Welt-Szene, Ladebildschirm
   wartet auf die Kacheln um den Start (~1–3 MB). Weitere Kacheln, sobald der Streamer sie braucht, plus Vorladen bis 1,1 km.
   Cache = LRU (`MapStore.CacheLimit` 1 GB). Offline: gecachte Kacheln, fehlende werden nach 20 s erneut versucht.
+- **Startpunkte im Katalog**: `index.json` je Karte `starts[]` = {name, x, z, yaw, thumb (lokaler Pfad, leer = Kartenbild)}
+  (`MapStore.Entry.starts`, eine Menükarte je Start; fehlt das Feld → ein Start mit Kartennamen) und `start[]` = Regionen
+  ≤ 1,2 km um **alle** Startpunkte. Kartenbilder: `Generated/<id>/<id>_thumb.png` (erster Start) und `<id>_thumb_<k>.png`
+  (`SceneSnapshot.RenderThumbnails`, gleiche Ansicht um den Start). `publish_maps.py` muss `starts` in den Katalog übernehmen
+  und die Start-Bilder hochladen (`thumb` → URL), sonst zeigt die App nur eine Karte pro Gebiet.
 - `Tools/release/publish_maps.sh [--dry-run] [--drop-old] [<id> …]` exportiert und lädt **nur geänderte Dateien** (SHA-256)
   hoch (bei Format 6: `area.bin` + `world.bin` je Gebiet). Katalog `https://github.com/1letzgo/nordisch/releases/download/maps/maps.json` (Pre-Release `maps`, nie „latest“ →
   stört den APK-Updater nicht): je Karte Name/Lage/Fahrzeuge/Thumbnail-URL und `builds[]` = {platform ("any"), format,
@@ -266,9 +273,18 @@ Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen sp�
   plus eines am Startpunkt (`spawnBikeSpot`). Rennen-Knopf = zweiter Gang auf dem Rad.
 - `Core/PositionMemory`: letzte Position, Blickrichtung und Fahrstatus pro Gebiet (PlayerPrefs; Schlüssel enthält Größe+Zentrum,
   wird also bei Gebietsänderung verworfen). Figurenwahl: `PlayerAvatar.SelectedIndex`.
+- **Startpunkte eines Gebiets** (areas.json `starts`, z. B. Westerstede + Oldenburg in einem Gebiet): Importer sucht je
+  Start einen begehbaren Punkt ≤ 200 m (`FindSpawn`) + Fahrradplatz → `AreaData.starts` (name, position, yaw, bikeSpot;
+  `spawn`/`spawnBikeSpot` = erster Start für alte Apps) → `MapFormat.AreaJson.starts` (kein Formatwechsel: alte Apps
+  ignorieren es, Dateien ohne Liste → `AreaData.StartList()` = Spawn). Menü + „Andere Orte“: eine Karte/Zeile je Start
+  (`StartPoints.Default(areaId, k, name)`, nicht gespeichert). `GameBootstrap`: gewählter Start setzt dort ab – die letzte
+  Position (`PositionMemory`) gewinnt nur, wenn sie näher an diesem als an jedem anderen Start liegt (Gebiete mit einem
+  Start: wie bisher „weiter, wo ich war“); frischer Start = zu Fuß. Startrad am Start, der dem Spieler am nächsten ist.
+  Start im aktuellen Gebiet („Andere Orte“, auch eigene Startpunkte) = direkt hinbeamen (`FullMap.BeamTo`), kein Neuladen.
 - **Eigene Startpunkte** (`Core/StartPoints`, `persistentDataPath/startpoints.json`): „Startpunkt merken“ in der großen
   Karte speichert Gebiet + Position + Blickrichtung (Name = nächste Straße). Erscheinen im Menü („Wo startest du?“,
-  scrollbar) und in „Andere Orte“; `MapStore.Start(map, point)` → `StartPoints.Pending` → `GameBootstrap` setzt dort ab.
+  scrollbar) und in „Andere Orte“; `MapStore.Start(map, point)` → `StartPoints.Pending` → `GameBootstrap` setzt dort ab
+  (gewinnt immer gegen die letzte Position).
 - `UI/PlaceSwitcher` („Andere Orte“ in der großen Karte): alle Gebiete mit Status; Tipp = hinbeamen (fehlt das Gebiet,
   erst Start-Download). `MapStore.Play` lädt dafür die Welt-Szene mit dem neuen Gebiet neu und gibt das alte erst danach
   frei; jeder `WorldStreamer` übernimmt seine eigene Kachelquelle (`WorldStreamer.Source` → Instanz).

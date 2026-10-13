@@ -38,6 +38,16 @@ namespace LeGamez.Editor
             public string path;
         }
 
+        /// <summary>A default start point (AreaData.starts): menu card in the app (MapStore.StartInfo). thumb = local path
+        /// of its card image (publish_maps.py uploads it and puts the URL in); empty = use the map's thumbnail.</summary>
+        [System.Serializable]
+        class IndexStart
+        {
+            public string name;
+            public float x, z, yaw;
+            public string thumb;
+        }
+
         [System.Serializable]
         class IndexMap
         {
@@ -46,8 +56,13 @@ namespace LeGamez.Editor
             public string[] vehicles;
             public int pois;
             public List<IndexFile> files = new List<IndexFile>();
+            /// <summary>Regions "rx_rz" within <see cref="StartRadius"/> of any start point (catalog "start[]").</summary>
             public List<string> start = new List<string>();
+            public List<IndexStart> starts = new List<IndexStart>();
         }
+
+        /// <summary>Regions this close to a start point count as its start surroundings.</summary>
+        const float StartRadius = 1200f;
 
         [System.Serializable]
         class Index
@@ -111,6 +126,7 @@ namespace LeGamez.Editor
                 File.WriteAllBytes(areaFile, MapFormat.WriteArea(data, OverviewImage(a.id), pack));
                 m.files.Add(new IndexFile { name = "area.bin", region = "", path = areaFile });
                 m.files.Add(new IndexFile { name = "world.bin", region = "", path = packFile });
+                AddStarts(m, a.id, data);
                 long areaSize = new FileInfo(areaFile).Length, packSize = new FileInfo(packFile).Length;
                 index.maps.Add(m);
                 if (noMap > 0) Debug.LogWarning($"[Maps] {a.id}: {noMap} regions without minimap image – run SceneSnapshot.RenderThumbnailsBatch -area {a.id}");
@@ -118,6 +134,35 @@ namespace LeGamez.Editor
             }
             File.WriteAllText(Path.Combine(OutDir, "index.json"), JsonUtility.ToJson(index, true));
             return true;
+        }
+
+        /// <summary>Default start points with their card images, and the regions around all of them.</summary>
+        static void AddStarts(IndexMap m, string id, AreaData data)
+        {
+            var list = data.StartList();
+            for (int k = 0; k < list.Count; k++)
+            {
+                var st = list[k];
+                string thumb = Path.GetFullPath(AreaCatalog.ThumbPath(id, k));
+                if (k > 0 && !File.Exists(thumb))
+                {
+                    Debug.LogWarning($"[Maps] {id}: no card image for start '{st.name}' – run SceneSnapshot.RenderThumbnailsBatch -area {id}");
+                    thumb = "";
+                }
+                m.starts.Add(new IndexStart { name = st.name, x = st.position.x, z = st.position.z, yaw = st.yaw, thumb = k == 0 ? m.thumb : thumb });
+            }
+            foreach (var r in data.tileKeys.Select(WorldStreamer.RegionOf).Distinct().OrderBy(r => r.x).ThenBy(r => r.y))
+            {
+                var b = RegionContent.Bounds(r);
+                foreach (var st in list)
+                {
+                    float dx = Mathf.Max(b.xMin - st.position.x, 0f, st.position.x - b.xMax);
+                    float dz = Mathf.Max(b.yMin - st.position.z, 0f, st.position.z - b.yMax);
+                    if (dx * dx + dz * dz > StartRadius * StartRadius) continue;
+                    m.start.Add($"{r.x}_{r.y}");
+                    break;
+                }
+            }
         }
 
         /// <summary>Overview JPEG of the area (SceneSnapshot.RenderThumbnails); areas not re-rendered since the region

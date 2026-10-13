@@ -22,14 +22,26 @@ namespace LeGamez.Core
             public Vector3 position;
             public float yaw;
             public long created;
+            /// <summary>Default start point of the area (index into AreaData.starts) – not saved, made by <see cref="Default"/>.
+            /// GameBootstrap takes its position from the area data, so only area id + index count.
+            /// 1-based, so 0 (also for points read from the file) means an own point.</summary>
+            [NonSerialized] public int defaultStart;
+
+            public bool IsDefault => defaultStart > 0;
+            public int StartIndex => defaultStart - 1;
         }
+
+        /// <summary>The area's default start point <paramref name="index"/> (0 = the area's main start / spawn).</summary>
+        public static Point Default(string areaId, int index, string name) =>
+            new Point { areaId = areaId, name = name, defaultStart = Mathf.Max(0, index) + 1 };
 
         [Serializable] class Store { public List<Point> points = new List<Point>(); }
 
         static List<Point> points;
         public static int Revision { get; private set; }
 
-        /// <summary>Where the next world start puts the player instead of spawn / last position (set by MapStore.Start).</summary>
+        /// <summary>Where the next world start puts the player (set by MapStore.Start): an own point wins over the last
+        /// position, a default start only when the last position is not nearer to another start (see GameBootstrap).</summary>
         public static Point Pending;
 
         static string Path => System.IO.Path.Combine(Application.persistentDataPath, "startpoints.json");

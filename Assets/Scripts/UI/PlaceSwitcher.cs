@@ -7,8 +7,9 @@ using UnityEngine.UI;
 namespace LeGamez.UI
 {
     /// <summary>
-    /// "Andere Orte" (from the full map): every area we have, with its state. Tap = beam there – an area not on the device
-    /// yet first downloads its start (area data + regions around the start point), then the world switches over.
+    /// "Andere Orte" (from the full map): the default start points of every area we have, with its state, and the player's
+    /// own start points. Tap = beam there – within the current area directly (no reload); an area not on the device yet
+    /// first downloads its area file, then the world switches over.
     /// </summary>
     public class PlaceSwitcher : MonoBehaviour
     {
@@ -98,14 +99,30 @@ namespace LeGamez.UI
             builtRevision = MapStore.Revision + StartPoints.Revision * 100000;
             foreach (Transform c in list) Destroy(c.gameObject);
             rows.Clear();
-            string current = AreaInfo.Current != null ? AreaInfo.Current.areaId : null;
+            var area = AreaInfo.Current;
+            string current = area != null ? area.areaId : null;
             const float h = 170f, gap = 24f;
             float y = 0f;
             foreach (var m in MapStore.Maps)
             {
-                if (m.Id == current) continue;
-                rows.Add(BuildRow(m, null, y, h));
-                y -= h + gap;
+                if (m.Id == current)
+                {
+                    // Other start points of the area we are in (e.g. Oldenburg while in Westerstede) – the area's own data
+                    // knows them even when the catalog doesn't. The one we are nearest to is "here" and left out.
+                    int here = area.NearestStart(NavState.Player != null ? NavState.Player.position : Vector3.zero);
+                    for (int k = 0; k < area.starts.Count; k++)
+                    {
+                        if (k == here) continue;
+                        rows.Add(BuildRow(m, StartPoints.Default(m.Id, k, area.starts[k].name), y, h));
+                        y -= h + gap;
+                    }
+                    continue;
+                }
+                for (int k = 0; k < m.StartCount; k++)
+                {
+                    rows.Add(BuildRow(m, StartPoints.Default(m.Id, k, m.StartName(k)), y, h));
+                    y -= h + gap;
+                }
             }
             // Own start points – also those in the current area (beam there directly).
             foreach (var p in StartPoints.All)
@@ -124,6 +141,8 @@ namespace LeGamez.UI
         Row BuildRow(MapStore.Map m, StartPoints.Point point, float y, float h)
         {
             var row = new Row { map = m, point = point };
+            bool own = point != null && !point.IsDefault;
+            var tex = own ? m.thumb : m.StartThumb(point != null ? point.StartIndex : 0);
             var card = UiKit.Rect($"Row {point?.name ?? m.entry.name}", list, new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(880, h));
             var bg = UiKit.Panel(card.gameObject, Color.white);
             var btn = card.gameObject.AddComponent<Button>();
@@ -136,10 +155,10 @@ namespace LeGamez.UI
             UiKit.Stretch(img);
             var image = img.gameObject.AddComponent<Image>();
             image.raycastTarget = false;
-            if (m.thumb != null)
+            if (tex != null)
             {
-                if (!sprites.TryGetValue(m.thumb, out var sp))
-                    sprites[m.thumb] = sp = Sprite.Create(m.thumb, new Rect(0, 0, m.thumb.width, m.thumb.height), new Vector2(0.5f, 0.5f));
+                if (!sprites.TryGetValue(tex, out var sp))
+                    sprites[tex] = sp = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
                 image.sprite = sp;
                 var fit = img.gameObject.AddComponent<AspectRatioFitter>();
                 fit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
@@ -150,7 +169,10 @@ namespace LeGamez.UI
             bool island = m.HasVehicle("carriage");
             UiKit.Label(card, point != null ? point.name : m.entry.name, 44, UiKit.Ink, TextAnchor.UpperLeft, FontStyle.Bold)
                 .Place(new Vector2(0f, 1f), new Vector2(262, -24), new Vector2(580, 56));
-            UiKit.Label(card, point != null ? $"{m.entry.name} · eigener Startpunkt" : island ? "Insel" : "Stadt", 26, UiKit.InkSoft, TextAnchor.UpperLeft)
+            string kind = island ? "Insel" : "Stadt";
+            string sub = own ? $"{m.entry.name} · eigener Startpunkt"
+                : point != null && point.name != m.entry.name ? $"{kind} · Gebiet {m.entry.name}" : kind;
+            UiKit.Label(card, sub, 26, UiKit.InkSoft, TextAnchor.UpperLeft)
                 .Place(new Vector2(0f, 1f), new Vector2(262, -80), new Vector2(580, 36));
             row.status = UiKit.Label(card, "", 28, UiKit.Navy, TextAnchor.UpperLeft, FontStyle.Bold)
                 .Place(new Vector2(0f, 1f), new Vector2(262, -118), new Vector2(580, 40));
@@ -168,6 +190,7 @@ namespace LeGamez.UI
         {
             var m = r.map;
             string text;
+            if (InCurrentArea(r.point)) { r.status.text = "Hierhin beamen"; r.fill.parent.gameObject.SetActive(false); return; }
             switch (m.status)
             {
                 case MapStore.Status.Installed:
@@ -190,12 +213,28 @@ namespace LeGamez.UI
 
         void Choose(MapStore.Map m, StartPoints.Point point)
         {
-            if (m.Busy) return;
+            if (m.Busy && !InCurrentArea(point)) return;
             Go(m, point);
+        }
+
+        /// <summary>A start point in the area being played: reachable by beaming, no area switch.</summary>
+        static bool InCurrentArea(StartPoints.Point point)
+        {
+            var area = AreaInfo.Current;
+            if (point == null || area == null || point.areaId != area.areaId) return false;
+            return point.IsDefault ? point.StartIndex < area.starts.Count : point.areaKey == area.MemoryKey && area.Contains(point.position, 2f);
         }
 
         void Go(MapStore.Map m, StartPoints.Point point)
         {
+            if (InCurrentArea(point))
+            {
+                var area = AreaInfo.Current;
+                var s = point.IsDefault ? area.starts[point.StartIndex] : null;
+                gameObject.SetActive(false);
+                FullMap.BeamTo(transform.parent, s != null ? s.position : point.position, s != null ? s.yaw : point.yaw);
+                return;
+            }
             var flash = BeamFlash.Create(transform.parent);
             flash.StartCoroutine(flash.Fade(0f, 1f, 0.25f)); // world scene reload follows; the loading screen takes over
             gameObject.SetActive(false);

@@ -30,7 +30,7 @@ namespace LeGamez.UI
         class CardUi
         {
             public MapStore.Map map;
-            public StartPoints.Point point; // own start point (null = the area's default start)
+            public StartPoints.Point point; // own start point or one of the area's default start points
             public Text status;
             public RectTransform progressFill;
             public Text deleteLabel;
@@ -307,9 +307,10 @@ namespace LeGamez.UI
                 return;
             }
 
-            // Default start of every area, then the player's own start points (of areas we know).
+            // Default start points of every area (one card each), then the player's own start points (of areas we know).
             var entries = new List<(MapStore.Map map, StartPoints.Point point)>();
-            foreach (var m in maps) entries.Add((m, null));
+            foreach (var m in maps)
+                for (int k = 0; k < m.StartCount; k++) entries.Add((m, StartPoints.Default(m.Id, k, m.StartName(k))));
             foreach (var p in StartPoints.All)
             {
                 var m = maps.Find(x => x.Id == p.areaId);
@@ -350,6 +351,8 @@ namespace LeGamez.UI
         {
             var ui = new CardUi { map = map, point = point };
             cards.Add(ui);
+            bool own = point != null && !point.IsDefault;
+            int start = point != null && point.IsDefault ? point.StartIndex : 0;
             var card = UiKit.Rect($"Card {point?.name ?? map.entry.name}", parent, new Vector2(0, 1), pos, size);
             UiKit.DropShadow(card, 16f, -6f, 0.28f);
             var bg = UiKit.Panel(card.gameObject, Color.white);
@@ -377,7 +380,7 @@ namespace LeGamez.UI
             UiKit.Stretch(thumb);
             var thumbImg = thumb.gameObject.AddComponent<Image>();
             thumbImg.raycastTarget = false;
-            var sprite = ThumbSprite(map.thumb);
+            var sprite = ThumbSprite(own ? map.thumb : map.StartThumb(start));
             if (sprite != null)
             {
                 thumbImg.sprite = sprite;
@@ -418,11 +421,15 @@ namespace LeGamez.UI
             if (map.HasVehicle("bicycle")) ways.Add("Fahrrad");
             if (map.HasVehicle("car")) ways.Add("Auto");
             if (map.HasVehicle("carriage")) ways.Add("Kutsche");
-            UiKit.Label(card, point != null ? $"{map.entry.name} · eigener Startpunkt" : string.Join(" · ", ways), 26, UiKit.InkSoft, TextAnchor.UpperLeft)
+            // Default start points of a bigger area (e.g. "Oldenburg" in Westerstede) name the area too.
+            string sub = own ? $"{map.entry.name} · eigener Startpunkt"
+                : point != null && point.name != map.entry.name ? $"{map.entry.name} · {string.Join(" · ", ways)}"
+                : string.Join(" · ", ways);
+            UiKit.Label(card, sub, 26, UiKit.InkSoft, TextAnchor.UpperLeft)
                 .Place(new Vector2(0, 1), new Vector2(26, -textTop - 54), new Vector2(size.x - 52, 34));
 
-            // Remove from the device (tap twice). Not in the editor – there the scenes are the project's.
-            if (point != null || (map.Playable && !map.Busy && !Application.isEditor))
+            // Remove from the device (tap twice; on the area's first card only). Not in the editor – there the scenes are the project's.
+            if (own || (start == 0 && map.Playable && !map.Busy && !Application.isEditor))
             {
                 var del = UiKit.Rect("Delete", card, new Vector2(1, 0), new Vector2(-14, 10), new Vector2(170, 52));
                 var delImg = del.gameObject.AddComponent<Image>();
@@ -435,7 +442,7 @@ namespace LeGamez.UI
                 {
                     if (Time.unscaledTime < ui.deleteArmedUntil)
                     {
-                        if (point != null) StartPoints.Remove(point);
+                        if (own) StartPoints.Remove(point);
                         else MapStore.Delete(map);
                     }
                     else ui.deleteArmedUntil = Time.unscaledTime + 3f;

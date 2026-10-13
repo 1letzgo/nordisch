@@ -100,6 +100,17 @@ namespace LeGamez.Core
             public int pois;
             public string thumb; // URL; the file name carries a version, so it doubles as cache key
             public Build[] builds = new Build[0];
+            /// <summary>Default start points (MapExport index.json "starts"); empty = one start named like the map.</summary>
+            public StartInfo[] starts = new StartInfo[0];
+        }
+
+        /// <summary>A default start point in the catalog: one menu card each. Position in the area's local metres.</summary>
+        [Serializable]
+        public class StartInfo
+        {
+            public string name;
+            public float x, z, yaw;
+            public string thumb; // URL of its card image; empty = the map's thumbnail
         }
 
         [Serializable] class Catalog { public int schema; public Entry[] maps; }
@@ -142,9 +153,17 @@ namespace LeGamez.Core
             public string error;
             public Texture2D thumb;
             internal string thumbUrl;
+            /// <summary>Card images of the default start points (index = start; null = use <see cref="thumb"/>).</summary>
+            internal Texture2D[] startThumbs = new Texture2D[0];
+            internal string[] startThumbUrls = new string[0];
             public string scenePath; // editor only: path of the AreaData asset
 
             public string Id => entry.id;
+            /// <summary>Default start points of the area (at least one: the area itself).</summary>
+            public int StartCount => Math.Max(1, entry.starts?.Length ?? 0);
+            public string StartName(int k) =>
+                entry.starts != null && k >= 0 && k < entry.starts.Length && !string.IsNullOrEmpty(entry.starts[k].name) ? entry.starts[k].name : entry.name;
+            public Texture2D StartThumb(int k) => k >= 0 && k < startThumbs.Length && startThumbs[k] != null ? startThumbs[k] : thumb;
             /// <summary>Installed and fitting this app – also while a newer version downloads.</summary>
             public bool Playable => installed != null && Fits(installed);
             public bool Busy => status == Status.Queued || status == Status.Downloading || status == Status.Installing;
@@ -223,7 +242,8 @@ namespace LeGamez.Core
         }
 
         /// <summary>Start a place: fetch/refresh its small area file if needed (online), then play. Offline with an
-        /// installed area: play right away (cached tiles only).</summary>
+        /// installed area: play right away (cached tiles only). <paramref name="at"/>: own start point or a default one
+        /// (<see cref="StartPoints.Default"/>); null = last position / the area's first start.</summary>
         public static void Start(Map m, StartPoints.Point at = null)
         {
             if (m == null || starting) return;
@@ -455,7 +475,15 @@ namespace LeGamez.Core
 
             foreach (var m in Maps) Evaluate(m);
             Maps.Sort((a, b) => b.entry.lat.CompareTo(a.entry.lat));
-            foreach (var m in Maps) if (m.thumb == null || m.thumbUrl != m.entry.thumb) Run(LoadThumb(m));
+            foreach (var m in Maps)
+            {
+                if (m.thumb == null || m.thumbUrl != m.entry.thumb) Run(LoadThumb(m, -1));
+                int n = m.entry.starts?.Length ?? 0;
+                if (m.startThumbs.Length != n) { m.startThumbs = new Texture2D[n]; m.startThumbUrls = new string[n]; }
+                for (int k = 1; k < n; k++)
+                    if (!string.IsNullOrEmpty(m.entry.starts[k].thumb) && (m.startThumbs[k] == null || m.startThumbUrls[k] != m.entry.starts[k].thumb))
+                        Run(LoadThumb(m, k));
+            }
             Changed();
 
             if (AutoUpdateOnWifi && Application.internetReachability == NetworkReachability.ReachableViaLocalAreaNetwork)
@@ -491,11 +519,18 @@ namespace LeGamez.Core
             }
         }
 
-        static IEnumerator LoadThumb(Map m)
+        /// <summary>Local copy of a card image in the map folder (k &lt; 0 or 0 = the map's thumbnail).</summary>
+        static string LocalThumb(string id, int k) => Path.Combine(MapDir(id), k <= 0 ? "thumb.png" : $"thumb_{k}.png");
+
+        static string ThumbUrl(Map m, int k) => k <= 0 ? m.entry.thumb : m.entry.starts[k].thumb;
+
+        /// <summary>Loads the map's thumbnail (k &lt; 0) or the card image of default start point k.</summary>
+        static IEnumerator LoadThumb(Map m, int k)
         {
-            string url = m.entry.thumb;
-            m.thumbUrl = url;
-            string local = m.installed != null ? Path.Combine(MapDir(m.Id), "thumb.png") : null;
+            string url = ThumbUrl(m, k);
+            if (k < 0) m.thumbUrl = url;
+            else m.startThumbUrls[k] = url;
+            string local = m.installed != null ? LocalThumb(m.Id, k) : null;
             string cached = ThumbCache(url);
             string path = cached != null && File.Exists(cached) ? cached : local != null && File.Exists(local) ? local : null;
             if (path == null && cached != null)
@@ -510,8 +545,17 @@ namespace LeGamez.Core
             var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
             if (tex.LoadImage(File.ReadAllBytes(path)))
             {
-                if (m.thumb != null) UnityEngine.Object.Destroy(m.thumb);
-                m.thumb = tex;
+                if (k < 0)
+                {
+                    if (m.thumb != null) UnityEngine.Object.Destroy(m.thumb);
+                    m.thumb = tex;
+                }
+                else if (k < m.startThumbs.Length && m.startThumbUrls[k] == url)
+                {
+                    if (m.startThumbs[k] != null) UnityEngine.Object.Destroy(m.startThumbs[k]);
+                    m.startThumbs[k] = tex;
+                }
+                else { UnityEngine.Object.Destroy(tex); yield break; } // catalog changed meanwhile
                 Changed();
             }
             else UnityEngine.Object.Destroy(tex);
@@ -569,8 +613,12 @@ namespace LeGamez.Core
             try
             {
                 m.installed = b;
-                string cached = ThumbCache(m.entry.thumb);
-                if (cached != null && File.Exists(cached)) File.Copy(cached, Path.Combine(MapDir(m.Id), "thumb.png"), true);
+                // Card images next to the map, for offline starts with an emptied thumbnail cache.
+                for (int k = 0; k < m.StartCount; k++)
+                {
+                    string cached = ThumbCache(ThumbUrl(m, k));
+                    if (cached != null && File.Exists(cached)) File.Copy(cached, LocalThumb(m.Id, k), true);
+                }
                 ExcludeFromBackup(MapDir(m.Id));
                 SaveInfo(m);
             }
@@ -759,6 +807,16 @@ namespace LeGamez.Core
                     scenePath = $"Assets/Generated/{a.id}/{a.id}_area.asset", // AreaData (OsmAreaImporter.AreaDataPath)
                     thumb = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>(World.AreaCatalog.ThumbPath(a.id)),
                 };
+                // Default start points: names from the catalog, card images from Generated/<id>/<id>_thumb_<k>.png.
+                int n = a.starts?.Count ?? 0;
+                m.entry.starts = new StartInfo[n];
+                m.startThumbs = new Texture2D[n];
+                m.startThumbUrls = new string[n];
+                for (int k = 0; k < n; k++)
+                {
+                    m.entry.starts[k] = new StartInfo { name = a.starts[k] };
+                    if (k > 0) m.startThumbs[k] = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>(World.AreaCatalog.ThumbPath(a.id, k));
+                }
                 Maps.Add(m);
             }
             Changed();

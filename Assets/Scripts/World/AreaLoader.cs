@@ -83,6 +83,7 @@ namespace LeGamez.World
             info.spawnPoint = spawn;
             info.bikeSpots = new System.Collections.Generic.List<Vector3>(d.bikeSpots);
             info.spawnBikeSpot = d.spawnBikeSpot;
+            info.starts = new System.Collections.Generic.List<AreaData.Start>(d.StartList());
             info.carSpots = new System.Collections.Generic.List<Vector4>(d.carSpots);
             info.mapTexture = d.mapTexture;
             info.attribution = d.attribution;
