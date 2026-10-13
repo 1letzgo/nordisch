@@ -195,6 +195,7 @@ namespace LeGamez.World
                 mr.shadowCastingMode = (part.flags & WorldTile.FlagShadows) != 0 ? ShadowCastingMode.On : ShadowCastingMode.Off;
                 if ((part.flags & WorldTile.FlagCollider) != 0) go.AddComponent<MeshCollider>().sharedMesh = part.mesh;
             }
+            InstancedProps.Create(root.transform, tile.instances, materials, hide); // trees, bushes, lamps
             return root;
         }
 

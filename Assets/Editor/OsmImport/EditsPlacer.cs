@@ -151,6 +151,14 @@ namespace LeGamez.Editor.OsmImport
                 dst.uvs.AddRange(src.uvs);
                 foreach (var i in src.triangles) dst.triangles.Add(i + offset);
             }
+            foreach (var inst in local.instances)
+            {
+                var moved = inst;
+                moved.position = pos + rot * (inst.position * scale);
+                moved.yaw = inst.yaw + yaw;
+                moved.scale = inst.scale * scale;
+                sink.instances.Add(moved);
+            }
         }
     }
 }

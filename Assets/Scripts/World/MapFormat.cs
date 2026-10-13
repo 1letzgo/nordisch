@@ -18,6 +18,9 @@ namespace LeGamez.World
     /// Tile blob: int parts; per part: byte material, byte flags, byte layer, string group, int vertexCount,
     /// int indexCount, bool uvs; positions (3 floats), normals (3 sbytes), colours (RGBA32), [uvs (4 floats)],
     /// indices (ushort if vertexCount ≤ 65535, else int).
+    /// Optional instance section after the parts ("INS1", int count, then column-wise: proto bytes, positions (3 floats),
+    /// yaw (ushort, 360° = 65536), scale (3 ushorts, 1/1000), colours (RGBA32)) – trees, bushes and lamps drawn from the
+    /// app's prototype meshes (<see cref="InstancePrototypes"/>). Tiles without it simply have no instances.
     /// </summary>
     public static class MapFormat
     {
@@ -162,6 +165,7 @@ namespace LeGamez.World
         {
             public Vector2Int key;
             public List<PartData> parts = new List<PartData>();
+            public List<WorldTile.Instance> instances = new List<WorldTile.Instance>();
         }
 
         public class PartData
@@ -203,8 +207,38 @@ namespace LeGamez.World
                     bool small = v.Length <= 65535;
                     foreach (var i in idx) { if (small) w.Write((ushort)i); else w.Write(i); }
                 }
+                if (t.instances != null && t.instances.Count > 0) WriteInstances(w, t.instances);
             }
             return ms.ToArray();
+        }
+
+        static readonly byte[] InstanceMagic = { (byte)'I', (byte)'N', (byte)'S', (byte)'1' };
+
+        /// <summary>Column-wise, so deflate finds the repetition (same prototypes, similar sizes and colours).</summary>
+        static void WriteInstances(BinaryWriter w, List<WorldTile.Instance> list)
+        {
+            w.Write(InstanceMagic);
+            w.Write(list.Count);
+            foreach (var i in list) w.Write(i.proto);
+            foreach (var i in list) { w.Write(i.position.x); w.Write(i.position.y); w.Write(i.position.z); }
+            foreach (var i in list) w.Write((ushort)(Mathf.RoundToInt(Mathf.Repeat(i.yaw, 360f) / 360f * 65536f) & 0xFFFF));
+            foreach (var i in list) { w.Write(Milli(i.scale.x)); w.Write(Milli(i.scale.y)); w.Write(Milli(i.scale.z)); }
+            foreach (var i in list) { w.Write(i.color.r); w.Write(i.color.g); w.Write(i.color.b); w.Write(i.color.a); }
+        }
+
+        static ushort Milli(float v) => (ushort)Mathf.Clamp(Mathf.RoundToInt(v * 1000f), 0, 65535);
+
+        /// <summary>Thread-safe (plain arithmetic only).</summary>
+        static void ReadInstances(BinaryReader r, List<WorldTile.Instance> list)
+        {
+            int n = r.ReadInt32();
+            var a = new WorldTile.Instance[n];
+            for (int i = 0; i < n; i++) a[i].proto = r.ReadByte();
+            for (int i = 0; i < n; i++) a[i].position = new Vector3(r.ReadSingle(), r.ReadSingle(), r.ReadSingle());
+            for (int i = 0; i < n; i++) a[i].yaw = r.ReadUInt16() * (360f / 65536f);
+            for (int i = 0; i < n; i++) a[i].scale = new Vector3(r.ReadUInt16() * 0.001f, r.ReadUInt16() * 0.001f, r.ReadUInt16() * 0.001f);
+            for (int i = 0; i < n; i++) a[i].color = new Color32(r.ReadByte(), r.ReadByte(), r.ReadByte(), r.ReadByte());
+            list.AddRange(a);
         }
 
         /// <summary>Thread-safe: no Unity objects are touched.</summary>
@@ -234,6 +268,13 @@ namespace LeGamez.World
                 for (int i = 0; i < ic; i++) p.indices[i] = small ? r.ReadUInt16() : r.ReadInt32();
                 t.parts.Add(p);
             }
+            var s = r.BaseStream;
+            if (s.Length - s.Position >= 8)
+            {
+                var magic = r.ReadBytes(4);
+                if (magic[0] == InstanceMagic[0] && magic[1] == InstanceMagic[1] && magic[2] == InstanceMagic[2] && magic[3] == InstanceMagic[3])
+                    ReadInstances(r, t.instances);
+            }
             return t;
         }
 
@@ -257,6 +298,7 @@ namespace LeGamez.World
                 mesh.UploadMeshData(!collider); // colliders need the CPU copy
                 tile.parts.Add(new WorldTile.Part { mesh = mesh, material = p.material, flags = p.flags, layer = p.layer, group = p.group });
             }
+            tile.instances = d.instances;
             return tile;
         }
 

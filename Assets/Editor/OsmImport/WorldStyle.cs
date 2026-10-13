@@ -55,11 +55,11 @@ namespace LeGamez.Editor.OsmImport
         public static readonly Color32 Path = Hex("#D8C49A");
         public static readonly Color32 Cycleway = Hex("#B5574B");
         public static readonly Color32 Rail = Hex("#6E5A4A");
-        public static readonly Color32 TreeLeaves = Hex("#4F8F3F");
-        public static readonly Color32 TreeTrunk = Hex("#7A5638");
-        public static readonly Color32 Bush = Hex("#6E9A55");
-        public static readonly Color32 LampPole = Hex("#3E4247");
-        public static readonly Color32 LampGlow = Hex("#FFF4D6");
+        public static readonly Color32 TreeLeaves = LeGamez.World.InstancePrototypes.TreeLeaves; // instanced: tint reference
+        public static readonly Color32 TreeTrunk = LeGamez.World.InstancePrototypes.TreeTrunk;
+        public static readonly Color32 Bush = LeGamez.World.InstancePrototypes.BushColor;
+        public static readonly Color32 LampPole = LeGamez.World.InstancePrototypes.LampPole;
+        public static readonly Color32 LampGlow = LeGamez.World.InstancePrototypes.LampGlow;
         public static readonly Color32 Hedge = Hex("#55834A");
         public static readonly Color32 StoneWall = Hex("#A69C8C");
         public static readonly Color32 Fence = Hex("#8A8F94");
