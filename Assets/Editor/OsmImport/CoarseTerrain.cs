@@ -10,8 +10,13 @@ namespace LeGamez.Editor.OsmImport
     /// 40 m blocks: heights are smoothed onto a 40 m grid, nearly planar neighbours are merged up to 160 m, and every
     /// sample inside such a block is replaced by its two triangles (same diagonal as the terrain cells). The field and
     /// the coarse mesh are thus identical – draped water/railways and the detailed blocks next to it fit without cracks.
-    /// Colours: majority ground cover of the aerial image (blocks split down to 10 m along field borders), forest from
-    /// the mask, lakes in water colour. Call <see cref="Build"/> before GroundBuilder.BuildBase, which skips the blocks built here.
+    /// Colours: a class field on a 20 m node grid (two 3×3 majority passes) – meadow / field from the smoothed aerial
+    /// image (<see cref="AerialImage.FieldScore"/>, the same map the detailed open-country ground uses, so field shapes run
+    /// on across the mask edge), forest and lakes from the mask. Blocks whose nodes all share one class stay whole (vertex
+    /// colours carry the measured tone of each field); where classes change, the 20 m triangles are cut along the
+    /// interpolated class border (marching triangles) – smooth field outlines instead of 10–16 m stair steps.
+    /// Forests near the built corridors get instanced trees (own random generator, not editable objects).
+    /// Call <see cref="Build"/> before GroundBuilder.BuildBase, which skips the blocks built here.
     /// </summary>
     public static class CoarseTerrain
     {
@@ -19,23 +24,26 @@ namespace LeGamez.Editor.OsmImport
         const int MaxUnits = 4;           // largest merged block in 40 m units (160 m)
         const float Tolerance = 0.15f;    // m: merged blocks stay this close to the smoothed 40 m grid
         const int Smooth = 4;             // samples (±20 m) averaged for a 40 m grid point
-        const float Majority = 0.9f;      // share of cell halves with one cover for a block to stay whole
-        const int MinCover = 2;           // cells: smallest block for cover borders (10 m)
-        const byte Forest = 5, Lake = 6;  // cover codes next to AerialImage.Cover
+        const int Node = 4;               // cells between colour nodes (20 m; 10 m doubles the triangles along borders)
+        const byte Grass = 0, Field = 1, Forest = 2, Lake = 3;
+        const float TreeReach = 100f;     // m from the detailed ground: forests get trees (visible from the roads)
 
-        static byte[] cover;              // per cell: lower half | upper half << 4
+        static byte[] nodeClass;          // per colour node
         static bool[] fine;               // per 40 m block: detailed (GroundBuilder)
-        static int ncx, ncz, nbx, nbz;    // cells, 40 m blocks
+        static int ncx, ncz, nbx, nbz, nnx, nnz; // cells, 40 m blocks, colour nodes
         static float startX, startZ;
+        static Color32 baseColor;
 
         public static int Blocks { get; private set; }
         public static int Triangles { get; private set; }
+        public static int Trees { get; private set; }
 
         public static void Build(MeshSink sink, AreaRect area, Color32 color, TerrainField t)
         {
-            Blocks = Triangles = 0;
+            Blocks = Triangles = Trees = 0;
             var mask = AreaMask.Current;
             if (mask == null) return;
+            baseColor = color;
             float cs = TerrainField.CellSize;
             var g = area.Expand(60f); // same cell grid as GroundBuilder.BuildBase
             startX = Mathf.Floor(g.xMin / cs) * cs; startZ = Mathf.Floor(g.zMin / cs) * cs;
@@ -47,25 +55,43 @@ namespace LeGamez.Editor.OsmImport
             for (int bx = 0; bx < nbx; bx++)
                 fine[bz * nbx + bx] = AreaMask.FineTerrain(startX + bx * Fine * cs, startZ + bz * Fine * cs, Fine * cs);
 
-            var aerial = AerialImage.Current;
-            cover = new byte[ncx * ncz];
-            for (int iz = 0; iz < ncz; iz++)
-            for (int ix = 0; ix < ncx; ix++)
+            nnx = ncx / Node + 1; nnz = ncz / Node + 1;
+            var raw = new byte[nnx * nnz];
+            var s = new float[4];
+            for (int k = 0; k < nnz; k++)
+            for (int i = 0; i < nnx; i++)
             {
-                if (fine[iz / Fine * nbx + ix / Fine]) continue;
-                float x0 = startX + ix * cs, z0 = startZ + iz * cs;
-                byte lo, up;
-                if (mask.IsForest(x0 + cs * 0.5f, z0 + cs * 0.5f)) lo = up = Forest;
-                else if (mask.IsLake(x0 + cs * 0.5f, z0 + cs * 0.5f)) lo = up = Lake;
-                else if (aerial == null) lo = up = 0;
-                else { lo = (byte)aerial.CoverIn(x0, z0, cs, false); up = (byte)aerial.CoverIn(x0, z0, cs, true); }
-                cover[iz * ncx + ix] = (byte)(lo | up << 4);
+                int bx = Mathf.Min(i * Node / Fine, nbx - 1), bz = Mathf.Min(k * Node / Fine, nbz - 1);
+                if (fine[bz * nbx + bx] && (i * Node) % Fine != 0 && (k * Node) % Fine != 0) { raw[k * nnx + i] = 255; continue; } // inside a detailed block
+                raw[k * nnx + i] = Classify(startX + i * Node * cs, startZ + k * Node * cs, s);
             }
+            // 3×3 majority, twice: no single-node specks (each costs ~10 triangles), straighter borders.
+            nodeClass = new byte[nnx * nnz];
+            var votes = new int[4];
+            for (int pass = 0; pass < 2; pass++)
+            {
+                for (int k = 0; k < nnz; k++)
+                for (int i = 0; i < nnx; i++)
+                {
+                    byte own = raw[k * nnx + i];
+                    if (own == 255) { nodeClass[k * nnx + i] = 255; continue; }
+                    System.Array.Clear(votes, 0, 4);
+                    for (int b = Mathf.Max(0, k - 1); b <= Mathf.Min(nnz - 1, k + 1); b++)
+                    for (int a = Mathf.Max(0, i - 1); a <= Mathf.Min(nnx - 1, i + 1); a++)
+                        if (raw[b * nnx + a] != 255) votes[raw[b * nnx + a]]++;
+                    byte best = own;
+                    for (byte c = 0; c < 4; c++) if (votes[c] > votes[best]) best = c;
+                    nodeClass[k * nnx + i] = votes[best] >= 5 ? best : own;
+                }
+                (raw, nodeClass) = (nodeClass, raw);
+            }
+            nodeClass = raw;
+            for (int j = 0; j < nodeClass.Length; j++) if (nodeClass[j] == 255) nodeClass[j] = Grass; // never read
 
             // Simplify the field: only with a 5 m grid on the cell corners (fetch_dgm "dgm_step": 5), else emit cells as they are.
-            var s = t.Samples;
-            int ox = s == null ? 0 : Mathf.RoundToInt((startX - t.XMin) / cs), oz = s == null ? 0 : Mathf.RoundToInt((startZ - t.ZMin) / cs);
-            bool editable = s != null && Mathf.Approximately(t.Step, cs) && ox >= 0 && oz >= 0 &&
+            var smp = t.Samples;
+            int ox = smp == null ? 0 : Mathf.RoundToInt((startX - t.XMin) / cs), oz = smp == null ? 0 : Mathf.RoundToInt((startZ - t.ZMin) / cs);
+            bool editable = smp != null && Mathf.Approximately(t.Step, cs) && ox >= 0 && oz >= 0 &&
                             Mathf.Abs(t.XMin + ox * cs - startX) < 0.01f && Mathf.Abs(t.ZMin + oz * cs - startZ) < 0.01f;
 
             var blocks = new List<(int bx, int bz, int n)>();
@@ -90,15 +116,64 @@ namespace LeGamez.Editor.OsmImport
                     if (!fine[bz * nbx + bx]) partial.Add((bx, bz));
             }
 
-            foreach (var (bx, bz, n) in blocks) Emit(sink, t, color, bx * Fine, bz * Fine, n * Fine);
+            foreach (var (bx, bz, n) in blocks) Emit(sink, t, bx * Fine, bz * Fine, n * Fine);
             foreach (var (bx, bz) in partial)
                 for (int iz = bz * Fine; iz < Mathf.Min((bz + 1) * Fine, ncz); iz++)
                 for (int ix = bx * Fine; ix < Mathf.Min((bx + 1) * Fine, ncx); ix++)
-                    Emit(sink, t, color, ix, iz, 1);
+                    Emit(sink, t, ix, iz, 1);
             Blocks = blocks.Count + partial.Count;
-            cover = null;
+            ForestTrees(sink);
+            nodeClass = null;
             fine = null;
         }
+
+        // ------------------------------------------------------------------ classes
+
+        /// <summary>Class scores at a point (grass, field, forest, lake) and the winning class.</summary>
+        static byte Classify(float x, float z, float[] s)
+        {
+            var mask = AreaMask.Current;
+            // Forest / lake share of a 3×3 neighbourhood of the 10 m mask: diagonal, not stepped, borders.
+            int forest = 0, lake = 0;
+            for (int a = -1; a <= 1; a++)
+            for (int b = -1; b <= 1; b++)
+            {
+                float px = x + a * 8f, pz = z + b * 8f;
+                if (mask.IsForest(px, pz)) forest++;
+                else if (mask.IsLake(px, pz)) lake++;
+            }
+            float f = forest / 9f, l = lake / 9f, open = Mathf.Max(0f, 1f - f - l);
+            var aerial = AerialImage.Current;
+            float bare = aerial != null ? aerial.FieldScore(x, z) : 0f;
+            s[Grass] = open * (1f - bare); s[Field] = open * bare; s[Forest] = f; s[Lake] = l;
+            byte best = 0;
+            for (byte c = 1; c < 4; c++) if (s[c] > s[best]) best = c;
+            return best;
+        }
+
+        /// <summary>All colour nodes of an even-aligned square (incl. its border) share one class.</summary>
+        static bool NodesUniform(int ix, int iz, int n, out byte c)
+        {
+            int i0 = ix / Node, k0 = iz / Node, i1 = Mathf.Min((ix + n) / Node, nnx - 1), k1 = Mathf.Min((iz + n) / Node, nnz - 1);
+            c = nodeClass[k0 * nnx + i0];
+            for (int k = k0; k <= k1; k++)
+            for (int i = i0; i <= i1; i++)
+                if (nodeClass[k * nnx + i] != c) return false;
+            return true;
+        }
+
+        static Color32 ClassColour(byte c, Vector3 p)
+        {
+            Color32 col;
+            var aerial = AerialImage.Current;
+            if (c == Forest) col = WorldStyle.Forest;
+            else if (c == Lake) col = WorldStyle.Water;
+            else if (aerial != null) col = aerial.ColorAt(c == Field ? AerialImage.Cover.Field : AerialImage.Cover.Grass, p.x, p.z, baseColor);
+            else col = c == Field ? AerialImage.FieldColor : baseColor;
+            return Shade(col, p);
+        }
+
+        // ------------------------------------------------------------------ heights
 
         /// <summary>Heights on the 40 m grid: mean of ±20 m (corners of detailed blocks keep their exact height).</summary>
         static float[] SmoothedGrid(TerrainField t, int ox, int oz)
@@ -156,7 +231,7 @@ namespace LeGamez.Editor.OsmImport
             for (int i = bx; whole && i < bx + n; i++)
             for (int k = bz; whole && k < bz + n; k++)
                 whole = !fine[k * nbx + i] && Whole(t, ox, oz, editable, i, k);
-            if (whole && Planar(grid, bx, bz, n) && Uniform(bx * Fine, bz * Fine, n * Fine, out _))
+            if (whole && Planar(grid, bx, bz, n)) // colour borders: Emit splits further
             {
                 blocks.Add((bx, bz, n));
                 if (editable)
@@ -196,16 +271,24 @@ namespace LeGamez.Editor.OsmImport
             }
         }
 
-        /// <summary>Two triangles per block; split (down to <see cref="MinCover"/> cells) where the ground cover changes.</summary>
-        static void Emit(MeshSink sink, TerrainField t, Color32 color, int ix, int iz, int n)
+        // ------------------------------------------------------------------ mesh
+
+        /// <summary>
+        /// Two triangles per block of one class; mixed blocks are split down to the 20 m node squares, whose triangles
+        /// are cut along the class borders.
+        /// </summary>
+        static void Emit(MeshSink sink, TerrainField t, int ix, int iz, int n)
         {
-            if (n > MinCover && !Uniform(ix, iz, n, out _))
+            bool aligned = n >= Node && ix % Node == 0 && iz % Node == 0;
+            byte c = 0;
+            bool uniform = aligned && NodesUniform(ix, iz, n, out c);
+            if (aligned && !uniform && n > Node)
             {
                 int h = n / 2;
-                Emit(sink, t, color, ix, iz, h);
-                Emit(sink, t, color, ix + h, iz, h);
-                Emit(sink, t, color, ix, iz + h, h);
-                Emit(sink, t, color, ix + h, iz + h, h);
+                Emit(sink, t, ix, iz, h);
+                Emit(sink, t, ix + h, iz, h);
+                Emit(sink, t, ix, iz + h, h);
+                Emit(sink, t, ix + h, iz + h, h);
                 return;
             }
             float cs = TerrainField.CellSize;
@@ -213,48 +296,141 @@ namespace LeGamez.Editor.OsmImport
             Vector3 p00 = new Vector3(x0, t.Raw(x0, z0), z0), p10 = new Vector3(x1, t.Raw(x1, z0), z0);
             Vector3 p01 = new Vector3(x0, t.Raw(x0, z1), z1), p11 = new Vector3(x1, t.Raw(x1, z1), z1);
             var batch = sink.Get(WorldStyle.MatTerrain, new Vector2(x0, z0));
-            Color32 cu, cl;
-            if (n == 1)
+            if (uniform)
             {
-                byte v = cover[iz * ncx + ix];
-                cu = Colour((byte)(v >> 4), color); cl = Colour((byte)(v & 15), color);
+                Tri3(batch, p00, p01, p11, ClassColour(c, p00), ClassColour(c, p01), ClassColour(c, p11));
+                Tri3(batch, p00, p11, p10, ClassColour(c, p00), ClassColour(c, p11), ClassColour(c, p10));
+                Triangles += 2;
+                return;
             }
-            else
-            {
-                Uniform(ix, iz, n, out byte c);
-                cu = cl = Colour(c, color);
-            }
-            Tri3(batch, p00, p01, p11, Shade(cu, p00), Shade(cu, p01), Shade(cu, p11));
-            Tri3(batch, p00, p11, p10, Shade(cl, p00), Shade(cl, p11), Shade(cl, p10));
-            Triangles += 2;
+            March(batch, p00, p01, p11);
+            March(batch, p00, p11, p10);
         }
 
-        /// <summary>At least <see cref="Majority"/> of the cell halves share one cover (returned in <paramref name="c"/>).</summary>
-        static bool Uniform(int ix, int iz, int n, out byte c)
+        /// <summary>
+        /// One planar triangle (clockwise from above) cut into class regions: the border crosses each edge where the
+        /// two end classes' scores are equal (depends on the edge only, so neighbours agree); three classes meet in the centroid.
+        /// </summary>
+        static void March(MeshSink.Batch batch, Vector3 a, Vector3 b, Vector3 c)
         {
-            var votes = new int[7];
-            for (int k = iz; k < Mathf.Min(iz + n, ncz); k++)
-            for (int i = ix; i < Mathf.Min(ix + n, ncx); i++)
+            float[] sa = new float[4], sb = new float[4], sc = new float[4];
+            byte ka = NodeAt(a, sa), kb = NodeAt(b, sb), kc = NodeAt(c, sc);
+            if (ka == kb && kb == kc)
             {
-                byte v = cover[k * ncx + i];
-                votes[v & 15]++; votes[v >> 4]++;
+                Poly(batch, ka, a, b, c);
+                return;
             }
-            int best = 0, total = 0;
-            for (int j = 0; j < votes.Length; j++) { total += votes[j]; if (votes[j] > votes[best]) best = j; }
-            c = (byte)best;
-            return votes[best] >= total * Majority;
+            if (ka != kb && kb != kc && ka != kc)
+            {
+                Vector3 ab = Cut(a, b, sa, sb, ka, kb), bc = Cut(b, c, sb, sc, kb, kc), ca = Cut(c, a, sc, sa, kc, ka);
+                var g = (a + b + c) / 3f;
+                Poly(batch, ka, a, ab, g, ca);
+                Poly(batch, kb, b, bc, g, ab);
+                Poly(batch, kc, c, ca, g, bc);
+                return;
+            }
+            // Two corners agree: rotate so that the odd one is first (keeps the winding).
+            if (kb != ka && kb != kc) { (a, b, c) = (b, c, a); (sa, sb, sc) = (sb, sc, sa); (ka, kb, kc) = (kb, kc, ka); }
+            else if (kc != ka && kc != kb) { (a, b, c) = (c, a, b); (sa, sb, sc) = (sc, sa, sb); (ka, kb, kc) = (kc, ka, kb); }
+            Vector3 cab = Cut(a, b, sa, sb, ka, kb), cca = Cut(c, a, sc, sa, kc, ka);
+            Poly(batch, ka, a, cab, cca);
+            Poly(batch, kb, cab, b, c, cca);
         }
 
-        /// <summary>Bare field (ploughed / harvested): out in the country, "paving" and "sand" in the aerial image are soil.</summary>
-        static readonly Color32 Field = Color32.Lerp(WorldStyle.Grass, new Color32(150, 122, 90, 255), 0.65f);
-
-        static Color32 Colour(byte c, Color32 fallback)
+        /// <summary>Class of the colour node at a triangle corner (filtered) and its raw scores (for the cut position).</summary>
+        static byte NodeAt(Vector3 p, float[] s)
         {
-            if (c == Forest) return WorldStyle.Forest;
-            if (c == Lake) return WorldStyle.Water;
-            var cover = (AerialImage.Cover)c;
-            if (cover == AerialImage.Cover.Paving || cover == AerialImage.Cover.Sand || cover == AerialImage.Cover.Soil) return Field;
-            return AerialImage.CoverColor(cover, fallback);
+            byte raw = Classify(p.x, p.z, s);
+            float size = Node * TerrainField.CellSize;
+            int i = Mathf.RoundToInt((p.x - startX) / size), k = Mathf.RoundToInt((p.z - startZ) / size);
+            bool onNode = Mathf.Abs(startX + i * size - p.x) < 0.01f && Mathf.Abs(startZ + k * size - p.z) < 0.01f;
+            return onNode && i >= 0 && k >= 0 && i < nnx && k < nnz ? nodeClass[k * nnx + i] : raw; // margin cells: raw
+        }
+
+        static Vector3 Cut(Vector3 p, Vector3 q, float[] sp, float[] sq, byte kp, byte kq)
+        {
+            float dp = sp[kp] - sp[kq], dq = sq[kp] - sq[kq]; // ≥ 0 at p, ≤ 0 at q
+            float t = dp > 0f && dq < 0f ? dp / (dp - dq) : 0.5f; // filtered node against its scores: midway
+            return Vector3.LerpUnclamped(p, q, Mathf.Clamp(t, 0.08f, 0.92f));
+        }
+
+        /// <summary>Convex polygon (3–4 corners, clockwise from above) in one class, fanned from the first corner.</summary>
+        static void Poly(MeshSink.Batch batch, byte k, params Vector3[] v)
+        {
+            var col = new Color32[v.Length];
+            for (int i = 0; i < v.Length; i++) col[i] = ClassColour(k, v[i]);
+            for (int i = 1; i + 1 < v.Length; i++)
+            {
+                Tri3(batch, v[0], v[i], v[i + 1], col[0], col[i], col[i + 1]);
+                Triangles++;
+            }
+        }
+
+        // ------------------------------------------------------------------ forest edges
+
+        /// <summary>
+        /// Sparse instanced trees in forests within <see cref="TreeReach"/> of the detailed ground: dense along the forest
+        /// edge (what one sees from the road), thinner inside, fading out with distance. Own generator – the shared
+        /// sequence and all object ids stay unchanged; the trees are not editable objects.
+        /// </summary>
+        static void ForestTrees(MeshSink sink)
+        {
+            var mask = AreaMask.Current;
+            float cs = TerrainField.CellSize, size = Node * cs;
+            // Distance (m) to the nearest detailed block, chamfer over the 40 m blocks.
+            var dist = new float[nbx * nbz];
+            for (int j = 0; j < dist.Length; j++) dist[j] = fine[j] ? 0f : 1e9f;
+            float bs = Fine * cs, diag = bs * 1.41421f;
+            for (int pass = 0; pass < 2; pass++)
+            for (int bz0 = 0; bz0 < nbz; bz0++)
+            for (int bx0 = 0; bx0 < nbx; bx0++)
+            {
+                int bx = pass == 0 ? bx0 : nbx - 1 - bx0, bz = pass == 0 ? bz0 : nbz - 1 - bz0, d = pass == 0 ? -1 : 1;
+                float best = dist[bz * nbx + bx];
+                void Try(int x, int z, float add) { if (x >= 0 && z >= 0 && x < nbx && z < nbz) best = Mathf.Min(best, dist[z * nbx + x] + add); }
+                Try(bx + d, bz, bs); Try(bx, bz + d, bs); Try(bx + d, bz + d, diag); Try(bx - d, bz + d, diag);
+                dist[bz * nbx + bx] = best;
+            }
+
+            var rng = new System.Random(0x0F0E57);
+            for (int k = 0; k < nnz - 1; k++)
+            for (int i = 0; i < nnx - 1; i++)
+            {
+                int bx = i * Node / Fine, bz = k * Node / Fine;
+                if (bx >= nbx || bz >= nbz || fine[bz * nbx + bx]) continue;
+                float reach = dist[bz * nbx + bx] - bs * 0.5f; // block centre → roughly the cell
+                if (reach > TreeReach) continue;
+                float x0 = startX + i * size, z0 = startZ + k * size;
+                if (!mask.IsForest(x0 + size * 0.5f, z0 + size * 0.5f)) continue;
+                // Forest edge: a non-forest pixel within ~15 m.
+                bool edge = false;
+                for (int a = -1; a <= 1 && !edge; a++)
+                for (int b = -1; b <= 1 && !edge; b++)
+                    if ((a != 0 || b != 0) && !mask.IsForest(x0 + size * 0.5f + a * 15f, z0 + size * 0.5f + b * 15f)) edge = true;
+                // Per 20 m cell: a closed edge (~1 tree per 70 m²), a looser stand behind it, fading out with distance.
+                float expected = (edge ? 6f : 3.5f) * Mathf.Clamp01(1.2f - reach / TreeReach);
+                int count = (int)expected + (rng.NextDouble() < expected - (int)expected ? 1 : 0);
+                for (int n = 0; n < count; n++)
+                {
+                    var p = new Vector2(x0 + (float)rng.NextDouble() * size, z0 + (float)rng.NextDouble() * size);
+                    if (!mask.IsForest(p.x, p.y) || mask.Inside(p.x, p.y)) continue;
+                    float height = 13f + (float)rng.NextDouble() * 10f;
+                    bool conifer = rng.NextDouble() < 0.35;
+                    float crown = (conifer ? 3.2f : 4.4f) + (float)rng.NextDouble() * 2f; // broad: a closed edge, not a plantation
+                    var leaves = WorldStyle.Tint(WorldStyle.TreeLeaves, rng, 0.14f);
+                    var local = new System.Random(rng.Next());
+                    PropPlacer.TreeMesh(sink, p, height, crown, conifer ? 0.3f : 0.4f, conifer, (float)rng.NextDouble() * Mathf.PI * 2f, leaves, local);
+                    Trees++;
+                }
+            }
+        }
+
+        /// <summary>All terrain triangles in the sink (detailed + coarse), for the import log.</summary>
+        public static int TerrainTriangles(MeshSink sink)
+        {
+            int n = 0;
+            foreach (var kv in sink.Batches) if (kv.Key.mat == WorldStyle.MatTerrain) n += kv.Value.triangles.Count / 3;
+            return n;
         }
 
         /// <summary>Same soft colour variation as the detailed ground (GroundBuilder.Shade with Perlin noise).</summary>
