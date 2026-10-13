@@ -254,6 +254,18 @@ namespace LeGamez.World
             }
         }
 
+        /// <summary>Editor tools: only the tiles within <paramref name="radius"/> (views into very large areas).</summary>
+        public void LoadAroundInEditor(Vector3 p, float radius)
+        {
+            UnloadAllInEditor();
+            foreach (var k in tileKeys)
+            {
+                if (Distance(k, p) > radius) continue;
+                var t = UnityEditor.AssetDatabase.LoadAssetAtPath<WorldTile>(EditorTilePath(areaId, k));
+                if (t != null) slots[k] = new Slot { tile = t, root = Build(t, transform, HideFlags.DontSave) };
+            }
+        }
+
         public void UnloadAllInEditor()
         {
             foreach (var s in slots.Values) if (s.root != null) DestroyImmediate(s.root);

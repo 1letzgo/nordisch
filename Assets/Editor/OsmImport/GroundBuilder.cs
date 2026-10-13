@@ -353,7 +353,10 @@ namespace LeGamez.Editor.OsmImport
             var aerial = AerialImage.Current;
             for (int bx = 0; bx < nx; bx += MaxBlock)
             for (int bz = 0; bz < nz; bz += MaxBlock)
+            {
+                if (!AreaMask.FineTerrain(startX + bx * cs, startZ + bz * cs, MaxBlock * cs)) continue; // CoarseTerrain
                 Block(sink, t, aerial, color, startX, startZ, bx, bz, MaxBlock, nx, nz);
+            }
         }
 
         static void Block(MeshSink sink, TerrainField t, AerialImage aerial, Color32 color, float startX, float startZ,

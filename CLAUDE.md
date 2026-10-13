@@ -54,6 +54,21 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    Braun, Moos, Solar, Flachdach Bitumen/Kies/grün; `buildings.json`-Overrides und OSM `roof:colour` gehen vor) und
    **Bodenbedeckung** je Geländedreieck (Rasen/Pflaster/Sand/Erde; unter LiDAR-Kronen entscheidet die Umgebung).
    Mit Luftbild entfallen die flächigen OSM-Flächen residential/commercial/retail/industrial, damit Gärten/Höfe sichtbar werden.
+3e. **Große Gebiete (ganze Gemeinde) – Maske** (`Tools/osm/make_mask.py <id>`, vor allen anderen Fetchern):
+   `"mask"` im Gebiet (`boundary` = Gemeindename, `admin_level`, `settlement_buffer`, `road_buffer`, `roads` …) →
+   `Data/<id>.mask.png/.json` (10 m/px, oben = Norden; 255 Siedlung, 192 Straßenkorridor, 32 Wald außerhalb, 0 außen).
+   Siedlung = OSM-landuse residential/commercial/industrial/retail + Gebäudecluster (Einzelhöfe nicht), gepuffert, plus
+   Korridore entlang der Verbindungsstraßen, auf die Gemeindegrenze geschnitten; `include` = Rechtecke, die immer drin
+   sind (Westerstede: die alte Stadtkarte, damit Parks/Wälder im Kern bleiben). Fetcher holen LoD2/Bäume/Hecken/Flurstücke
+   nur innerhalb (`Tools/osm/area_mask.py`, STAC-Suchen blättern), OSM in 3-km-Kacheln nur wo Maske (Wasser/Bahn überall).
+   DGM (`"dgm_step": 5`, gzip „DGMQ“ uint16-cm) und DOP (`"dop_step": 2`, außerhalb 16-m-Blockmittel) decken das ganze Rechteck.
+   Importer: `AreaMask.Filter` wirft beim Laden alles außerhalb raus (Knoten, Häuser per Schwerpunkt, Linien werden an der
+   Maske geschnitten; Seen/Teiche, Flüsse, Kanäle + Bahn bleiben, Bäche/Gräben nur innen), auch LoD2/LiDAR/Flurstücke/
+   Hecken/Verkehrsknoten; Straßenlaternen nur in Siedlungen (Landstraßen sind unbeleuchtet). `CoarseTerrain` vereinfacht
+   das Höhenfeld außerhalb der 40-m-Detailblöcke (40-m-Raster geglättet, bis 160 m zusammengelegt, Samples durch die
+   Blockdreiecke ersetzt → Mesh = Feld, keine Risse) und baut dort nur große Dreiecke (Farbe aus Luftbild, Wald aus Maske);
+   `GroundBuilder.BuildBase` überspringt diese Blöcke. Ohne Maske ändert sich nichts. Ansichten einzelner Stellen ohne
+   alle Kacheln zu laden: `-executeMethod LeGamez.Editor.AreaViewSnapshot.Render -area <id> -views "name:x,z,yaw,höhe,neigung;…"`.
 4. **In Unity importieren** (baut alle Gebiete, Menü-Vorschaubilder, Minimap-Karten, Hauptmenü-Szene):
    ```bash
    /Applications/Unity/Hub/Editor/6000.3.26f1/Unity.app/Contents/MacOS/Unity -batchmode -quit -projectPath . -buildTarget iOS \

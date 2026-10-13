@@ -33,15 +33,41 @@ namespace LeGamez.Editor.OsmImport
             IsFlat = samples == null;
         }
 
+        /// <summary>Sample grid for in-place edits (<see cref="CoarseTerrain"/> simplifies the ground outside the area mask).</summary>
+        internal float[] Samples => samples;
+        internal int Nx => nx;
+        internal int Nz => nz;
+        internal float XMin => xMin;
+        internal float ZMin => zMin;
+        internal float Step => step;
+
         static TerrainField Flat() => new TerrainField(null, 0, 0, 0, 0, 1, 0);
 
         public static TerrainField Load(string path)
         {
             if (!File.Exists(path)) return Current = Flat();
-            using var br = new BinaryReader(File.OpenRead(path));
+            Stream stream = File.OpenRead(path);
+            if (stream.ReadByte() == 0x1f && stream.ReadByte() == 0x8b) // gzip (large areas, see fetch_dgm.py)
+            {
+                stream.Position = 0;
+                stream = new BufferedStream(new System.IO.Compression.GZipStream(stream, System.IO.Compression.CompressionMode.Decompress), 1 << 20);
+            }
+            else stream.Position = 0;
+            using var br = new BinaryReader(stream);
             int nx, nz;
             float xMin, zMin, step, baseH;
             var magic = br.ReadBytes(4);
+            if (magic[0] == 'D' && magic[1] == 'G' && magic[2] == 'M' && magic[3] == 'Q')
+            {
+                // Compact grid: same header, heights as uint16 centimetres.
+                nx = br.ReadInt32(); nz = br.ReadInt32();
+                xMin = br.ReadSingle(); zMin = br.ReadSingle();
+                step = br.ReadSingle(); baseH = br.ReadSingle();
+                var q = new float[nx * nz];
+                var bytes = br.ReadBytes(q.Length * 2);
+                for (int i = 0; i < q.Length; i++) q[i] = (bytes[2 * i] | bytes[2 * i + 1] << 8) * 0.01f;
+                return Current = new TerrainField(q, nx, nz, xMin, zMin, step, baseH);
+            }
             if (magic[0] == 'D' && magic[1] == 'G' && magic[2] == 'M' && magic[3] == '2')
             {
                 // Rectangular grid (current format).

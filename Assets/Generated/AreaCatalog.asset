@@ -36,7 +36,7 @@ MonoBehaviour:
     sceneName: Westerstede
     lat: 53.257
     lon: 7.9275
-    poiCount: 21
+    poiCount: 30
     vehicles:
     - bicycle
     - car

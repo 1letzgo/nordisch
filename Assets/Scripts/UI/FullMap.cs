@@ -18,7 +18,8 @@ namespace LeGamez.UI
     /// </summary>
     public class FullMap : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
-        const float MaxZoom = 6f;
+        /// <summary>6× for town maps; whole municipalities (20 km) zoom further, down to ~1.3 km across.</summary>
+        float MaxZoom => area != null ? Mathf.Clamp(Mathf.Max(area.MapSize.x, area.MapSize.y) / 1300f, 6f, 16f) : 6f;
         float zoom = 1f;
         bool gesture;          // pinch or drag in progress / just ended: the release is not a tap
         float pinchStartDist, pinchStartZoom;

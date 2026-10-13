@@ -36,6 +36,12 @@ Details zu jedem Baustein stehen in `CLAUDE.md` (Abschnitt „Wie eine Karte ent
 Bestehende Karte vergrößern/verschieben: nur `extent`/`size_m`/Mittelpunkt ändern und alle Schritte ab 2 neu laufen
 lassen. Gespeicherte Spielerposition verfällt dabei automatisch (Schlüssel enthält Größe + Zentrum).
 
+**Ganze Gemeinde / Dörfer + Verbindungsstraßen** (Beispiel Westerstede, ~18 × 21 km): Rechteck = Gemeinde-Bbox, dazu
+`"dgm_step": 5`, `"dop_step": 2` und `"mask": {"boundary": "<Gemeinde>", "admin_level": 8, "settlement_buffer": 50,
+"road_buffer": 35, "roads": [...]}`. Dann **zuerst** `python3 Tools/osm/make_mask.py <id>` (gibt die Maskenfläche in km²
+aus; Vorschau der PNG ansehen: Dörfer drin, Einzelhöfe/Felder draußen?) – alle Fetcher und der Importer richten sich danach
+(siehe CLAUDE.md 3e). Faustregel Aufwand: Dreiecke ≈ Gebäude in der Maske × ~350; Importer hält alles im RAM.
+
 ## 2. Daten holen (Reihenfolge wichtig: Bäume brauchen LoD2 als Gebäudemaske)
 
 ```bash
