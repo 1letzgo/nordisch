@@ -71,6 +71,26 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    Blockdreiecke ersetzt → Mesh = Feld, keine Risse) und baut dort nur große Dreiecke (Farbe aus Luftbild, Wald aus Maske);
    `GroundBuilder.BuildBase` überspringt diese Blöcke. Ohne Maske ändert sich nichts. Ansichten einzelner Stellen ohne
    alle Kacheln zu laden: `-executeMethod LeGamez.Editor.AreaViewSnapshot.Render -area <id> -views "name:x,z,yaw,höhe,neigung;…"`.
+3f. **Autobahn + zweite Stadt im selben Gebiet** (Westerstede: A28 bis Oldenburg, Gebiet bis 20,4 km Ost / 14,2 km Süd;
+   Gebiete haben je ein eigenes Koordinatensystem, deshalb ein Gebiet statt zwei verbundener Karten). In `"mask"`:
+   `"motorway": {"refs": ["A 28"], "clip": [x0,x1,z0,z1], "corridor": 45, "landscape": 220, "strip": 25}` → Autobahn
+   (+ Rampen nahe dran) als **176** = Autobahnkorridor (feines Gelände, Straßen, Bäume, keine Häuser/Gärten/Möbel), Straßen,
+   die ihn kreuzen/anbinden, als 25-m-Streifen derselben Stufe, beidseitig **160** = Landschaftsband (grobes Gelände, aber
+   Straßen, Wasser, Zäune, LiDAR-Bäume); `"extra": [[x0,x1,z0,z1], …]` = Siedlungsrechtecke außerhalb der Gemeinde
+   (Oldenburg: Dreieck Oldenburg-West → Haarentor → Innenstadt, 3,4 km²). Stufen: ≥ 128 Straßen/Bäume (`AreaMask.Inside`),
+   ≥ 176 feines Gelände (`FineTerrain`, DOP in voller Auflösung), ≥ 192 Häuser/LoD2/Flurstücke/Hecken/Flächen/Knoten
+   (`AreaMask.Detail`, `area_mask.AreaMask.load(id, detail=True)`). **Gebiet vergrößern ohne alles neu zu holen**: alte
+   Maske nach `Data/<id>.old.mask.png/.json` kopieren, `make_mask.py <id> --keep-old` (alte Pixel bleiben exakt →
+   Objekt-IDs/Edits stabil), `fetch_area.py <id> --add` (nur 3-km-Kacheln mit neuen Maskenpixeln, alte Elemente bleiben
+   unverändert), `fetch_dgm.py/fetch_dop.py <id> --reuse` (vorhandene Raster übernehmen, nur fehlende Kacheln laden);
+   LoD2/Bäume/Flurstücke/Hecken über ein temporäres Gebiet `<id>_add` mit Maske = nur neue Teile holen und hinten anhängen
+   (Reihenfolge der alten Einträge bleibt → gleiche Zufallszüge). Importer: `BridgeBuilder` (Brücken mit Lücke darunter
+   ≥ 1,8 m: Fahrbahnplatte zwischen den Endhöhen, Kappen, Brüstung, Pfeiler wo unten nichts fährt; Kollider, nicht
+   drapiert – das DGM hat keine Brücken), `MotorwayBuilder` (Rand-/Leitlinien, Standstreifen, Schutzplanken beidseitig mit
+   Lücken an Rampen), `TrafficBuilder.Motorway` (blaue Vorwegweiser 500 m vor jeder Ausfahrt mit Nummer/Name/`destination`
+   der Rampe, „Ausfahrt“-Schild; `motorway_junction` aus traffic.json). Rampen haben Rang 3 (Vorfahrt achten am Ende),
+   an Autobahn-Ein-/Ausfädelungen keine Schilder. Straßenindex: Autobahn heißt nach `ref` („A 28“), Rampen
+   „Anschlussstelle“; `StreetIndex.fast` markiert sie → Auto bis 130 km/h (`Car.MotorwaySpeed`, sonst 90).
 4. **In Unity importieren** (baut alle Gebiete, Menü-Vorschaubilder, Minimap-Karten, Hauptmenü-Szene):
    ```bash
    /Applications/Unity/Hub/Editor/6000.3.26f1/Unity.app/Contents/MacOS/Unity -batchmode -quit -projectPath . -buildTarget iOS \
@@ -99,7 +119,9 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
   Export: `Editor/MapExport` (`-executeMethod LeGamez.Editor.MapExport.ExportBatch [-areas a,b]`) → `Builds/Maps/<id>/`
   + `Builds/Maps/index.json`. Vorher: Format 5 = eine Datei pro Region, Formate 1–4 = AssetBundles.
 - **Starten**: Startpunkt antippen (`MapStore.Start`) → nur `area.bin` holen/auffrischen, Welt-Szene, Ladebildschirm
-  wartet auf die Kacheln um den Start (~1–3 MB). Weitere Kacheln, sobald der Streamer sie braucht, plus Vorladen bis 1,1 km.
+  wartet auf die Kacheln um den Start (~1–3 MB). Weitere Kacheln, sobald der Streamer sie braucht, plus Vorladen bis 1,1 km (in Fahrt ab 10 m/s um den Punkt 15 s voraus, alle 0,1 s, bis 6 Anfragen;
+  der Streamer sortiert ab 5 m/s nach Abstand zu einem Punkt 4 s voraus). Fahrzeuge bremsen auf 5 m/s, solange die Kachel
+  unter oder vor ihnen (3 s) noch nicht in der Szene ist (`WorldStreamer.Ready`, `VehicleSteering.speedLimit`).
   Cache = LRU (`MapStore.CacheLimit` 1 GB). Offline: gecachte Kacheln, fehlende werden nach 20 s erneut versucht.
 - **Startpunkte im Katalog**: `index.json` je Karte `starts[]` = {name, x, z, yaw, thumb (lokaler Pfad, leer = Kartenbild)}
   (`MapStore.Entry.starts`, eine Menükarte je Start; fehlt das Feld → ein Start mit Kartennamen) und `start[]` = Regionen

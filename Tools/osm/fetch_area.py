@@ -4,6 +4,9 @@
 Usage:
     python3 Tools/osm/fetch_area.py            # all areas
     python3 Tools/osm/fetch_area.py oldenburg  # single area
+    python3 Tools/osm/fetch_area.py westerstede --add   # grown area: keep Data/<id>.osm.json, fetch only the 3 km
+                                                        # tiles touching the part of the mask that is new compared
+                                                        # to Data/<id>.old.mask.png (the previous mask, copied there)
 
 Writes Data/<id>.osm.json (Overpass JSON with geometry inlined).
 Data (c) OpenStreetMap contributors, ODbL.
@@ -18,6 +21,8 @@ import urllib.request
 from pathlib import Path
 
 from area_bounds import latlon_bbox, local_bounds
+import numpy as np
+
 from area_mask import AreaMask
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -158,9 +163,10 @@ out geom tags;
 """
 
 
-def fetch_tiled(area, mask):
+def fetch_tiled(area, mask, add=False):
     """Large masked areas: the full query only for 3 km tiles touching the mask (one query for 20 km times out),
-    water and railways for the whole rectangle. Merged in Overpass order (nodes, ways, relations; by id)."""
+    water and railways for the whole rectangle. Merged in Overpass order (nodes, ways, relations; by id).
+    add: start from the existing file and fetch only tiles touching mask pixels the old mask didn't have."""
     x0, x1, z0, z1 = local_bounds(area)
     lat0, lon0 = area["lat"], area["lon"]
     m_lat, m_lon = 110574.0, 111320.0 * math.cos(math.radians(lat0))
@@ -169,6 +175,15 @@ def fetch_tiled(area, mask):
     zs = [z0 + i * TILE_M for i in range(int(math.ceil((z1 - z0) / TILE_M)) + 1)]
     tiles = [(xa, min(xa + TILE_M, x1), za, min(za + TILE_M, z1)) for xa in xs[:-1] for za in zs[:-1]]
     tiles = [t for t in tiles if mask.any_in_rect(*t, 50)]
+    if add:
+        old = AreaMask.load(area["id"] + ".old")
+        if old is None:
+            raise SystemExit(f"--add needs Data/{area['id']}.old.mask.png/.json (the previous mask)")
+        for el in json.loads((OUT_DIR / f"{area['id']}.osm.json").read_text())["elements"]:
+            merged[(el["type"], el["id"])] = el
+        n0 = len(tiles)
+        tiles = [t for t in tiles if new_in_rect(mask, old, *t, 50)]
+        print(f"  --add: {len(merged)} elements from the existing file, {len(tiles)} of {n0} tiles to fetch", flush=True)
     if "--reverse" in sys.argv:  # a second process from the other end shares the tile cache
         tiles.reverse()
     for a in sys.argv:
@@ -185,7 +200,7 @@ def fetch_tiled(area, mask):
             res = fetch(build_query(s, w, n, e))
             cache.write_text(json.dumps(res))
         for el in res["elements"]:
-            merged[(el["type"], el["id"])] = el
+            merged.setdefault((el["type"], el["id"]), el)  # --add: existing elements stay as they were
         print(f"    tile {i + 1}/{len(tiles)}: {len(res['elements'])} elements, {len(merged)} total", flush=True)
         time.sleep(1)
     s, w, n, e = latlon_bbox(area)
@@ -196,6 +211,14 @@ def fetch_tiled(area, mask):
     out = dict(res)
     out["elements"] = [merged[k] for k in sorted(merged, key=lambda k: (rank.get(k[0], 3), k[1]))]
     return out
+
+
+def new_in_rect(mask, old, x0, x1, z0, z1, margin):
+    """Some pixel of the rectangle is inside the new mask but was outside the old one."""
+    xs = np.arange(x0 - margin, x1 + margin, mask.step / 2)
+    zs = np.arange(z0 - margin, z1 + margin, mask.step / 2)
+    X, Z = np.meshgrid(xs, zs)
+    return bool((mask.inside(X, Z) & ~old.inside(X, Z)).any())
 
 
 def main(argv):
@@ -209,7 +232,7 @@ def main(argv):
         print(f"[{a['id']}] bbox {s:.5f},{w:.5f},{n:.5f},{e:.5f} …", flush=True)
         mask = AreaMask.load(a["id"])
         if mask is not None:
-            result = fetch_tiled(a, mask)
+            result = fetch_tiled(a, mask, "--add" in argv)
             prefilter(result, a, mask)
         else:
             result = fetch(build_query(s, w, n, e))

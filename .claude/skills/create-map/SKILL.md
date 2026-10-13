@@ -42,6 +42,16 @@ lassen. Gespeicherte Spielerposition verfällt dabei automatisch (Schlüssel ent
 aus; Vorschau der PNG ansehen: Dörfer drin, Einzelhöfe/Felder draußen?) – alle Fetcher und der Importer richten sich danach
 (siehe CLAUDE.md 3e). Faustregel Aufwand: Dreiecke ≈ Gebäude in der Maske × ~350; Importer hält alles im RAM.
 
+**Zwei Orte verbinden (Autobahn/Landstraße + Landschaft)** – nie zwei Gebiete, sondern ein Gebiet vergrößern (eigene
+Koordinatensysteme!), Beispiel Westerstede → A28 → Oldenburg (CLAUDE.md 3f): `extent` erweitern (Nord/West-Kante
+unverändert lassen, sonst passt `--keep-old` nicht), in `"mask"` `"motorway"` (refs, clip, corridor/landscape/strip)
+und `"extra"`-Rechtecke für die andere Stadt, `"starts"` um den zweiten Startpunkt ergänzen, ggf. `car_spots` dort.
+Ablauf: alte Maske nach `Data/<id>.old.mask.*` kopieren → `make_mask.py <id> --keep-old` → `fetch_area.py <id> --add`,
+`fetch_traffic.py <id>`, `fetch_dgm.py/fetch_dop.py <id> --reuse` → LoD2/Bäume/Flurstücke/Hecken über ein temporäres
+Gebiet `<id>_add` (Maske = nur neue Pixel) holen und an die alten Listen **hinten anhängen** → Import → Import-Log auf
+nicht passende Edits prüfen → Temp-Dateien (`<id>_add.*`, `<id>.old.mask.*`, temporärer areas.json-Eintrag) löschen.
+Prüfen: Auffahrt, Fahrersicht, Brücken (Fahrbahnplatte, keine Bäume darauf), Ausfahrt-Schilder, Übergang Maske → Landschaft.
+
 ## 2. Daten holen (Reihenfolge wichtig: Bäume brauchen LoD2 als Gebäudemaske)
 
 ```bash

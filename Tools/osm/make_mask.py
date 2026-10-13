@@ -267,7 +267,7 @@ def add_motorway(r, area, cfg, out, refresh):
     free = out < 128
     out[free & band] = LANDSCAPE
     out[free & (corridor | strip)] = MOTORWAY
-    return km / 2  # both carriageways are mapped
+    return motorway.sum() * step / 1000 / 2  # ~km inside clip; both carriageways are mapped
 
 
 def process_area(area, refresh, keep_old=False):

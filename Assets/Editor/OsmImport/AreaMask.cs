@@ -9,7 +9,9 @@ namespace LeGamez.Editor.OsmImport
     /// corridors along the roads between them. Everything outside is only terrain (<see cref="CoarseTerrain"/>), water
     /// and railways – no houses, trees, gardens, props or roads. Areas without a mask file are built everywhere
     /// (<see cref="Current"/> is null).
-    /// Pixel values: 0 outside, 32 outside + forest, 64 outside + lake, 192 road corridor, 255 settlement (≥ 128 = inside); top row = north.
+    /// Pixel values: 0 outside, 32 outside + forest, 64 outside + lake, 160 landscape band along a motorway (coarse terrain,
+    /// but roads, water, barriers, LiDAR trees), 176 motorway corridor (same with detailed terrain), 192 road corridor,
+    /// 255 settlement (≥ 128 = inside; houses, areas and mapped objects only ≥ 192 = <see cref="Detail"/>); top row = north.
     /// </summary>
     public class AreaMask
     {
@@ -53,18 +55,24 @@ namespace LeGamez.Editor.OsmImport
 
         public bool Inside(float x, float z) => Value(x, z) >= 128;
         public bool Inside(Vector2 p) => Value(p.x, p.y) >= 128;
+        /// <summary>Settlement or road corridor: houses, gardens, landuse areas, furniture (not in the motorway's landscape).</summary>
+        public bool Detail(float x, float z) => Value(x, z) >= 192;
+        public bool Detail(Vector2 p) => Value(p.x, p.y) >= 192;
+        public const byte FineLevel = 176;
         public bool IsForest(float x, float z) => Value(x, z) == 32;
         public bool IsLake(float x, float z) => Value(x, z) == 64;
 
         /// <summary>No mask, or the point is inside: the builders may place things here.</summary>
         public static bool Allows(Vector2 p) => Current == null || Current.Inside(p);
         public static bool Allows(float x, float z) => Current == null || Current.Inside(x, z);
+        /// <summary>No mask, or houses are built here (settlements and road corridors).</summary>
+        public static bool AllowsDetail(float x, float z) => Current == null || Current.Detail(x, z);
 
         /// <summary>Generated street lamps: in settlements only – the country roads between the villages are unlit.</summary>
         public static bool LitStreet(Vector2 p) => Current == null || Current.Value(p.x, p.y) == 255;
 
         /// <summary>Any inside pixel touches the square [x0, x0+size]² grown by <paramref name="margin"/>.</summary>
-        public bool AnyInside(float x0, float z0, float size, float margin)
+        public bool AnyInside(float x0, float z0, float size, float margin, byte level = 128)
         {
             int c0 = Mathf.Max(0, Mathf.FloorToInt((x0 - margin - xMin) / step));
             int c1 = Mathf.Min(w - 1, Mathf.FloorToInt((x0 + size + margin - xMin) / step));
@@ -72,7 +80,7 @@ namespace LeGamez.Editor.OsmImport
             int r1 = Mathf.Min(h - 1, Mathf.FloorToInt((zMax - (z0 - margin)) / step));
             for (int r = r0; r <= r1; r++)
             for (int c = c0; c <= c1; c++)
-                if (px[r * w + c] >= 128) return true;
+                if (px[r * w + c] >= level) return true;
             return false;
         }
 
@@ -80,7 +88,7 @@ namespace LeGamez.Editor.OsmImport
         /// Terrain block that is built in full detail (<see cref="GroundBuilder.BuildBase"/>); all others are left to
         /// <see cref="CoarseTerrain"/>. 10 m margin so nothing draped inside the mask reaches coarse ground.
         /// </summary>
-        public static bool FineTerrain(float x0, float z0, float size) => Current == null || Current.AnyInside(x0, z0, size, 10f);
+        public static bool FineTerrain(float x0, float z0, float size) => Current == null || Current.AnyInside(x0, z0, size, 10f, FineLevel);
 
         // ------------------------------------------------------------------ OSM filter
 
@@ -105,7 +113,7 @@ namespace LeGamez.Editor.OsmImport
         public FilterStats Filter(OsmData data)
         {
             var st = new FilterStats();
-            st.nodes = data.nodes.RemoveAll(n => !Inside(data.projection.ToLocal(n.lat, n.lon)));
+            st.nodes = data.nodes.RemoveAll(n => !Detail(data.projection.ToLocal(n.lat, n.lon)));
             st.polygons = data.polygons.RemoveAll(p => !KeepPolygon(p));
             var ways = new List<OsmWay>(data.ways.Count);
             foreach (var way in data.ways)
@@ -132,10 +140,10 @@ namespace LeGamez.Editor.OsmImport
                 foreach (var q in p.outer) if (Inside(q)) return true;
                 return false;
             }
-            if (!Inside(GeoUtil.Centroid(p.outer))) return false;
+            if (!Detail(GeoUtil.Centroid(p.outer))) return false;
             if (p.tags.Has("building") || p.tags.Has("building:part")) return true;
             int inside = 0;
-            foreach (var q in p.outer) if (Inside(q)) inside++;
+            foreach (var q in p.outer) if (Detail(q)) inside++;
             return inside * 2 >= p.outer.Count;
         }
 

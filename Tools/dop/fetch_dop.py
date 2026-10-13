@@ -152,6 +152,8 @@ def process_area(area, reuse=False):
             with rasterio.open(href) as src:
                 b = src.bounds
                 inside = (E >= b.left) & (E < b.right) & (N > b.bottom) & (N <= b.top)
+                if have is not None:
+                    inside &= ~have[r0:r1, c0:c1]  # --reuse: pixels the previous image already has
                 if not inside.any():
                     continue
                 tw = int(round((b.right - b.left) / step))
@@ -160,8 +162,6 @@ def process_area(area, reuse=False):
             cols = np.clip(((E[inside] - b.left) / step).astype(int), 0, tw - 1)
             rows = np.clip(((b.top - N[inside]) / step).astype(int), 0, th - 1)
             win = out[r0:r1, c0:c1]
-            if have is not None:
-                inside &= ~have[r0:r1, c0:c1]
             for band in range(4):
                 win[..., band][inside] = img[band, rows, cols]
             dates.add(date)

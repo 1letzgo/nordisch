@@ -20,9 +20,9 @@ namespace LeGamez.Editor.OsmImport
     /// Poles and plates go into the Props bucket (lifted onto the terrain), markings into Ground (draped).
     /// Text (numbers, names) becomes TextMesh objects in <see cref="Spawn"/>.
     /// </summary>
-    public static class TrafficBuilder
+    public static partial class TrafficBuilder
     {
-        public struct Stats { public int junctionSignals, crossingSignals, heads, zebras, lanes, stops, giveWays, priority, speed, oneway, names, mapped; }
+        public struct Stats { public int junctionSignals, crossingSignals, heads, zebras, lanes, stops, giveWays, priority, speed, oneway, names, mapped, motorway; }
 
         class Road
         {
@@ -106,6 +106,8 @@ namespace LeGamez.Editor.OsmImport
                 r.link = w.tags.Get("highway").EndsWith("_link");
                 string ow = w.tags.Get("oneway");
                 r.oneway = ow == "yes" || ow == "1" || ow == "true" || r.roundabout && ow != "no" ? 1 : ow == "-1" ? -1 : 0;
+                // Motorways and their ramps are one-way unless tagged otherwise.
+                if (ow == null && (w.tags.Is("highway", "motorway") || w.tags.Is("highway", "motorway_link"))) r.oneway = 1;
                 ParseSpeed(w.tags, r);
                 roads.Add(r);
                 carriageways.AddLine(w.points, r.Hw);
@@ -219,6 +221,10 @@ namespace LeGamez.Editor.OsmImport
             foreach (var j in junctions)
             {
                 if (j.signal) continue;
+                // Ramps leaving or joining a motorway: lanes merge, no signs.
+                bool motorwayJunction = false;
+                foreach (var a in j.arms) motorwayJunction |= a.road.way.tags.Is("highway", "motorway");
+                if (motorwayJunction) continue;
                 int max = j.MaxRank();
                 bool anyControl = false;
                 foreach (var a in j.arms) anyControl |= a.control != null;
@@ -329,6 +335,8 @@ namespace LeGamez.Editor.OsmImport
                 if (MappedSign(roads, p, t, sign, data.meta.name)) st.mapped++;
             }
 
+            // ---- motorway exits
+            st.motorway = MotorwaySigns(roads, nodes);
             return st;
         }
 
@@ -357,7 +365,9 @@ namespace LeGamez.Editor.OsmImport
         {
             switch (hw)
             {
-                case "motorway": case "trunk": case "primary": case "motorway_link": case "trunk_link": case "primary_link": return 5;
+                case "motorway": case "trunk": case "primary": return 5;
+                // Ramps give way where they meet the road at their end (the motorway end merges, see above).
+                case "motorway_link": case "trunk_link": case "primary_link": return 3;
                 case "secondary": case "secondary_link": return 4;
                 case "tertiary": case "tertiary_link": return 3;
                 case "unclassified": case "residential": return 2;

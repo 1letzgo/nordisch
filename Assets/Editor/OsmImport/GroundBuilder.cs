@@ -96,7 +96,7 @@ namespace LeGamez.Editor.OsmImport
             {
                 if (way.tags.Is("area", "yes") || way.tags.Is("tunnel", "yes") || way.tags.Has("tunnel") && !way.tags.Is("tunnel", "no")) continue;
                 if (!TryLineStyle(way.tags, out var style)) continue;
-                if (!area.Overlaps(way.points, 20f)) continue;
+                if (!area.Overlaps(way.points, 20f) || BridgeBuilder.IsDeck(way)) continue; // decks: BridgeBuilder
                 Ribbon(sink, way.points, style, area);
                 if (style.marking) DashedLine(sink, way.points, area, style.y + 0.012f);
                 count++;
@@ -120,8 +120,9 @@ namespace LeGamez.Editor.OsmImport
                 if (way.tags.Is("area", "yes") || way.tags.Has("tunnel") && !way.tags.Is("tunnel", "no")) continue;
                 if (!TryLineStyle(way.tags, out var style) || !style.color.Equals(WorldStyle.Asphalt)) continue;
                 if (!area.Overlaps(way.points, 20f)) continue;
-                roads.Add((way, style));
                 carriageways.AddLine(way.points, style.width * 0.5f);
+                if (BridgeBuilder.IsDeck(way)) continue; // the deck has its own kerbs
+                roads.Add((way, style));
             }
             const float piece = 1.2f, band = 0.2f;
             foreach (var (way, style) in roads)

@@ -139,7 +139,10 @@ namespace LeGamez.Editor.OsmImport
             CoarseTerrain.Build(sink, area, WorldStyle.GroundColor(meta.ground), terrain); // before BuildBase: simplifies the field
             GroundBuilder.BuildBase(sink, area, WorldStyle.GroundColor(meta.ground), terrain);
             GroundBuilder.BuildAreas(data, sink, area);
+            int bridges = BridgeBuilder.Prepare(data, area, terrain); // decks instead of draped ribbons where there is a gap below
             int lines = GroundBuilder.BuildLines(data, sink, area);
+            BridgeBuilder.Build(data, sink, terrain);
+            var motorway = MotorwayBuilder.Build(data, sink, area); // lane markings, guard rails
             // Prefer official LGLN LoD2 buildings (real roof shapes); fall back to OSM extrusion.
             string lod2Path = Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".lod2.json");
             bool island = meta.ground == "sand";
@@ -206,7 +209,9 @@ namespace LeGamez.Editor.OsmImport
             d.areaId = meta.id;
             d.displayName = meta.name;
             d.projection = data.projection;
-            d.sizeMeters = Mathf.Max(area.Width, area.Height);
+            // Only part of AreaInfo.MemoryKey (saved positions, own start points). An area that grew around the same
+            // centre keeps its frame – "key_size" in areas.json keeps the old value, so nothing saved is lost.
+            d.sizeMeters = KeySize(meta.id) ?? Mathf.Max(area.Width, area.Height);
             d.boundsMin = new Vector2(area.xMin, area.zMin);
             d.boundsMax = new Vector2(area.xMax, area.zMax);
             d.allowedVehicles = new List<string>(meta.vehicles);
@@ -229,6 +234,7 @@ namespace LeGamez.Editor.OsmImport
             // Leave a preview of the area open (unsaved scene with all tiles) for snapshot tools.
             AreaPreview.Open(d);
 
+            Debug.Log($"[OSM] {meta.name}: motorway {motorway.carriageways} carriageway pieces/{motorway.ramps} ramps/{motorway.railKm:F1} km guard rail/{traffic.motorway} exit signs, {bridges} bridge decks");
             Debug.Log($"[OSM] {meta.name}: {buildings} buildings (+{osmExtra} OSM-only), {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, gardens {gardens.plots} plots/{gardens.measured} measured hedges/{gardens.hedges} hedges/{gardens.fences} fences/{gardens.walls} walls/{gardens.drawn} drawn, terrain {(terrain.IsFlat ? "flat" : "DGM1")}, aerial {(aerial != null ? "DOP20" : "-")}, trees {(lidarTrees != null ? "LiDAR" : "OSM")}, " +
                       $"furniture {furniture.mapped} mapped/{furniture.benches} benches/{furniture.planters} planters/{furniture.seating} café tables/{furniture.fountains} fountains, {edits} hand-placed/{EditsPlacer.ChangedCount} edited, " +
                       $"facade {FacadeRecords.Windows} windows/{FacadeRecords.Doors} doors/{FacadeRecords.Gutters} gutters/{FacadeRecords.Verges} verges/{FacadeRecords.Ridges} ridges, traffic {traffic.junctionSignals} signal junctions/{traffic.crossingSignals} signal crossings/{traffic.heads} heads/{traffic.zebras} zebras/{traffic.lanes} lanes/{traffic.stops} stop/{traffic.giveWays} give way/{traffic.priority} priority/{traffic.speed} speed/{traffic.oneway} one-way/{traffic.names} names/{traffic.mapped} mapped, {pois.Count} POIs, " +
@@ -518,6 +524,17 @@ namespace LeGamez.Editor.OsmImport
         /// Cars from "car_spots" ([{lat, lon}]) of this area in Tools/osm/areas.json – e.g. a house address.
         /// Each is moved to the edge of the nearest drivable street and lined up with it.
         /// </summary>
+        /// <summary>"key_size" of the area in Tools/osm/areas.json, if set.</summary>
+        static float? KeySize(string id)
+        {
+            string areasPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Tools", "osm", "areas.json"));
+            if (!File.Exists(areasPath)) return null;
+            var root = (Dictionary<string, object>)MiniJson.Parse(File.ReadAllText(areasPath));
+            foreach (Dictionary<string, object> a in (List<object>)root["areas"])
+                if ((string)a["id"] == id && a.TryGetValue("key_size", out var v)) return System.Convert.ToSingle(v);
+            return null;
+        }
+
         static List<Vector4> CarSpots(OsmData data, AreaRect area, TerrainField terrain)
         {
             var result = new List<Vector4>();

@@ -190,6 +190,14 @@ namespace LeGamez.Editor.OsmImport
                         h = Mathf.Min(h, 3f + r * 3f);
                     }
                     float yaw = (float)rng.NextDouble() * 360f;
+                    if (BridgeBuilder.Covers(p, 2f))
+                    {
+                        // The surface model sees bridge decks as tall "plants" over the road below: built into a
+                        // throwaway sink, so the shared random sequence (and every later object) stays the same.
+                        TreeSized(new MeshSink(), p, h, r, rng);
+                        dropped++;
+                        continue;
+                    }
                     EditsPlacer.Emit(sink, "tree", p, yaw, h / 8f, (s, q, y) => TreeSized(s, q, h, r, rng));
                     count++;
                 }
