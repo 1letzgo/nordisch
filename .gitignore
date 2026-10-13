@@ -42,3 +42,7 @@ mono_crash.*
 
 # Agent worktrees
 /.claude/worktrees/
+
+# Large rasters (aerial image, terrain) – re-create with Tools/dop/fetch_dop.py and Tools/dgm/fetch_dgm.py
+/Data/*.dop.png
+/Data/*.dgm.bin
