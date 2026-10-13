@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lod2"))
 from fetch_lod2 import LocalFrame, utm_to_latlon  # noqa: E402
 from area_bounds import latlon_bbox, local_bounds  # noqa: E402  (path added by fetch_lod2)
 from fetch_dgm import latlon_to_utm  # noqa: E402
+from area_mask import AreaMask, stac_items  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 AREAS_FILE = ROOT / "Tools" / "osm" / "areas.json"
@@ -44,11 +45,8 @@ BUILDING_BUFFER = 1.5   # m around LoD2 footprints
 
 
 def newest_tiles(collection, bbox):
-    url = STAC[collection] + f"?collections={collection}&limit=200&bbox=" + ",".join(f"{v:.6f}" for v in bbox)
-    with urllib.request.urlopen(url, timeout=60) as r:
-        feats = json.load(r)["features"]
     best = {}
-    for f in feats:
+    for f in stac_items(STAC[collection], bbox, collection):
         parts = f["id"].split("_")          # dom1_32_426_5900_1_ni_2021
         key = (int(parts[2]), int(parts[3]))
         year = int(parts[-1])
@@ -83,21 +81,26 @@ def building_rings(area_id):
     return rings
 
 
+_utm_cache = {}
+
+
 def rasterize_mask(rings, frame, e0, n0, shape):
     """Boolean building mask in tile pixel space (row = north→south), dilated by BUILDING_BUFFER."""
     from PIL import ImageDraw
+    if _utm_cache.get("rings") is not rings:
+        # UTM of every footprint once (vectorised), with bounds – large areas have tens of thousands of houses.
+        utm = []
+        for ring in rings:
+            r = np.asarray(ring, dtype=np.float64)
+            e, n = latlon_to_utm(frame.lat0 + r[:, 1] / frame.m_lat, frame.lon0 + r[:, 0] / frame.m_lon)
+            utm.append((np.stack([e, n], axis=1), e.min(), e.max(), n.min(), n.max()))
+        _utm_cache["rings"], _utm_cache["utm"] = rings, utm
     img = Image.new("L", (shape[1], shape[0]), 0)
     draw = ImageDraw.Draw(img)
-    lat0, lon0 = frame.lat0, frame.lon0
-    for ring in rings:
-        px = []
-        for x, z in ring:
-            lat = lat0 + z / frame.m_lat
-            lon = lon0 + x / frame.m_lon
-            e, n = latlon_to_utm(lat, lon)
-            px.append((e - e0, n0 - n))
-        if len(px) >= 3 and any(0 <= c < shape[1] + 50 and 0 <= r < shape[0] + 50 for c, r in px):
-            draw.polygon(px, fill=1)
+    for en, emin, emax, nmin, nmax in _utm_cache["utm"]:
+        if len(en) < 3 or emax < e0 - 50 or emin > e0 + shape[1] + 50 or nmin > n0 + 50 or nmax < n0 - shape[0] - 50:
+            continue
+        draw.polygon([(e - e0, n0 - n) for e, n in en], fill=1)
     mask = np.array(img, dtype=bool)
     if BUILDING_BUFFER > 0:
         mask = ndimage.binary_dilation(mask, iterations=int(round(BUILDING_BUFFER)))
@@ -127,6 +130,9 @@ def process_area(area):
     dom = newest_tiles("dom1", [w, s, e, n])
     dgm = newest_tiles("dgm1", [w, s, e, n])
     rings = building_rings(area["id"])
+    mask = AreaMask.load(area["id"])  # large areas: trees only inside the mask (make_mask.py)
+    if mask is not None:
+        dom = {k: v for k, v in dom.items() if mask.utm_tile_inside(k, frame, utm_to_latlon)}
     print(f"[{area['id']}] {len(dom)} DOM1 tiles, {len(rings)} building footprints", flush=True)
 
     trees = []
@@ -153,7 +159,7 @@ def process_area(area):
             utm_n = n0 - (r + 0.5) * px
             lat, lon = utm_to_latlon(utm_e, utm_n)
             x, z = frame.to_local(lat, lon)
-            if not (x0 <= x <= x1 and z0 <= z <= z1):
+            if not (x0 <= x <= x1 and z0 <= z <= z1) or (mask is not None and not mask.inside(x, z)):
                 continue
             h = float(ndom[r, c])
             trees.append([round(x, 1), round(z, 1), round(h, 1), round(crown_radius(smooth, r, c, h) * px, 1)])

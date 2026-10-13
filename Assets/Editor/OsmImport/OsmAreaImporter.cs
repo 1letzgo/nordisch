@@ -118,12 +118,17 @@ namespace LeGamez.Editor.OsmImport
             var area = meta.bounds;
             var rng = new System.Random(meta.id.GetHashCode());
 
+            // Large areas: only settlements + road corridors are built, the rest is coarse terrain (AreaMask, CoarseTerrain).
+            var mask = AreaMask.Load(Path.GetDirectoryName(jsonPath), meta.id);
+            var maskStats = mask?.Filter(data);
             var terrain = TerrainField.Load(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".dgm.bin"));
             var lidarTrees = PropPlacer.LoadLidarTrees(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".trees.json"));
+            if (mask != null && lidarTrees != null) lidarTrees = lidarTrees.FindAll(t => mask.Inside(t.x, t.y));
             var aerial = AerialImage.Load(Path.GetDirectoryName(jsonPath), meta.id);
             aerial?.SetCanopy(lidarTrees);
             var sink = new MeshSink();
             GroundBuilder.BuildBase(sink, area, WorldStyle.GroundColor(meta.ground), terrain);
+            CoarseTerrain.Build(sink, area, WorldStyle.GroundColor(meta.ground), terrain);
             GroundBuilder.BuildAreas(data, sink, area);
             int lines = GroundBuilder.BuildLines(data, sink, area);
             // Prefer official LGLN LoD2 buildings (real roof shapes); fall back to OSM extrusion.
@@ -232,6 +237,7 @@ namespace LeGamez.Editor.OsmImport
             Debug.Log($"[OSM] {meta.name}: {buildings} buildings (+{osmExtra} OSM-only), {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, gardens {gardens.plots} plots/{gardens.measured} measured hedges/{gardens.hedges} hedges/{gardens.fences} fences/{gardens.walls} walls/{gardens.drawn} drawn, terrain {(terrain.IsFlat ? "flat" : "DGM1")}, aerial {(aerial != null ? "DOP20" : "-")}, trees {(lidarTrees != null ? "LiDAR" : "OSM")}, " +
                       $"furniture {furniture.mapped} mapped/{furniture.benches} benches/{furniture.planters} planters/{furniture.seating} café tables/{furniture.fountains} fountains, {edits} hand-placed/{EditsPlacer.ChangedCount} edited, " +
                       $"facade {FacadeRecords.Windows} windows/{FacadeRecords.Doors} doors/{FacadeRecords.Gutters} gutters/{FacadeRecords.Verges} verges/{FacadeRecords.Ridges} ridges, traffic {traffic.junctionSignals} signal junctions/{traffic.crossingSignals} signal crossings/{traffic.heads} heads/{traffic.zebras} zebras/{traffic.lanes} lanes/{traffic.stops} stop/{traffic.giveWays} give way/{traffic.priority} priority/{traffic.speed} speed/{traffic.oneway} one-way/{traffic.names} names/{traffic.mapped} mapped, {pois.Count} POIs, " +
+                      $"{(maskStats.HasValue ? $"mask -{maskStats.Value.nodes} nodes/-{maskStats.Value.polygons} areas/-{maskStats.Value.ways} ways/{maskStats.Value.pieces} cut, {CoarseTerrain.Blocks} coarse terrain blocks, " : "")}" +
                       $"{sink.Batches.Count()} meshes in {sw.ElapsedMilliseconds} ms -> {scenePath}");
             return scenePath;
         }
@@ -269,6 +275,7 @@ namespace LeGamez.Editor.OsmImport
                     bool facadeData = style == WorldStyle.MatBuildings || style == WorldStyle.MatGround;
                     var mesh = MeshSink.ToMesh(kv.Value, $"{id}_{mat}_{chunk.x}_{chunk.y}", facadeData);
                     MeshUtility.Optimize(mesh);
+                    Release(kv.Value); // large areas: the geometry now lives in the mesh only
                     bool collider = WorldStyle.HasCollider(mat) || mat == WorldStyle.MatWater;
                     AssetDatabase.AddObjectToAsset(mesh, tile);
                     if (!collider)
@@ -299,6 +306,15 @@ namespace LeGamez.Editor.OsmImport
             var keys = tiles.Keys.ToList();
             keys.Sort((a, b) => a.x != b.x ? a.x.CompareTo(b.x) : a.y.CompareTo(b.y));
             return keys;
+        }
+
+        static void Release(MeshSink.Batch b)
+        {
+            b.vertices.Clear(); b.vertices.TrimExcess();
+            b.normals.Clear(); b.normals.TrimExcess();
+            b.colors.Clear(); b.colors.TrimExcess();
+            b.uvs.Clear(); b.uvs.TrimExcess();
+            b.triangles.Clear(); b.triangles.TrimExcess();
         }
 
         /// <summary>Named OSM streets/paths as segments (asset next to the meshes) for the HUD street display.</summary>

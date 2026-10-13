@@ -188,8 +188,9 @@ namespace LeGamez.Editor.OsmImport
         public bool IsPaved(Vector2 p, float radius = 0.8f)
         {
             int paved = 0, other = 0;
-            for (float dx = -radius; dx <= radius + 1e-3f; dx += step)
-            for (float dz = -radius; dz <= radius + 1e-3f; dz += step)
+            float d = step <= 1f ? step : Mathf.Max(radius, 0.1f); // coarse images (large areas): still 3×3 samples
+            for (float dx = -radius; dx <= radius + 1e-3f; dx += d)
+            for (float dz = -radius; dz <= radius + 1e-3f; dz += d)
             {
                 if (!TryPixel(p.x + dx, p.y + dz, out var c)) continue;
                 var k = Classify(c);

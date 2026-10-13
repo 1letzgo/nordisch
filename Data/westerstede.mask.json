@@ -1,0 +1,38 @@
+{
+ "xMin": -8910.0,
+ "zMin": -10210.0,
+ "step": 10.0,
+ "width": 1782,
+ "height": 2077,
+ "inside_km2": 32.97,
+ "settlement_km2": 27.44,
+ "corridor_km2": 5.53,
+ "road_km": 366.9,
+ "osm_buildings_inside": 12728,
+ "source": "OpenStreetMap (ODbL)",
+ "config": {
+  "admin_level": 8,
+  "step": 10,
+  "landuse": [
+   "residential",
+   "commercial",
+   "industrial",
+   "retail"
+  ],
+  "roads": [
+   "motorway",
+   "trunk",
+   "primary",
+   "secondary",
+   "tertiary",
+   "unclassified"
+  ],
+  "settlement_buffer": 50,
+  "road_buffer": 35,
+  "min_settlement": 15000,
+  "cluster_radius": 100,
+  "cluster_buildings": 12,
+  "fill_holes": 40000,
+  "boundary": "Westerstede"
+ }
+}

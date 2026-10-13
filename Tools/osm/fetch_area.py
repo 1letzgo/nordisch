@@ -17,6 +17,7 @@ import urllib.request
 from pathlib import Path
 
 from area_bounds import latlon_bbox, local_bounds
+from area_mask import AreaMask
 
 ROOT = Path(__file__).resolve().parents[2]
 AREAS_FILE = Path(__file__).with_name("areas.json")
@@ -40,7 +41,7 @@ def bbox(lat: float, lon: float, size_m: float):
 def build_query(s, w, n, e) -> str:
     b = f"{s:.6f},{w:.6f},{n:.6f},{e:.6f}"
     return f"""
-[out:json][timeout:120];
+[out:json][timeout:300];
 (
   way["building"]({b});
   relation["building"]["type"="multipolygon"]({b});
@@ -81,16 +82,104 @@ out geom tags;
 def fetch(query: str) -> dict:
     data = urllib.parse.urlencode({"data": query}).encode()
     last_err = None
-    for url in ENDPOINTS:
+    for url in ENDPOINTS * 2:
         for attempt in range(2):
             try:
                 req = urllib.request.Request(url, data=data, headers={"User-Agent": USER_AGENT})
-                with urllib.request.urlopen(req, timeout=180) as r:
+                with urllib.request.urlopen(req, timeout=360) as r:
                     return json.loads(r.read())
             except Exception as err:  # noqa: BLE001
                 last_err = err
+                print(f"    {url}: {err}", flush=True)
                 time.sleep(5 * (attempt + 1))
     raise RuntimeError(f"Overpass failed: {last_err}")
+
+
+WATER_KEYS = {("natural", "water"), ("waterway", "river"), ("waterway", "canal"), ("waterway", "stream"),
+              ("waterway", "riverbank"), ("landuse", "basin"), ("landuse", "reservoir")}
+
+
+def prefilter(result, area, mask):
+    """Large masked areas: drop what lies completely outside the mask (the importer cuts exactly; this only keeps
+    the file small). Water and railways stay everywhere."""
+    lat0, lon0 = area["lat"], area["lon"]
+    m_lat, m_lon = 110574.0, 111320.0 * math.cos(math.radians(lat0))
+
+    def any_inside(pts):
+        if not pts:
+            return False
+        xs = [(p["lon"] - lon0) * m_lon for p in pts]
+        zs = [(p["lat"] - lat0) * m_lat for p in pts]
+        if mask.inside(xs, zs).any():
+            return True
+        # Long straight pieces may cross the mask between two outside vertices (conservative: segment bounds).
+        return any(mask.any_in_rect(min(xs[i], xs[i + 1]), max(xs[i], xs[i + 1]), min(zs[i], zs[i + 1]), max(zs[i], zs[i + 1]))
+                   for i in range(len(xs) - 1))
+
+    kept = []
+    for el in result["elements"]:
+        tags = el.get("tags", {})
+        if any((k, tags.get(k)) in WATER_KEYS for k in ("natural", "waterway", "landuse")) or "water" in tags or \
+                tags.get("railway") in ("rail", "light_rail", "narrow_gauge"):
+            kept.append(el)
+            continue
+        if el["type"] == "node":
+            pts = [el]
+        elif el["type"] == "way":
+            pts = [p for p in el.get("geometry") or [] if p]
+        else:
+            pts = [p for m in el.get("members", []) for p in (m.get("geometry") or []) if p]
+        if any_inside(pts):
+            kept.append(el)
+    print(f"  mask: kept {len(kept)} of {len(result['elements'])} elements", flush=True)
+    result["elements"] = kept
+
+
+TILE_M = 3000.0
+
+
+def water_query(s, w, n, e) -> str:
+    b = f"{s:.6f},{w:.6f},{n:.6f},{e:.6f}"
+    return f"""
+[out:json][timeout:600];
+(
+  way["natural"="water"]({b});
+  way["water"]({b});
+  way["waterway"~"^(river|canal|stream|riverbank)$"]({b});
+  way["landuse"~"^(basin|reservoir)$"]({b});
+  way["railway"~"^(rail|light_rail|narrow_gauge)$"]({b});
+  relation["type"="multipolygon"]["natural"="water"]({b});
+);
+out geom tags;
+"""
+
+
+def fetch_tiled(area, mask):
+    """Large masked areas: the full query only for 3 km tiles touching the mask (one query for 20 km times out),
+    water and railways for the whole rectangle. Merged in Overpass order (nodes, ways, relations; by id)."""
+    x0, x1, z0, z1 = local_bounds(area)
+    lat0, lon0 = area["lat"], area["lon"]
+    m_lat, m_lon = 110574.0, 111320.0 * math.cos(math.radians(lat0))
+    merged = {}
+    xs = [x0 + i * TILE_M for i in range(int(math.ceil((x1 - x0) / TILE_M)) + 1)]
+    zs = [z0 + i * TILE_M for i in range(int(math.ceil((z1 - z0) / TILE_M)) + 1)]
+    tiles = [(xa, min(xa + TILE_M, x1), za, min(za + TILE_M, z1)) for xa in xs[:-1] for za in zs[:-1]]
+    tiles = [t for t in tiles if mask.any_in_rect(*t, 50)]
+    for i, (xa, xb, za, zb) in enumerate(tiles):
+        s, w, n, e = lat0 + za / m_lat, lon0 + xa / m_lon, lat0 + zb / m_lat, lon0 + xb / m_lon
+        res = fetch(build_query(s, w, n, e))
+        for el in res["elements"]:
+            merged[(el["type"], el["id"])] = el
+        print(f"    tile {i + 1}/{len(tiles)}: {len(res['elements'])} elements, {len(merged)} total", flush=True)
+        time.sleep(1)
+    s, w, n, e = latlon_bbox(area)
+    res = fetch(water_query(s, w, n, e))
+    for el in res["elements"]:
+        merged.setdefault((el["type"], el["id"]), el)
+    rank = {"node": 0, "way": 1, "relation": 2}
+    out = dict(res)
+    out["elements"] = [merged[k] for k in sorted(merged, key=lambda k: (rank.get(k[0], 3), k[1]))]
+    return out
 
 
 def main(argv):
@@ -102,7 +191,12 @@ def main(argv):
             continue
         s, w, n, e = latlon_bbox(a)
         print(f"[{a['id']}] bbox {s:.5f},{w:.5f},{n:.5f},{e:.5f} …", flush=True)
-        result = fetch(build_query(s, w, n, e))
+        mask = AreaMask.load(a["id"])
+        if mask is not None:
+            result = fetch_tiled(a, mask)
+            prefilter(result, a, mask)
+        else:
+            result = fetch(build_query(s, w, n, e))
         result["legamez"] = {
             "id": a["id"], "name": a["name"], "center": [a["lat"], a["lon"]],
             "bbox": [s, w, n, e], "size_m": a["size_m"], "bounds": list(local_bounds(a)),

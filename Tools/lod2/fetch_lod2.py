@@ -22,6 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "osm"))
 from area_bounds import latlon_bbox, local_bounds  # noqa: E402
+from area_mask import AreaMask, stac_items  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 AREAS_FILE = ROOT / "Tools" / "osm" / "areas.json"
@@ -138,10 +139,13 @@ def extract_building(b):
 # ---------------------------------------------------------------- main
 
 def find_tiles(bbox):
-    url = STAC + "?collections=lod2&limit=50&bbox=" + ",".join(f"{v:.6f}" for v in bbox)
-    with urllib.request.urlopen(url, timeout=60) as r:
-        data = json.load(r)
-    return [f["assets"]["lod2-gml"]["href"] for f in data["features"] if "lod2-gml" in f["assets"]]
+    """{(east km, north km): href} – paged, large areas have hundreds of tiles."""
+    tiles = {}
+    for f in stac_items(STAC, bbox, "lod2", limit=100):
+        if "lod2-gml" in f["assets"]:
+            parts = f["id"].split("_")          # LoD2_32_428_5901_1_ni
+            tiles[(int(parts[2]), int(parts[3]))] = f["assets"]["lod2-gml"]["href"]
+    return tiles
 
 
 def process_area(area):
@@ -150,11 +154,14 @@ def process_area(area):
     x0, x1, z0, z1 = local_bounds(area)
     s, w, n, e = latlon_bbox(area, MARGIN_M)
     tiles = find_tiles([w, s, e, n])
-    print(f"[{area['id']}] {len(tiles)} tiles", flush=True)
+    mask = AreaMask.load(area["id"])  # large areas: only tiles/buildings inside the mask (make_mask.py)
+    if mask is not None:
+        tiles = {k: v for k, v in tiles.items() if mask.utm_tile_inside(k, frame, utm_to_latlon)}
+    print(f"[{area['id']}] {len(tiles)} tiles{' (masked)' if mask is not None else ''}", flush=True)
 
     buildings = []
     seen = set()
-    for href in tiles:
+    for _, href in sorted(tiles.items()):
         print("   ", href.rsplit("/", 1)[-1], flush=True)
         with urllib.request.urlopen(urllib.request.Request(href, headers={"User-Agent": "Nordisch-LoD2/0.1"}), timeout=300) as resp:
             for _, el in ET.iterparse(resp, events=("end",)):
@@ -183,6 +190,8 @@ def process_area(area):
                     cx = sum(p[0] for p in pts) / len(pts)
                     cz = sum(p[2] for p in pts) / len(pts)
                     if not (x0 - MARGIN_M <= cx <= x1 + MARGIN_M and z0 - MARGIN_M <= cz <= z1 + MARGIN_M):
+                        continue
+                    if mask is not None and not mask.inside(cx, cz):
                         continue
                     seen.add(attrs["id"])
                     buildings.append({**{k: v for k, v in attrs.items() if v}, "s": conv})

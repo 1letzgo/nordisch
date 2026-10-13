@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lod2"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "osm"))
 from fetch_lod2 import LocalFrame  # noqa: E402  (same projection as the importer)
 from area_bounds import latlon_bbox, local_bounds  # noqa: E402
+from area_mask import AreaMask  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 AREAS_FILE = ROOT / "Tools" / "osm" / "areas.json"
@@ -89,11 +90,18 @@ def process_area(area):
     x0, x1, z0, z1 = local_bounds(area)
     s, w, n, e = latlon_bbox(area, MARGIN_M)
     parcels, seen = [], set()
+    mask = AreaMask.load(area["id"])  # large areas: only requests touching the mask (make_mask.py)
     lat = s
     tiles = 0
     while lat < n:
         lon = w
         while lon < e:
+            if mask is not None:
+                tx0, tz0 = frame.to_local(lat, lon)
+                tx1, tz1 = frame.to_local(min(lat + TILE_DEG, n), min(lon + TILE_DEG * 1.6, e))
+                if not mask.any_in_rect(tx0, tx1, tz0, tz1, 20):
+                    lon += TILE_DEG * 1.6
+                    continue
             tiles += 1
             for m in fetch_tile(lat, lon, min(lat + TILE_DEG, n), min(lon + TILE_DEG * 1.6, e)):
                 pr = parse(m, frame)
@@ -102,6 +110,8 @@ def process_area(area):
                 cx = sum(p[0] for p in pr["ring"]) / len(pr["ring"])
                 cz = sum(p[1] for p in pr["ring"]) / len(pr["ring"])
                 if not (x0 - MARGIN_M <= cx <= x1 + MARGIN_M and z0 - MARGIN_M <= cz <= z1 + MARGIN_M):
+                    continue
+                if mask is not None and not mask.inside(cx, cz):
                     continue
                 seen.add(pr["id"])
                 parcels.append(pr)

@@ -70,6 +70,7 @@ namespace LeGamez.Editor.OsmImport
                 if (ring.Count < 3) continue;
                 PolygonTriangulator.EnsureWinding(ring, true);
                 string id = (string)o["id"];
+                if (!AreaMask.Allows(GeoUtil.Centroid(ring))) continue; // large areas: only the built-up part
                 parcels.Add(new Parcel { id = id, ring = ring, bounds = GeoUtil.Bounds(ring), seed = StableHash(id) });
             }
             var parcelGrid = Index(parcels.Count, i => parcels[i].bounds);
@@ -133,7 +134,7 @@ namespace LeGamez.Editor.OsmImport
                     var b = new Vector2((float)(double)h[2], (float)(double)h[3]);
                     // kind 1 = detected on a plot border (checked green in the current aerial), 0 = free-standing.
                     bool onBorder = h.Count > 6 && (double)h[6] > 0.5;
-                    if (!area.Contains((a + b) * 0.5f, 1f) || OnRoad((a + b) * 0.5f, roads, roadGrid)) continue;
+                    if (!area.Contains((a + b) * 0.5f, 1f) || !AreaMask.Allows((a + b) * 0.5f) || OnRoad((a + b) * 0.5f, roads, roadGrid)) continue;
                     if (!onBorder && st.plots > 0 && !NearGarden((a + b) * 0.5f, parcels, parcelGrid, 4f)) continue; // dune scrub, field shrubs
                     float height = Mathf.Clamp((float)(double)h[4], 0.8f, 3.5f), width = Mathf.Clamp((float)(double)h[5], 0.6f, 2f);
                     measured.Add((a, b)); // also when removed in the editor: no generated fence takes its place

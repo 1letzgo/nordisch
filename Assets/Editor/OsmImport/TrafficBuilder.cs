@@ -347,7 +347,8 @@ namespace LeGamez.Editor.OsmImport
                     foreach (var kv in td) tags[kv.Key] = kv.Value?.ToString();
                 double lat = System.Convert.ToDouble(d["lat"], CultureInfo.InvariantCulture);
                 double lon = System.Convert.ToDouble(d["lon"], CultureInfo.InvariantCulture);
-                result.Add((data.projection.ToLocal(lat, lon), tags));
+                var local = data.projection.ToLocal(lat, lon);
+                if (AreaMask.Allows(local)) result.Add((local, tags)); // large areas: only the built-up part
             }
             return result;
         }

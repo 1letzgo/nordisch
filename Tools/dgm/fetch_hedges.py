@@ -42,6 +42,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fetch_lod2 import LocalFrame  # noqa: E402
 from area_bounds import latlon_bbox, local_bounds  # noqa: E402
 from fetch_dop import local_to_utm_affine  # noqa: E402
+from fetch_dgm import latlon_to_utm  # noqa: E402
+from fetch_lod2 import utm_to_latlon  # noqa: E402
+from area_mask import AreaMask, stac_items  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 AREAS_FILE = ROOT / "Tools" / "osm" / "areas.json"
@@ -59,11 +62,8 @@ INLIER, GAP, BAND, MIN_LEN, MAX_WIDTH = 0.9, 2.5, 1.8, 6.0, 2.4   # free hedges:
 # ------------------------------------------------------------------ tiles
 
 def tiles(kind, bbox):
-    url = STAC[kind] + ("?collections=dgm1&" if kind == "dgm1" else "?") + "limit=200&bbox=" + ",".join(f"{v:.6f}" for v in bbox)
-    with urllib.request.urlopen(url, timeout=60) as r:
-        feats = json.load(r)["features"]
     best = {}
-    for f in feats:
+    for f in stac_items(STAC[kind], bbox, "dgm1" if kind == "dgm1" else None):
         p = f["id"].split("_")              # bdom20_32_426_5900_1_ni_2026-05-25 / dgm1_32_426_5900_1_ni_2021
         key, date = (int(p[2]), int(p[3])), p[-1]
         assets = f["assets"]
@@ -231,15 +231,29 @@ def process_area(area):
     s, w, n, e = latlon_bbox(area, 20)
     bdom, dgm, dop = tiles("bdom", [w, s, e, n]), tiles("dgm1", [w, s, e, n]), tiles("dop", [w, s, e, n])
     plots, houses = load_plots(aid)
+    mask = AreaMask.load(aid)  # large areas: only tiles inside the mask (make_mask.py)
+    if mask is not None:
+        bdom = {k: v for k, v in bdom.items() if mask.utm_tile_inside(k, frame, utm_to_latlon)}
     edges = border_edges(plots)
     date = max(d for d, _ in bdom.values()) if bdom else "?"
     print(f"[{aid}] {len(bdom)} bDOM tiles ({date}), {len(plots)} garden plots, {len(edges)} borders", flush=True)
 
-    # local <-> UTM (affine, exact to cm over a few km)
+    # local <-> UTM: exact projection (an affine fit is off by metres over a whole municipality); the inverse by
+    # Newton steps on the affine approximation.
     ce, cn = local_to_utm_affine(frame, x0 - 50, x1 + 50, z0 - 50, z1 + 50)
     M = np.array([[ce[0], ce[1]], [cn[0], cn[1]]]); Minv = np.linalg.inv(M); off = np.array([ce[2], cn[2]])
-    to_utm = lambda xz: np.asarray(xz) @ M.T + off
-    to_local = lambda en: (np.asarray(en) - off) @ Minv.T
+
+    def to_utm(xz):
+        xz = np.asarray(xz, dtype=np.float64)
+        e, n = latlon_to_utm(frame.lat0 + xz[..., 1] / frame.m_lat, frame.lon0 + xz[..., 0] / frame.m_lon)
+        return np.stack([np.asarray(e), np.asarray(n)], axis=-1)
+
+    def to_local(en):
+        en = np.asarray(en, dtype=np.float64)
+        xz = (en - off) @ Minv.T
+        for _ in range(4):
+            xz = xz + (en - to_utm(xz)) @ Minv.T
+        return xz
 
     # Border samples: positions along every edge, each with a strip of sub-samples across the border.
     across = np.arange(-STRIP, STRIP + 1e-6, RES)
@@ -369,7 +383,8 @@ def process_area(area):
 
     free = [f for f in drop_rows(free) if not along_border(f) and not in_plot(f, plots)]
     out_list = [[round(float(v), 2) for v in h] + [1] for h in border] + [[round(float(v), 2) for v in h] + [0] for h in free]
-    out_list = [h for h in out_list if x0 <= (h[0] + h[2]) / 2 <= x1 and z0 <= (h[1] + h[3]) / 2 <= z1]
+    out_list = [h for h in out_list if x0 <= (h[0] + h[2]) / 2 <= x1 and z0 <= (h[1] + h[3]) / 2 <= z1
+                and (mask is None or mask.inside((h[0] + h[2]) / 2, (h[1] + h[3]) / 2))]
     out = DATA / f"{aid}.hedges.json"
     out.write_text(json.dumps({"source": "LGLN bDOM20 + DGM1 + DOP20 (CC BY 4.0)", "date": date, "hedges": out_list},
                               separators=(",", ":")))
