@@ -67,19 +67,24 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
 7. **Veröffentlichen**: `Tools/release/publish_maps.sh [<id> …]` – siehe „Karten-Downloads“.
 
 ### Karten-Downloads (App enthält keine Karten)
-- Jede Stadt = ein AssetBundle pro Plattform (Szene + Meshes + POIs + Straßen + Minimap + Materialien/Shader), gebaut von
+- Jede Stadt = zwei AssetBundles pro Plattform: `<id>.bundle` (Szene + POIs + Straßen + Minimap + Materialien/Shader)
+  und `<id>.tiles.bundle` (Welt-Kacheln, einzeln ladbar; Szenen-Bundles dürfen keine anderen Assets enthalten), gebaut von
   `Editor/MapBundles` (`-buildTarget iOS|Android -executeMethod LeGamez.Editor.MapBundles.BuildBatch [-areas a,b]`)
   nach `Builds/Maps/<platform>/<id>.bundle` (LZMA) + `index.json`.
 - `Tools/release/publish_maps.sh [--dry-run] [--drop-old] [<id> …]` baut iOS + Android und lädt **nur geänderte** Karten
   (Inhalts-CRC) in die GitHub-**Pre-Release `maps`** (nie „latest“ → stört den APK-Updater nicht). Katalog
   `https://github.com/1letzgo/nordisch/releases/download/maps/maps.json`: je Karte Name/Lage/Fahrzeuge/Thumbnail-URL und
-  `builds[]` = {platform, format, unity, version (yyyyMMddHHmm), url, size, sha256, crc}. Alte, nicht mehr referenzierte Assets werden gelöscht.
+  `builds[]` = {platform, format, unity, version (yyyyMMddHHmm), url, size, sha256, crc, files[] = {name, url, size, sha256}}
+  (Format 2: `map.bundle` + `tiles.bundle`; Format 1 hatte nur url/size/sha256). Alte, nicht mehr referenzierte Assets werden gelöscht.
 - App: `Core/MapStore` – Katalog einmal pro App-Start laden (Kopie für offline), Download → Größe + SHA-256 prüfen →
   `RecompressAssetBundleAsync` nach LZ4 → `persistentDataPath/maps/<id>/map.bundle` + `info.json` (iOS: kein iCloud-Backup).
   Spielen = Bundle laden + Szene daraus; zurück im Menü wird es entladen. Im Editor listet `MapStore` die lokalen Szenen.
 - **Update-Logik**: Ein Build passt nur bei gleicher Plattform, `MapStore.Format` und Unity-Version. Neuerer passender Build
   → „Update“ (im WLAN automatisch, sonst Tipp auf das Pill; die alte Version bleibt bis zum Tausch spielbar).
-  Installierter Build passt nicht mehr (App-Update) → „Update nötig“. Kein passender Build → „Neue App-Version nötig“.
+  Installierter Build passt nicht mehr (App-Update) → „Update nötig“. Kein passender Build: nur neuere Formate →
+  „Neue App-Version nötig“, nur ältere → „Karte wird aktualisiert“.
+- Testen ohne GitHub: `maps/catalog-url.txt` im App-Datenordner (Android: `/storage/emulated/0/Android/data/de.letzgo.legamez/files/`)
+  enthält eine andere Katalog-URL, z. B. `file://…/catalog.json` mit `file://`-Bundle-URLs (per `adb push`).
 - `MapStore.Format` erhöhen, wenn Kartenszenen etwas brauchen, das ältere Apps nicht haben (neues Skript in Szenen,
   geänderte serialisierte Felder von AreaInfo/TrafficLights/FacadeDetails/PoiDatabase/StreetIndex …).
   **Reihenfolge bei neuem Format oder Unity-Update: erst Karten veröffentlichen, dann App releasen** (ohne `--drop-old`,
@@ -143,6 +148,13 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
   Ortsnamen die aktuelle Straße (`UI/StreetDisplay`, nächste Straße ≤ 30 m, 4 m Trägheit gegen Flackern).
 - `MeshSink`: Geometrie pro Material und 100-m-Chunk; Kollider für Gebäude, Stämme, Props
   (Stämme/Props liegen auf Layer 2, damit die Kamera sie ignoriert).
+- **Nachladen (Streaming)**: Die Szene enthält keine Welt-Meshes. `OsmAreaImporter.WriteTiles` sortiert die Chunks in
+  200-m-Kacheln (`World/WorldTile`, Meshes als Sub-Assets, `Assets/Generated/<id>/tiles/`, nicht im Repo); Meshes ohne
+  Kollider sind nicht CPU-lesbar (halber Speicher). `World/WorldStreamer` (in der Szene) lädt Kacheln ≤ 760 m um die
+  Kamera (nächste zuerst, max. 3 parallel, 1 pro Frame instanziiert) und gibt sie ab 960 m wieder frei.
+  `GameBootstrap` wartet mit Ladebildschirm, bis der Start-Umkreis (220 m) steht; Beamen (`FullMap`) lädt das Ziel hinter
+  dem Blitz vor. Editor-Werkzeuge, die die ganze Welt brauchen (`SceneSnapshot`), rufen `LoadAllInEditor()` auf.
+  `-executeMethod LeGamez.Editor.MeshStats.Print` zeigt Dreiecke je Materialgruppe und Gebiet.
 - Shader `Assets/Shaders/VertexColorLit.shader`: Vertex-Farben, Fenster/Sprossen (Laibungsschatten, Gardinen), Klinker, Putz,
   Sockel, Traufband, Dachpfannen, Wasser, großflächige Farbvariation auf Boden/Flachdächern. Bordsteinbänder: `GroundBuilder.Kerbs`.
 - Himmel `Assets/Shaders/Sky.shader` (Verlauf, Sonne, ziehende Wolken); Licht/Nebel in `OsmAreaImporter.AddLighting`,

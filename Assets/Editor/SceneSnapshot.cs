@@ -28,6 +28,8 @@ namespace LeGamez.Editor
                 var area = Object.FindAnyObjectByType<AreaInfo>();
                 if (area == null) continue;
                 string id = area.areaId;
+                var world = Object.FindAnyObjectByType<WorldStreamer>();
+                if (world != null) world.LoadAllInEditor(); // the scene itself holds no geometry
 
                 var camGo = new GameObject("SnapshotCam");
                 var cam = camGo.AddComponent<Camera>();
@@ -85,6 +87,7 @@ namespace LeGamez.Editor
 
                 Object.DestroyImmediate(volume.gameObject);
                 Object.DestroyImmediate(camGo);
+                if (world != null) world.UnloadAllInEditor();
                 Debug.Log($"[Snapshot] {id} -> {outDir}");
             }
         }
@@ -102,6 +105,8 @@ namespace LeGamez.Editor
                 var scene = EditorSceneManager.OpenScene(AssetDatabase.GUIDToAssetPath(guid), OpenSceneMode.Single);
                 var area = Object.FindAnyObjectByType<AreaInfo>();
                 if (area == null) continue;
+                var world = Object.FindAnyObjectByType<WorldStreamer>();
+                if (world != null) world.LoadAllInEditor();
 
                 var camGo = new GameObject("ThumbCam");
                 var cam = camGo.AddComponent<Camera>();
@@ -160,6 +165,7 @@ namespace LeGamez.Editor
                     ti.SaveAndReimport();
                 }
 
+                if (world != null) world.UnloadAllInEditor(); // never save tile objects into the scene
                 area.mapTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(mapFile);
                 EditorUtility.SetDirty(area);
                 EditorSceneManager.MarkSceneDirty(scene);

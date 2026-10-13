@@ -1,3 +1,4 @@
+using System.Collections;
 using LeGamez.Player;
 using LeGamez.Quests;
 using LeGamez.UI;
@@ -6,6 +7,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.UI;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem.UI;
 #endif
@@ -18,7 +20,7 @@ namespace LeGamez.Core
     /// </summary>
     public class GameBootstrap : MonoBehaviour
     {
-        void Start()
+        IEnumerator Start()
         {
             Application.targetFrameRate = 60;
             // Player/props layer walks through water surfaces (they only exist for placement checks).
@@ -31,8 +33,14 @@ namespace LeGamez.Core
             bool resumed = false;
             Vector3 saved = default;
             float savedYaw = 0f;
-            if (area != null && PositionMemory.TryLoad(area.MemoryKey, out saved, out savedYaw)
-                && area.Contains(saved, 2f))
+            bool hasSaved = area != null && PositionMemory.TryLoad(area.MemoryKey, out saved, out savedYaw) && area.Contains(saved, 2f);
+
+            // The world streams in around the camera – the start surroundings must be there before anything is placed.
+            var loading = LoadingScreen(area != null ? area.displayName : "");
+            yield return WorldStreamer.WaitFor(hasSaved ? saved : spawn, 220f);
+            Destroy(loading);
+
+            if (hasSaved)
             {
                 // Re-validate: data may have changed since saving (new buildings, terrain, props).
                 Placement.TryFindFreeGround(saved, null, out var safe, 20f);
@@ -58,6 +66,25 @@ namespace LeGamez.Core
             var vehicles = new GameObject("Vehicles").AddComponent<LeGamez.Vehicles.VehicleManager>();
             vehicles.player = player;
             vehicles.hud = hud;
+        }
+
+        /// <summary>Plain navy screen with the area name while the first tiles load.</summary>
+        static GameObject LoadingScreen(string areaName)
+        {
+            var go = new GameObject("Loading", typeof(Canvas), typeof(CanvasScaler));
+            var canvas = go.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 100;
+            var scaler = go.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1080, 1080);
+            scaler.matchWidthOrHeight = Screen.height > Screen.width ? 0f : 1f;
+            var bg = UiKit.Rect("Background", go.transform);
+            UiKit.Stretch(bg);
+            bg.gameObject.AddComponent<Image>().color = UiKit.Navy;
+            UiKit.Label(go.transform, $"{areaName}\n<size=34>wird geladen …</size>", 56, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold)
+                .Place(new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, 200));
+            return go;
         }
 
         static void EnsureEventSystem()

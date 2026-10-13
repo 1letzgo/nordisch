@@ -27,8 +27,9 @@ namespace LeGamez.Core
     public static class MapStore
     {
         /// <summary>Bump when map scenes need something only a newer app has (new script in map scenes, changed serialized
-        /// fields of AreaInfo/TrafficLights/FacadeDetails/PoiDatabase/StreetIndex …). Then re-publish all maps.</summary>
-        public const int Format = 1;
+        /// fields of AreaInfo/TrafficLights/FacadeDetails/PoiDatabase/StreetIndex/WorldStreamer/WorldTile …). Then re-publish all maps.
+        /// 1 = one scene bundle with all geometry; 2 = scene bundle + tiles bundle streamed by World/WorldStreamer.</summary>
+        public const int Format = 2;
 
         public const string CatalogUrl = "https://github.com/1letzgo/nordisch/releases/download/maps/maps.json";
         const bool AutoUpdateOnWifi = true;
@@ -40,6 +41,15 @@ namespace LeGamez.Core
         // ------------------------------------------------------------------ catalog format (maps.json)
 
         [Serializable]
+        public class FileEntry
+        {
+            public string name; // file name in the map folder (map.bundle, tiles.bundle)
+            public string url;
+            public long size;
+            public string sha256;
+        }
+
+        [Serializable]
         public class Build
         {
             public string platform;
@@ -47,8 +57,13 @@ namespace LeGamez.Core
             public string unity;
             public long version; // yyyyMMddHHmm of the build
             public string url;
-            public long size;
+            public long size;     // total of all files
             public string sha256;
+            public FileEntry[] files = new FileEntry[0]; // format 2+; format 1 = just url/size/sha256 (map.bundle)
+
+            public FileEntry[] AllFiles => files != null && files.Length > 0
+                ? files
+                : new[] { new FileEntry { name = "map.bundle", url = url, size = size, sha256 = sha256 } };
         }
 
         [Serializable]
@@ -77,7 +92,8 @@ namespace LeGamez.Core
             Installed,
             UpdateAvailable, // installed and playable, newer build exists
             UpdateRequired,  // installed build does not fit this app any more, a fitting one exists
-            Unavailable,     // installed build does not fit, no fitting build published (yet)
+            Unavailable,     // nothing fits: the catalog only has builds for a newer app (format/engine) – update the app
+            Pending,         // nothing fits: only builds for older apps – maps not re-published for this version yet
             Failed,
         }
 
@@ -109,13 +125,14 @@ namespace LeGamez.Core
         static string Root => Path.Combine(Application.persistentDataPath, "maps");
         static string MapDir(string id) => Path.Combine(Root, id);
         static string BundlePath(string id) => Path.Combine(MapDir(id), "map.bundle");
+        static string TilesPath(string id) => Path.Combine(MapDir(id), "tiles.bundle");
         static string InfoPath(string id) => Path.Combine(MapDir(id), "info.json");
         static string ThumbDir => Path.Combine(Root, "thumbs");
         static string CatalogCache => Path.Combine(Root, "catalog.json");
 
         static bool initialized;
         static Runner runner;
-        static AssetBundle loaded;
+        static AssetBundle loaded, loadedTiles;
         static readonly Queue<Map> queue = new Queue<Map>();
         static bool working;
         static bool starting; // a map is being loaded – ignore further taps
@@ -185,6 +202,8 @@ namespace LeGamez.Core
         /// <summary>Releases the bundle of the map that was played (the menu scene has replaced its scene by now).</summary>
         public static void UnloadLoaded()
         {
+            World.WorldStreamer.Bundle = null;
+            if (loadedTiles != null) { loadedTiles.Unload(true); loadedTiles = null; }
             if (loaded == null) return;
             loaded.Unload(true);
             loaded = null;
@@ -216,12 +235,28 @@ namespace LeGamez.Core
             return best;
         }
 
+        static bool HasPlatform(Entry e)
+        {
+            if (e.builds != null) foreach (var b in e.builds) if (b != null && b.platform == Platform) return true;
+            return false;
+        }
+
+        /// <summary>A build for this platform exists but needs a newer app (higher format).</summary>
+        static bool NewerAppNeeded(Entry e)
+        {
+            if (e.builds != null)
+                foreach (var b in e.builds)
+                    if (b != null && b.platform == Platform && b.format > Format) return true;
+            return false;
+        }
+
         static void Evaluate(Map m)
         {
             if (m.Busy) return;
             m.latest = BestBuild(m.entry);
-            if (m.installed == null) m.status = m.latest != null ? Status.Available : Status.Unavailable;
-            else if (!Fits(m.installed)) m.status = m.latest != null ? Status.UpdateRequired : Status.Unavailable;
+            if (m.latest == null && (m.installed == null || !Fits(m.installed))) m.status = NewerAppNeeded(m.entry) ? Status.Unavailable : Status.Pending;
+            else if (m.installed == null) m.status = Status.Available;
+            else if (!Fits(m.installed)) m.status = Status.UpdateRequired;
             else m.status = m.latest != null && m.latest.version > m.installed.version ? Status.UpdateAvailable : Status.Installed;
         }
 
@@ -255,7 +290,7 @@ namespace LeGamez.Core
                     if (string.IsNullOrEmpty(e?.id)) continue;
                     if (!byId.TryGetValue(e.id, out var m))
                     {
-                        if (BestBuild(e) == null) continue; // nothing this app can use – don't advertise it
+                        if (!HasPlatform(e)) continue; // not built for this platform – don't advertise it
                         m = new Map();
                         byId[e.id] = m;
                         Maps.Add(m);
@@ -284,7 +319,11 @@ namespace LeGamez.Core
         static IEnumerator FetchCatalog()
         {
             Fetching = true;
-            using (var req = UnityWebRequest.Get(CatalogUrl))
+            // Testing: maps/catalog-url.txt on the device points the app at another catalog (e.g. a file:// copy).
+            string url = CatalogUrl;
+            try { string o = Path.Combine(Root, "catalog-url.txt"); if (File.Exists(o)) url = File.ReadAllText(o).Trim(); }
+            catch (Exception) { }
+            using (var req = UnityWebRequest.Get(url))
             {
                 req.SetRequestHeader("Cache-Control", "no-cache");
                 req.timeout = 20;
@@ -345,73 +384,98 @@ namespace LeGamez.Core
         static IEnumerator Install(Map m)
         {
             var b = m.latest;
+            var files = b.AllFiles;
             string tmpDir = Path.Combine(Root, ".download");
             Directory.CreateDirectory(tmpDir);
-            string part = Path.Combine(tmpDir, m.Id + ".part"), lz4 = Path.Combine(tmpDir, m.Id + ".lz4");
-            TryDelete(part); TryDelete(lz4);
+            long total = 0, done = 0, downloaded = 0;
+            foreach (var f in files) total += Math.Max(1, f.size);
+            var ready = new List<(string lz4, string name)>();
 
             m.status = Status.Downloading;
             m.progress = 0f;
             Changed();
-            using (var req = new UnityWebRequest(b.url, UnityWebRequest.kHttpVerbGET))
+            foreach (var f in files)
             {
-                req.downloadHandler = new DownloadHandlerFile(part) { removeFileOnAbort = true };
-                var op = req.SendWebRequest();
-                while (!op.isDone) { m.progress = req.downloadProgress; yield return null; }
-                if (req.result != UnityWebRequest.Result.Success) { Fail(m, "Download fehlgeschlagen", req.error); yield break; }
-            }
-
-            m.status = Status.Installing;
-            m.progress = 1f;
-            Changed();
-            long size = new FileInfo(part).Length;
-            if (b.size > 0 && size != b.size) { Fail(m, "Download unvollständig", $"{size} != {b.size}"); TryDelete(part); yield break; }
-            if (!string.IsNullOrEmpty(b.sha256))
-            {
-                var hash = Task.Run(() => Sha256(part));
-                while (!hash.IsCompleted) yield return null;
-                if (hash.IsFaulted || !string.Equals(hash.Result, b.sha256, StringComparison.OrdinalIgnoreCase))
+                string part = Path.Combine(tmpDir, $"{m.Id}.{f.name}.part"), lz4 = Path.Combine(tmpDir, $"{m.Id}.{f.name}.lz4");
+                TryDelete(part); TryDelete(lz4);
+                if (m.status != Status.Downloading) { m.status = Status.Downloading; Changed(); }
+                using (var req = new UnityWebRequest(f.url, UnityWebRequest.kHttpVerbGET))
                 {
-                    Fail(m, "Download beschädigt", "SHA-256 mismatch");
-                    TryDelete(part);
-                    yield break;
+                    req.downloadHandler = new DownloadHandlerFile(part) { removeFileOnAbort = true };
+                    var op = req.SendWebRequest();
+                    while (!op.isDone) { m.progress = (done + req.downloadProgress * Math.Max(1, f.size)) / total; yield return null; }
+                    if (req.result != UnityWebRequest.Result.Success) { Fail(m, "Download fehlgeschlagen", req.error); Cleanup(ready); yield break; }
                 }
-            }
+                done += Math.Max(1, f.size);
 
-            // Published bundles are LZMA (small download); LZ4 on disk loads fast and streams from file.
-            var recompress = AssetBundle.RecompressAssetBundleAsync(part, lz4, BuildCompression.LZ4Runtime);
-            yield return recompress;
-            TryDelete(part);
-            if (!recompress.success) { Fail(m, "Karte nicht lesbar", recompress.humanReadableResult); TryDelete(lz4); yield break; }
+                m.status = Status.Installing;
+                Changed();
+                long size = new FileInfo(part).Length;
+                downloaded += size;
+                if (f.size > 0 && size != f.size) { Fail(m, "Download unvollständig", $"{f.name}: {size} != {f.size}"); TryDelete(part); Cleanup(ready); yield break; }
+                if (!string.IsNullOrEmpty(f.sha256))
+                {
+                    var hash = Task.Run(() => Sha256(part));
+                    while (!hash.IsCompleted) yield return null;
+                    if (hash.IsFaulted || !string.Equals(hash.Result, f.sha256, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Fail(m, "Download beschädigt", $"{f.name}: SHA-256 mismatch");
+                        TryDelete(part); Cleanup(ready);
+                        yield break;
+                    }
+                }
+                // Published bundles are LZMA (small download); LZ4 on disk loads fast and single assets stream from file.
+                var recompress = AssetBundle.RecompressAssetBundleAsync(part, lz4, BuildCompression.LZ4Runtime);
+                yield return recompress;
+                TryDelete(part);
+                if (!recompress.success) { Fail(m, "Karte nicht lesbar", recompress.humanReadableResult); TryDelete(lz4); Cleanup(ready); yield break; }
+                ready.Add((lz4, f.name));
+            }
 
             try
             {
                 Directory.CreateDirectory(MapDir(m.Id));
                 TryDelete(BundlePath(m.Id));
-                File.Move(lz4, BundlePath(m.Id));
+                TryDelete(TilesPath(m.Id)); // a format-1 map has none – don't leave an old one behind
+                foreach (var (lz4, name) in ready)
+                {
+                    string target = Path.Combine(MapDir(m.Id), name);
+                    TryDelete(target);
+                    File.Move(lz4, target);
+                    ExcludeFromBackup(target);
+                }
                 var info = new Installed { entry = m.entry, build = b };
                 File.WriteAllText(InfoPath(m.Id), JsonUtility.ToJson(info));
-                if (!string.IsNullOrEmpty(m.entry.thumb))
-                {
-                    string cached = ThumbCache(m.entry.thumb);
-                    if (cached != null && File.Exists(cached)) File.Copy(cached, Path.Combine(MapDir(m.Id), "thumb.png"), true);
-                }
+                string cached = ThumbCache(m.entry.thumb);
+                if (cached != null && File.Exists(cached)) File.Copy(cached, Path.Combine(MapDir(m.Id), "thumb.png"), true);
                 ExcludeFromBackup(MapDir(m.Id));
-                ExcludeFromBackup(BundlePath(m.Id));
             }
-            catch (Exception e) { Fail(m, "Speichern fehlgeschlagen", e.Message); yield break; }
+            catch (Exception e) { Fail(m, "Speichern fehlgeschlagen", e.Message); Cleanup(ready); yield break; }
 
             m.installed = b;
             m.status = Status.Installed; // leaves Busy so Evaluate runs
             Evaluate(m);
             Changed();
-            Debug.Log($"[Maps] {m.Id} {b.version} installed ({size / (1024 * 1024)} MB download)");
+            Debug.Log($"[Maps] {m.Id} {b.version} installed ({downloaded / (1024 * 1024)} MB download, {files.Length} file(s))");
+        }
+
+        static void Cleanup(List<(string lz4, string name)> ready)
+        {
+            foreach (var (lz4, _) in ready) TryDelete(lz4);
         }
 
         static IEnumerator PlayRoutine(Map m)
         {
             starting = true;
             UnloadLoaded();
+            // Tiles first: the scene's WorldStreamer asks for them as soon as it wakes up.
+            if (File.Exists(TilesPath(m.Id)))
+            {
+                var tilesReq = AssetBundle.LoadFromFileAsync(TilesPath(m.Id));
+                yield return tilesReq;
+                loadedTiles = tilesReq.assetBundle;
+                World.WorldStreamer.Bundle = loadedTiles;
+            }
             var req = AssetBundle.LoadFromFileAsync(BundlePath(m.Id));
             yield return req;
             loaded = req.assetBundle;

@@ -313,21 +313,24 @@ namespace LeGamez.UI
                 if (away.sqrMagnitude < 0.01f) away = Vector3.back;
                 wanted = targetPoi.position + away.normalized * 7f;
             }
-            var spot = FindFreeGround(wanted);
-            Vector3 face = targetPoi != null ? targetPoi.position - spot : Vector3.zero;
-            face.y = 0f;
-            if (face.sqrMagnitude > 0.01f) player.transform.rotation = Quaternion.LookRotation(face);
             var p = player;
+            var poi = targetPoi;
             var flash = BeamFlash.Create(transform.parent);
             Hide();
             // Run on the flash object – this panel is now inactive and can't host coroutines.
-            flash.StartCoroutine(BeamRoutine(flash, p, spot));
+            flash.StartCoroutine(BeamRoutine(flash, p, wanted, poi));
         }
 
-        static IEnumerator BeamRoutine(BeamFlash flash, PlayerController player, Vector3 spot)
+        static IEnumerator BeamRoutine(BeamFlash flash, PlayerController player, Vector3 wanted, PoiEntry poi)
         {
             player.InputEnabled = false;
             yield return flash.Fade(0f, 1f, 0.18f);
+            // The target may be far outside the streamed surroundings: load it (behind the flash) before placing.
+            yield return WorldStreamer.WaitFor(wanted, 220f);
+            Placement.TryFindFreeGround(wanted, player.transform, out var spot);
+            Vector3 face = poi != null ? poi.position - spot : Vector3.zero;
+            face.y = 0f;
+            if (face.sqrMagnitude > 0.01f) player.transform.rotation = Quaternion.LookRotation(face);
             player.Teleport(spot + Vector3.up * 0.2f);
             var cam = NavState.View != null ? NavState.View.GetComponent<ThirdPersonCamera>() : null;
             if (cam != null) cam.SnapToTarget();
@@ -337,12 +340,6 @@ namespace LeGamez.UI
             player.InputEnabled = true;
         }
 
-        /// <summary>Terrain surface near the wanted point with room for the character (see <see cref="Placement"/>).</summary>
-        Vector3 FindFreeGround(Vector3 wanted)
-        {
-            Placement.TryFindFreeGround(wanted, player != null ? player.transform : null, out var spot);
-            return spot;
-        }
     }
 
     /// <summary>Full-screen white flash used for the beam transition.</summary>

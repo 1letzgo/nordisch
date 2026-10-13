@@ -9,9 +9,10 @@ using UnityEngine;
 namespace LeGamez.Editor
 {
     /// <summary>
-    /// Builds one download bundle per area (scene + everything it references: meshes, POIs, streets, facade data,
-    /// minimap texture, materials, shaders) for the active platform into Builds/Maps/&lt;platform&gt;/, plus index.json
-    /// for Tools/release/publish_maps.py. Bundles are LZMA (small download); the app recompresses them to LZ4.
+    /// Builds two download bundles per area for the active platform into Builds/Maps/&lt;platform&gt;/, plus index.json for
+    /// Tools/release/publish_maps.py: &lt;id&gt;.bundle = the scene with everything it references (POIs, streets, facade data,
+    /// minimap texture, materials, shaders), &lt;id&gt;.tiles.bundle = the world tiles, loaded one by one by WorldStreamer
+    /// (scene bundles cannot hold other assets). Bundles are LZMA (small download); the app recompresses them to LZ4.
     /// Batch: Unity -batchmode -quit -projectPath . -buildTarget iOS|Android -executeMethod LeGamez.Editor.MapBundles.BuildBatch [-areas a,b]
     /// </summary>
     public static class MapBundles
@@ -39,11 +40,11 @@ namespace LeGamez.Editor
         [System.Serializable]
         class IndexMap
         {
-            public string id, name, file, thumb;
+            public string id, name, file, tiles, thumb;
             public double lat, lon;
             public string[] vehicles;
             public int pois;
-            public uint crc;
+            public uint crc, tilesCrc;
         }
 
         [System.Serializable]
@@ -70,6 +71,10 @@ namespace LeGamez.Editor
                 if (!File.Exists(AreaCatalog.MapPath(a.id)) || !File.Exists(AreaCatalog.ThumbPath(a.id)))
                     Debug.LogWarning($"[Maps] {a.id}: thumbnail/map texture missing – run SceneSnapshot.RenderThumbnails");
                 builds.Add(new AssetBundleBuild { assetBundleName = a.id + ".bundle", assetNames = new[] { scene } });
+                var tiles = AssetDatabase.FindAssets("t:WorldTile", new[] { $"Assets/Generated/{a.id}/tiles" })
+                    .Select(AssetDatabase.GUIDToAssetPath).ToArray();
+                if (tiles.Length == 0) { Debug.LogError($"[Maps] {a.id}: no world tiles – re-import the area"); return false; }
+                builds.Add(new AssetBundleBuild { assetBundleName = a.id + ".tiles.bundle", assetNames = tiles });
             }
             if (builds.Count == 0) { Debug.LogError("[Maps] nothing to build"); return false; }
 
@@ -82,14 +87,15 @@ namespace LeGamez.Editor
             var index = new Index { platform = platform, unity = Application.unityVersion, format = MapStore.Format };
             foreach (var a in areas)
             {
-                string file = Path.Combine(outDir, a.id + ".bundle");
+                string file = Path.Combine(outDir, a.id + ".bundle"), tilesFile = Path.Combine(outDir, a.id + ".tiles.bundle");
                 BuildPipeline.GetCRCForAssetBundle(file, out uint crc);
+                BuildPipeline.GetCRCForAssetBundle(tilesFile, out uint tilesCrc);
                 index.maps.Add(new IndexMap
                 {
                     id = a.id, name = a.displayName, lat = a.lat, lon = a.lon, vehicles = a.vehicles.ToArray(), pois = a.poiCount,
-                    file = file, thumb = Path.GetFullPath(AreaCatalog.ThumbPath(a.id)), crc = crc,
+                    file = file, tiles = tilesFile, thumb = Path.GetFullPath(AreaCatalog.ThumbPath(a.id)), crc = crc, tilesCrc = tilesCrc,
                 });
-                Debug.Log($"[Maps] {platform} {a.id}: {new FileInfo(file).Length / (1024 * 1024)} MB, crc {crc}");
+                Debug.Log($"[Maps] {platform} {a.id}: scene {new FileInfo(file).Length / (1024 * 1024)} MB + tiles {new FileInfo(tilesFile).Length / (1024 * 1024)} MB");
             }
             File.WriteAllText(Path.Combine(outDir, "index.json"), JsonUtility.ToJson(index, true));
             return true;

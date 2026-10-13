@@ -456,6 +456,7 @@ namespace LeGamez.UI
                 case MapStore.Status.UpdateAvailable: text = $"Update · {size}"; break;
                 case MapStore.Status.UpdateRequired: text = $"Update nötig · {size}"; break;
                 case MapStore.Status.Unavailable: text = "Neue App-Version nötig"; break;
+                case MapStore.Status.Pending: text = "Karte wird aktualisiert"; break;
                 case MapStore.Status.Failed: text = (m.error ?? "Fehler") + " – nochmal"; break;
                 default: text = ""; break;
             }

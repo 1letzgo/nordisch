@@ -100,16 +100,23 @@ def main():
             if a.drop_old:
                 builds[:] = [b for b in builds if b["platform"] != platform or (b["format"] == fmt and b["unity"] == unity)]
             same = [b for b in builds if b["platform"] == platform and b["format"] == fmt and b["unity"] == unity]
-            if same and same[0].get("crc") == m["crc"]:
+            crc = f"{m['crc']}-{m.get('tilesCrc', 0)}"
+            if same and str(same[0].get("crc")) == crc:
                 print(f"  {m['id']:<14} {platform:<8} unchanged (v{same[0]['version']})")
             else:
-                name = f"{m['id']}-{platform}-f{fmt}-{version}.bundle"
-                shutil.copyfile(m["file"], os.path.join(stage, name))
-                uploads.append(os.path.join(stage, name))
-                size = os.path.getsize(m["file"])
+                # Format 2+: scene bundle + tiles bundle; installed as map.bundle / tiles.bundle.
+                files = []
+                for local, installed, suffix in ((m["file"], "map.bundle", ""), (m.get("tiles"), "tiles.bundle", "-tiles")):
+                    if not local:
+                        continue
+                    name = f"{m['id']}-{platform}-f{fmt}-{version}{suffix}.bundle"
+                    shutil.copyfile(local, os.path.join(stage, name))
+                    uploads.append(os.path.join(stage, name))
+                    files.append({"name": installed, "url": BASE_URL + name, "size": os.path.getsize(local), "sha256": sha256(local)})
+                size = sum(f["size"] for f in files)
                 builds[:] = [b for b in builds if b not in same]
                 builds.append({"platform": platform, "format": fmt, "unity": unity, "version": version,
-                               "url": BASE_URL + name, "size": size, "sha256": sha256(m["file"]), "crc": m["crc"]})
+                               "url": files[0]["url"], "size": size, "sha256": files[0]["sha256"], "files": files, "crc": crc})
                 print(f"  {m['id']:<14} {platform:<8} NEW v{version} ({size / 1048576:.0f} MB)")
 
             # Thumbnail: file name = content hash, so the app's cache notices a new picture.
@@ -140,7 +147,9 @@ def main():
     # Drop assets no catalog entry references any more (replaced builds, old thumbnails).
     referenced = {"maps.json"}
     for e in catalog["maps"]:
-        referenced.update(b["url"].rsplit("/", 1)[1] for b in e.get("builds", []))
+        for b in e.get("builds", []):
+            referenced.add(b["url"].rsplit("/", 1)[1])
+            referenced.update(f["url"].rsplit("/", 1)[1] for f in b.get("files", []))
         if e.get("thumb"):
             referenced.add(e["thumb"].rsplit("/", 1)[1])
     for name in sorted(release_assets() - referenced):

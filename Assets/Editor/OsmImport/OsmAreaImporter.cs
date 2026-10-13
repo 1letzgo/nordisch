@@ -171,50 +171,11 @@ namespace LeGamez.Editor.OsmImport
             var worldRoot = new GameObject($"World_{meta.name}");
             worldRoot.isStatic = true;
 
-            // Meshes go into a single asset file per area.
-            string meshAssetPath = $"{areaDir}/{meta.id}_meshes.asset";
-            AssetDatabase.DeleteAsset(meshAssetPath);
-            var container = ScriptableObject.CreateInstance<GeneratedMeshes>();
-            AssetDatabase.CreateAsset(container, meshAssetPath);
-
-            var groups = new Dictionary<string, Transform>();
-            foreach (var kv in sink.Batches)
-            {
-                var (mat, chunk) = kv.Key;
-                if (kv.Value.vertices.Count == 0) continue;
-                if (!groups.TryGetValue(mat, out var parent))
-                {
-                    parent = new GameObject(mat).transform;
-                    parent.SetParent(worldRoot.transform, false);
-                    groups[mat] = parent;
-                }
-
-                bool facadeData = WorldStyle.MaterialOf(mat) == WorldStyle.MatBuildings || WorldStyle.MaterialOf(mat) == WorldStyle.MatGround;
-                var mesh = MeshSink.ToMesh(kv.Value, $"{meta.id}_{mat}_{chunk.x}_{chunk.y}", facadeData);
-                MeshUtility.Optimize(mesh);
-                AssetDatabase.AddObjectToAsset(mesh, container);
-
-                var go = new GameObject($"{mat}_{chunk.x}_{chunk.y}");
-                go.transform.SetParent(parent, false);
-                go.AddComponent<MeshFilter>().sharedMesh = mesh;
-                var mr = go.AddComponent<MeshRenderer>();
-                mr.sharedMaterial = materials[WorldStyle.MaterialOf(mat)];
-                bool casts = mat != WorldStyle.MatGround && mat != WorldStyle.MatWater && mat != WorldStyle.MatDetails;
-                mr.shadowCastingMode = casts ? ShadowCastingMode.On : ShadowCastingMode.Off;
-                if (WorldStyle.HasCollider(mat))
-                    go.AddComponent<MeshCollider>().sharedMesh = mesh;
-                // Thin props (lamps, trunks, fences) block the player but not the camera probe.
-                if (mat == WorldStyle.MatProps || mat == WorldStyle.MatTreeTrunks) go.layer = 2;
-                if (mat == WorldStyle.MatDetails) go.layer = WorldStyle.DetailsLayer;
-                // Water: collider on the built-in "Water" layer so placement can detect it; the player walks through.
-                if (mat == WorldStyle.MatWater)
-                {
-                    go.AddComponent<MeshCollider>().sharedMesh = mesh;
-                    go.layer = 4;
-                }
-                GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccluderStatic | StaticEditorFlags.OccludeeStatic);
-            }
-
+            // World geometry: one asset per WorldStreamer tile (meshes as sub-assets), loaded around the camera at runtime.
+            var streamer = new GameObject("WorldStreamer").AddComponent<WorldStreamer>();
+            streamer.transform.SetParent(worldRoot.transform, false);
+            streamer.areaId = meta.id;
+            streamer.tileKeys = WriteTiles(sink, meta.id, areaDir, materials, streamer.materials);
             AddGroundAndBounds(worldRoot.transform, area);
             TrafficBuilder.Spawn(worldRoot.transform, terrain, materials[WorldStyle.MatTrees]);
             var facade = new GameObject("FacadeDetails").AddComponent<FacadeDetails>();
@@ -272,6 +233,71 @@ namespace LeGamez.Editor.OsmImport
                       $"facade {FacadeRecords.Windows} windows/{FacadeRecords.Doors} doors/{FacadeRecords.Gutters} gutters/{FacadeRecords.Verges} verges/{FacadeRecords.Ridges} ridges, traffic {traffic.junctionSignals} signal junctions/{traffic.crossingSignals} signal crossings/{traffic.heads} heads/{traffic.zebras} zebras/{traffic.lanes} lanes/{traffic.stops} stop/{traffic.giveWays} give way/{traffic.priority} priority/{traffic.speed} speed/{traffic.oneway} one-way/{traffic.names} names/{traffic.mapped} mapped, {pois.Count} POIs, " +
                       $"{sink.Batches.Count()} meshes in {sw.ElapsedMilliseconds} ms -> {scenePath}");
             return scenePath;
+        }
+
+        /// <summary>
+        /// Sorts the sink's batches (100 m chunks, 25 m for details) into <see cref="WorldStreamer.TileSize"/> tiles and
+        /// writes one <see cref="WorldTile"/> asset per tile to &lt;areaDir&gt;/tiles (old tiles are removed first).
+        /// Meshes without collider are not CPU-readable – halves their memory on the device.
+        /// </summary>
+        static List<Vector2Int> WriteTiles(MeshSink sink, string id, string areaDir, Dictionary<string, Material> materials, List<Material> materialList)
+        {
+            string tileDir = $"{areaDir}/tiles";
+            if (AssetDatabase.IsValidFolder(tileDir)) AssetDatabase.DeleteAsset(tileDir);
+            AssetDatabase.DeleteAsset($"{areaDir}/{id}_meshes.asset"); // pre-streaming single mesh file
+            EnsureFolder(tileDir);
+
+            var tiles = new Dictionary<Vector2Int, WorldTile>();
+            {
+                foreach (var kv in sink.Batches)
+                {
+                    var (mat, chunk) = kv.Key;
+                    if (kv.Value.vertices.Count == 0) continue;
+                    float chunkSize = mat == WorldStyle.MatDetails ? MeshSink.DetailChunkSize : MeshSink.ChunkSize;
+                    var key = WorldStreamer.KeyOf((chunk.x + 0.5f) * chunkSize, (chunk.y + 0.5f) * chunkSize);
+                    if (!tiles.TryGetValue(key, out var tile))
+                    {
+                        tile = ScriptableObject.CreateInstance<WorldTile>();
+                        tile.key = key;
+                        tile.name = WorldStreamer.TileName(id, key);
+                        AssetDatabase.CreateAsset(tile, WorldStreamer.EditorTilePath(id, key));
+                        tiles[key] = tile;
+                    }
+
+                    string style = WorldStyle.MaterialOf(mat);
+                    bool facadeData = style == WorldStyle.MatBuildings || style == WorldStyle.MatGround;
+                    var mesh = MeshSink.ToMesh(kv.Value, $"{id}_{mat}_{chunk.x}_{chunk.y}", facadeData);
+                    MeshUtility.Optimize(mesh);
+                    bool collider = WorldStyle.HasCollider(mat) || mat == WorldStyle.MatWater;
+                    AssetDatabase.AddObjectToAsset(mesh, tile);
+                    if (!collider)
+                    {
+                        var so = new SerializedObject(mesh);
+                        so.FindProperty("m_IsReadable").boolValue = false;
+                        so.ApplyModifiedPropertiesWithoutUndo();
+                    }
+
+                    var material = materials[style];
+                    int mi = materialList.IndexOf(material);
+                    if (mi < 0) { mi = materialList.Count; materialList.Add(material); }
+                    bool casts = mat != WorldStyle.MatGround && mat != WorldStyle.MatWater && mat != WorldStyle.MatDetails;
+                    // Thin props (lamps, trunks, fences) block the player but not the camera probe; water sits on
+                    // the built-in "Water" layer so placement can detect it, the player walks through.
+                    int layer = mat == WorldStyle.MatProps || mat == WorldStyle.MatTreeTrunks ? 2
+                              : mat == WorldStyle.MatDetails ? WorldStyle.DetailsLayer
+                              : mat == WorldStyle.MatWater ? 4 : 0;
+                    tile.parts.Add(new WorldTile.Part
+                    {
+                        mesh = mesh, material = mi, layer = layer, group = mat,
+                        flags = (byte)((collider ? WorldTile.FlagCollider : 0) | (casts ? WorldTile.FlagShadows : 0)),
+                    });
+                }
+                foreach (var t in tiles.Values) EditorUtility.SetDirty(t);
+            }
+            AssetDatabase.SaveAssets();
+            var keys = tiles.Keys.ToList();
+            keys.Sort((a, b) => a.x != b.x ? a.x.CompareTo(b.x) : a.y.CompareTo(b.y));
+            return keys;
         }
 
         /// <summary>Named OSM streets/paths as segments (asset next to the meshes) for the HUD street display.</summary>
