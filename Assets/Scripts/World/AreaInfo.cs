@@ -13,6 +13,8 @@ namespace LeGamez.World
         public float sizeMeters = 1000f;
         public List<string> allowedVehicles = new List<string>();
         public PoiDatabase pois;
+        [Tooltip("Named streets for the HUD street display, filled by the importer.")]
+        public StreetIndex streets;
         public Transform spawnPoint;
         [Tooltip("Parked bicycles (OSM bicycle_parking), filled by the importer.")]
         public List<Vector3> bikeSpots = new List<Vector3>();
@@ -20,6 +22,8 @@ namespace LeGamez.World
         public Vector3 spawnBikeSpot;
         [Tooltip("Parked cars: (x, y, z, yaw), filled by the importer from car_spots in areas.json.")]
         public List<Vector4> carSpots = new List<Vector4>();
+        [Tooltip("Top-down render of the area (+MapMargin) for minimap and full map, set by SceneSnapshot.RenderThumbnails.")]
+        public Texture2D mapTexture;
         [TextArea] public string attribution = "© OpenStreetMap-Mitwirkende";
 
         public static AreaInfo Current { get; private set; }

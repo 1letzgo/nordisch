@@ -43,6 +43,7 @@ python3 Tools/dgm/fetch_dgm.py <id>      # Gelände DGM1 → Data/<id>.dgm.bin
 python3 Tools/dgm/fetch_trees.py <id>    # Bäume DOM1−DGM1 → Data/<id>.trees.json
 python3 Tools/dop/fetch_dop.py <id>      # Luftbild DOP20 RGBI → Data/<id>.dop.png/.json (braucht rasterio)
 python3 Tools/alkis/fetch_parcels.py <id> # Flurstücke (INSPIRE-WFS) → Data/<id>.parcels.json → Gartenzäune/-grenzen
+python3 Tools/osm/fetch_traffic.py <id>  # Ampeln, Übergänge, Stopp/Vorfahrt, Verkehrszeichen (OSM-Knoten) → Data/<id>.traffic.json
 # nach dem ersten Unity-Import (braucht Assets/Generated/<id>/<id>_buildings.json als Maske), dann nochmal importieren:
 python3 Tools/dgm/fetch_hedges.py <id>   # echte Hecken bDOM20−DGM1 + DOP-NIR (aktuell, 0,4 m) → Data/<id>.hedges.json (~4 min)
 ```
@@ -60,6 +61,7 @@ grep -E "error CS|\[OSM\]|\[Trees\]" /tmp/import.log
 - Exit 139 = bekannter Absturz beim Asset-Import → einfach erneut starten.
 - Die `[OSM]`-Zeile muss `terrain DGM1`, `aerial DOP20`, `trees LiDAR` zeigen (sonst fehlt die jeweilige Datei)
   und `gardens N plots/M measured hedges/…` mit N, M > 0 (sonst fehlt `parcels.json` bzw. `hedges.json`).
+- `traffic …`: in Städten > 0 Ampelkreuzungen/Schilder (sonst fehlt `traffic.json`); Inseln haben fast nur Straßenschilder.
 - Unity meldet „No valid Unity Editor license found“ → Nutzer muss sich im Unity Hub neu anmelden.
 - Nur ein Gebiet: `-executeMethod LeGamez.Editor.OsmImport.OsmAreaImporter.ImportAreaBatch -area <id>`
   (Menü-Szene/Katalog werden dann trotzdem aktualisiert).
@@ -77,11 +79,18 @@ Bilder in `Builds/Snapshots/<id>_{top,aerial,street,landmark}.png` mit Read anse
 - Gärten: Hecken/Zäune an Grundstücksgrenzen, Einfahrten (gepflastert im Luftbild) frei, nichts auf Straßen oder
   durch Häuser. Hecken-Erkennung prüfen: Overlay der `hedges.json`-Linien auf `Data/<id>.dop.png` (rot) ansehen –
   rot = Grenzhecken (sollen durchgängig auf den Grundstücksgrenzen liegen), gelb = freie Hecken außerhalb der Gärten.
-- Spawnpunkt/Startfahrrad nicht in Brunnen/Wasser; Menü-Thumbnail (`Assets/Resources/AreaThumbs/<id>.png`) ok.
+- `facade N windows/…` in der `[OSM]`-Zeile > 0 (sonst fehlen LoD2-Häuser). Nahdetails (Rahmen, Rinnen, Ortgang) sieht man
+  erst zur Laufzeit; für Testbilder `FacadeDetails.Refresh(kameraPosition, 1000)` vor dem Rendern aufrufen.
+- Verkehr: Ampeln/Schilder am rechten Fahrbahnrand, nicht auf der Fahrbahn; Schrift lesbar und nicht durch Hecken/Häuser
+  sichtbar (Shader `LeGamez/SignText`); keine Schilderwälder (Einbahn-/Tempo-Schilder nur an echten Übergängen).
+- Spawnpunkt/Startfahrrad nicht in Brunnen/Wasser; Menü-Thumbnail (`Assets/Generated/<id>/<id>_thumb.png`) ok.
 - POIs: `Assets/Generated/<id>/<id>_pois.asset` (max. 30) sinnvoll?
 Fehler → im Importer beheben (gilt dann für alle Karten), nicht per Hand in der Szene.
 
 ## 5. Aufs iPhone
+
+Die App enthält keine Karten: Auf dem Gerät erscheint eine neue Karte erst nach `publish_maps.sh <id>` (Abschnitt 6).
+Vorher im Unity-Editor (Play im MainMenu) oder über die Snapshots prüfen.
 
 ```bash
 ...Unity -batchmode -quit -projectPath . -buildTarget iOS -executeMethod LeGamez.Editor.BuildScript.BuildIOS -logFile /tmp/build.log
@@ -97,7 +106,9 @@ Builds brauchen mehrere GB – bei „Disk full“ nur eigene Simulator-/Derived
 ## 6. Abschluss
 
 - Commit: `Tools/osm/areas.json`, `Data/<id>.*`, `Assets/Generated/<id>/`, `Assets/Scenes/Areas/<Name>.unity`,
-  `Assets/Resources/AreaCatalog.asset`, `AreaThumbs/`, `AreaMaps/`, `MainMenu.unity`, Build-Settings.
+  `Assets/Generated/AreaCatalog.asset`, `MainMenu.unity`.
+- In die App bringen: `Tools/release/publish_maps.sh <id>` (Unity zu; baut iOS + Android-Bundle, lädt in die GitHub-Release
+  `maps`, aktualisiert `maps.json`). Erst `--dry-run`, Upload nur nach Rückfrage beim Nutzer (öffentlich).
   Nur eigene Änderungen stagen, wenn parallel eine andere Sitzung im Repo arbeitet.
 - Dem Nutzer berichten: Gebiet/Größe, Häuser (LoD2 + OSM-only), Bäume, Datenstand (Befliegungsjahr), Auffälligkeiten.
 - Neue Erkenntnisse/Stolperfallen in `CLAUDE.md` und hier ergänzen.

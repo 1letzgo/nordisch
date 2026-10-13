@@ -6,6 +6,7 @@ using LeGamez.Quests;
 using LeGamez.World;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace LeGamez.UI
@@ -13,9 +14,17 @@ namespace LeGamez.UI
     /// <summary>
     /// Full-screen north-up area map (opened by tapping the minimap). Tap a spot or a POI to place a
     /// target pin, then "Hierhin beamen" teleports the player to the nearest free ground there.
+    /// Zoom: two-finger pinch, mouse wheel or the +/− buttons; drag pans the zoomed map.
     /// </summary>
-    public class FullMap : MonoBehaviour, IPointerClickHandler
+    public class FullMap : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
+        const float MaxZoom = 6f;
+        float zoom = 1f;
+        bool gesture;          // pinch or drag in progress / just ended: the release is not a tap
+        float pinchStartDist, pinchStartZoom;
+        Vector2 pinchLastMid;
+        Canvas canvas;
+
         RectTransform mapRect, pin, playerMarker;
         Button beamButton;
         Text hint;
@@ -69,7 +78,7 @@ namespace LeGamez.UI
             fm.mapRect = UiKit.Rect("Map", mask, new Vector2(0.5f, 0.5f), Vector2.zero, mapPx);
             fm.mapPixels = mapPx;
             var raw = fm.mapRect.gameObject.AddComponent<RawImage>();
-            raw.texture = fm.area != null ? Resources.Load<Texture2D>("AreaMaps/" + fm.area.areaId) : null;
+            raw.texture = fm.area != null ? fm.area.mapTexture : null;
             raw.raycastTarget = true; // taps land here (handled by FullMap via bubbling)
 
             // POIs with names.
@@ -116,6 +125,20 @@ namespace LeGamez.UI
             closeBtn.onClick.AddListener(fm.Hide);
             UiKit.Stretch(UiKit.Label(close, "×", 54, UiKit.Navy, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform);
 
+            // Zoom buttons at the right edge of the map.
+            for (int i = 0; i < 2; i++)
+            {
+                bool plus = i == 0;
+                var zb = UiKit.Rect(plus ? "ZoomIn" : "ZoomOut", root, new Vector2(0.5f, 0.5f),
+                    new Vector2(mapPx.x / 2 - 56, -mapPx.y / 2 + (plus ? 150 : 56)), new Vector2(80, 80));
+                UiKit.DropShadow(zb, 10f, -3f, 0.3f);
+                var zi = UiKit.Panel(zb.gameObject, new Color(1, 1, 1, 0.95f), UiKit.Circle);
+                var zbtn = zb.gameObject.AddComponent<Button>();
+                zbtn.targetGraphic = zi;
+                zbtn.onClick.AddListener(() => fm.ZoomAroundCentre(plus ? 1.6f : 1f / 1.6f));
+                UiKit.Stretch(UiKit.Label(zb, plus ? "+" : "−", 52, UiKit.Navy, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform);
+            }
+
             // Beam button.
             var beam = UiKit.Rect("Beam", root, new Vector2(0.5f, 0.5f), new Vector2(0, -(mapPx.y / 2 + 90)), new Vector2(520, 104));
             UiKit.DropShadow(beam, 16f, -5f, 0.35f);
@@ -149,15 +172,102 @@ namespace LeGamez.UI
             target = null;
             pin.gameObject.SetActive(false);
             beamButton.interactable = false;
-            hint.text = "Tippe auf einen Ort oder ein Ziel";
-            foreach (var (poi, dot) in dots)
-                dot.color = area != null && StampBook.Has(area.areaId, poi.id) ? UiKit.Done : NavState.Target == poi ? UiKit.Mustard : Color.white;
+            hint.text = "Tippe auf einen Ort oder ein Ziel · zwei Finger zoomen";
+            if (canvas == null) canvas = GetComponentInParent<Canvas>();
+            SetZoom(1f, Vector2.zero);
         }
 
         void Hide()
         {
             if (player != null) player.InputEnabled = true;
             gameObject.SetActive(false);
+        }
+
+        Camera UiCamera => canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+
+        void Update()
+        {
+            // Pinch zoom (two fingers) – zooms about the midpoint and pans with it.
+            var ts = Touchscreen.current;
+            int down = 0;
+            Vector2 a = default, b = default;
+            if (ts != null)
+                foreach (var t in ts.touches)
+                {
+                    if (!t.press.isPressed) continue;
+                    if (down == 0) a = t.position.ReadValue(); else if (down == 1) b = t.position.ReadValue();
+                    down++;
+                }
+            if (down >= 2)
+            {
+                float dist = Vector2.Distance(a, b);
+                var mid = (a + b) * 0.5f;
+                if (pinchStartDist <= 0f) { pinchStartDist = Mathf.Max(1f, dist); pinchStartZoom = zoom; pinchLastMid = mid; }
+                gesture = true;
+                ZoomAt(mid, pinchStartZoom * dist / pinchStartDist);
+                PanBy(mid - pinchLastMid);
+                pinchLastMid = mid;
+            }
+            else
+            {
+                pinchStartDist = 0f;
+                if (down == 0 && !(Mouse.current != null && Mouse.current.leftButton.isPressed)) gesture = false;
+            }
+            // Mouse wheel (Mac / editor).
+            var mouse = Mouse.current;
+            if (mouse != null)
+            {
+                float wheel = mouse.scroll.ReadValue().y;
+                if (Mathf.Abs(wheel) > 0.01f) ZoomAt(mouse.position.ReadValue(), zoom * Mathf.Pow(1.0015f, wheel));
+            }
+        }
+
+        public void OnBeginDrag(PointerEventData e) => gesture = true;
+
+        public void OnDrag(PointerEventData e)
+        {
+            if (pinchStartDist > 0f) return; // the pinch handles panning
+            PanBy(e.delta);
+        }
+
+        public void OnEndDrag(PointerEventData e) { }
+
+        /// <summary>Screen-pixel delta → map offset.</summary>
+        void PanBy(Vector2 screenDelta)
+        {
+            float k = canvas != null ? canvas.scaleFactor : 1f;
+            SetZoom(zoom, mapRect.anchoredPosition + screenDelta / Mathf.Max(0.01f, k));
+        }
+
+        void ZoomAroundCentre(float factor)
+        {
+            var centre = RectTransformUtility.WorldToScreenPoint(UiCamera, mapRect.parent.position);
+            ZoomAt(centre, zoom * factor);
+        }
+
+        /// <summary>Zooms so the map point under <paramref name="screenPoint"/> stays put.</summary>
+        void ZoomAt(Vector2 screenPoint, float newZoom)
+        {
+            newZoom = Mathf.Clamp(newZoom, 1f, MaxZoom);
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(mapRect, screenPoint, UiCamera, out var local)) return;
+            var offset = mapRect.anchoredPosition + local * (zoom - newZoom);
+            SetZoom(newZoom, offset);
+        }
+
+        void SetZoom(float z, Vector2 offset)
+        {
+            zoom = Mathf.Clamp(z, 1f, MaxZoom);
+            // Keep the map covering its frame.
+            var limit = mapPixels * (zoom - 1f) * 0.5f;
+            offset.x = Mathf.Clamp(offset.x, -limit.x, limit.x);
+            offset.y = Mathf.Clamp(offset.y, -limit.y, limit.y);
+            mapRect.localScale = Vector3.one * zoom;
+            mapRect.anchoredPosition = offset;
+            // Markers keep their screen size.
+            var inv = Vector3.one / zoom;
+            foreach (var (_, dot) in dots) dot.rectTransform.localScale = inv;
+            pin.localScale = inv;
+            playerMarker.localScale = inv;
         }
 
         void LateUpdate()
@@ -169,12 +279,13 @@ namespace LeGamez.UI
 
         public void OnPointerClick(PointerEventData e)
         {
+            if (gesture || e.dragging) return;
             if (!RectTransformUtility.RectangleContainsScreenPoint(mapRect, e.position, e.pressEventCamera)) return;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(mapRect, e.position, e.pressEventCamera, out var local);
 
             // Snap to a POI if the tap is close to one.
             PoiEntry snapped = null;
-            float best = 40f;
+            float best = 40f / zoom;
             foreach (var (poi, _) in dots)
             {
                 float d = Vector2.Distance(WorldToMap(poi.position), local);
@@ -196,7 +307,7 @@ namespace LeGamez.UI
             Vector3 wanted = target.Value;
             if (targetPoi != null)
             {
-                // Land a few metres in front of the landmark (inside the stamp radius), not in its marker.
+                // Land a few metres in front of the landmark, facing it.
                 Vector3 away = player.transform.position - targetPoi.position;
                 away.y = 0f;
                 if (away.sqrMagnitude < 0.01f) away = Vector3.back;

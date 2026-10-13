@@ -58,11 +58,35 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
      -executeMethod LeGamez.Editor.OsmImport.OsmAreaImporter.ImportAllBatch -logFile /tmp/import.log
    grep "\[OSM\]" /tmp/import.log
    ```
-   Ergebnis: `Assets/Scenes/Areas/<Name>.unity`, Eintrag in `Assets/Resources/AreaCatalog.asset`, Thumbnail `Resources/AreaThumbs/<id>.png`,
-   Minimap `Resources/AreaMaps/<id>.png`. Die Szene steht automatisch in den Build-Settings; das Menü zeigt sie als Karte.
+   Ergebnis: `Assets/Scenes/Areas/<Name>.unity`, Eintrag in `Assets/Generated/AreaCatalog.asset`, Thumbnail `Generated/<id>/<id>_thumb.png`,
+   Minimap `Generated/<id>/<id>_map.png` (hängt an `AreaInfo.mapTexture`). Im Editor zeigt das Menü die Szene sofort als Karte;
+   in die App kommt sie erst per **Veröffentlichen** (Schritt 7). Die Build-Settings enthalten nur `MainMenu`.
 5. **Prüfen**: `-executeMethod LeGamez.Editor.SceneSnapshot.RenderAll` rendert Luft-/Straßen-/Wahrzeichen-Bilder nach `Builds/Snapshots/`.
    POI-Auswahl in `Assets/Generated/<id>/<id>_pois.asset` ansehen (max. 30, Hotels/Läden sind ausgefiltert).
 6. **Bauen & aufs iPhone** – siehe unten.
+7. **Veröffentlichen**: `Tools/release/publish_maps.sh [<id> …]` – siehe „Karten-Downloads“.
+
+### Karten-Downloads (App enthält keine Karten)
+- Jede Stadt = ein AssetBundle pro Plattform (Szene + Meshes + POIs + Straßen + Minimap + Materialien/Shader), gebaut von
+  `Editor/MapBundles` (`-buildTarget iOS|Android -executeMethod LeGamez.Editor.MapBundles.BuildBatch [-areas a,b]`)
+  nach `Builds/Maps/<platform>/<id>.bundle` (LZMA) + `index.json`.
+- `Tools/release/publish_maps.sh [--dry-run] [--drop-old] [<id> …]` baut iOS + Android und lädt **nur geänderte** Karten
+  (Inhalts-CRC) in die GitHub-**Pre-Release `maps`** (nie „latest“ → stört den APK-Updater nicht). Katalog
+  `https://github.com/1letzgo/nordisch/releases/download/maps/maps.json`: je Karte Name/Lage/Fahrzeuge/Thumbnail-URL und
+  `builds[]` = {platform, format, unity, version (yyyyMMddHHmm), url, size, sha256, crc}. Alte, nicht mehr referenzierte Assets werden gelöscht.
+- App: `Core/MapStore` – Katalog einmal pro App-Start laden (Kopie für offline), Download → Größe + SHA-256 prüfen →
+  `RecompressAssetBundleAsync` nach LZ4 → `persistentDataPath/maps/<id>/map.bundle` + `info.json` (iOS: kein iCloud-Backup).
+  Spielen = Bundle laden + Szene daraus; zurück im Menü wird es entladen. Im Editor listet `MapStore` die lokalen Szenen.
+- **Update-Logik**: Ein Build passt nur bei gleicher Plattform, `MapStore.Format` und Unity-Version. Neuerer passender Build
+  → „Update“ (im WLAN automatisch, sonst Tipp auf das Pill; die alte Version bleibt bis zum Tausch spielbar).
+  Installierter Build passt nicht mehr (App-Update) → „Update nötig“. Kein passender Build → „Neue App-Version nötig“.
+- `MapStore.Format` erhöhen, wenn Kartenszenen etwas brauchen, das ältere Apps nicht haben (neues Skript in Szenen,
+  geänderte serialisierte Felder von AreaInfo/TrafficLights/FacadeDetails/PoiDatabase/StreetIndex …).
+  **Reihenfolge bei neuem Format oder Unity-Update: erst Karten veröffentlichen, dann App releasen** (ohne `--drop-old`,
+  damit alte Apps ihre Builds behalten).
+- Stripping: Engine-Code-Stripping sieht nur das Menü → `Assets/link.xml` (TextMesh, Collider, Light, Assembly-CSharp) und
+  `BuildScript` übergibt das Bundle-Manifest der letzten Kartenbuilds. Fog-Varianten: Grafik-Einstellung „Fog Modes“ = Custom
+  (`MapBundles` setzt das), sonst fehlt in Kartenszenen der Nebel.
 
 ### Was der Importer macht (`Assets/Editor/OsmImport/`)
 - `OsmData` + `MiniJson`: Overpass-JSON lesen, `GeoProjection` (äquirektangulär um den Mittelpunkt, 1 Unit = 1 m, +X Ost, +Z Nord).
@@ -93,12 +117,30 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
   Hecken kürzen sich an Straßen/Gehwegen (Abstand 0,5 m + halbe Breite). Map-Editor-Modus „Gärten“: jede gebaute Linie
   hat eine ID `<art>@<x·10>,<z·10>` (Mitte) in `Assets/Generated/<id>/<id>_gardens.json`; `Data/<id>.garden.json`
   = `{"removed": [ids], "lines": [{"kind","points","height"}]}` (entfernen ±1,5 m tolerant, gezeichnete Linien werden gebaut).
+- `TrafficBuilder`: Verkehr aus `Data/<id>.traffic.json` (`Tools/osm/fetch_traffic.py`, OSM-Knoten: Ampeln, Übergänge,
+  stop/give_way, traffic_sign; getrennt von osm.json, damit Objekt-IDs stabil bleiben) + aus dem Straßennetz abgeleitet.
+  Kreuzungen = gemeinsame Way-Punkte mit ≥ 3 Armen. Ampelknoten ≤ 28 m → Ampelkreuzung (Kopf je Zufahrt rechts, Haltlinie,
+  Fußgängerfurten; Gruppe 0/1 nach Achse), sonst Fußgängerampel. Lampen animiert zur Laufzeit (`World/TrafficLights`,
+  ein Mesh, Vertex-Farben, Phasen rot/rot-gelb/grün/gelb). Zebrastreifen + Z. 350 nur bei zebra/markings=yes, `dashes` = Furt.
+  Vorfahrt: Nebenstraße (Rang kleiner, Hauptstraße ≥ tertiary) → Vorfahrt achten + Wartelinie, Hauptstraße → Z. 306;
+  gleichrangig = rechts vor links (keine Schilder). Tempo-/Zone-30-Schilder wo maxspeed wechselt (nicht beim Abbiegen in
+  größere Straßen, nicht `DE:urban`), Einbahn: Pfeil am Anfang, Z. 267 nur am echten Ende (nicht bei Hauptstraßen ≥ secondary),
+  Straßennamen-Schilder an Kreuzungen benannter Straßen, kartierte Schilder (Ortsschild, 101, 239, 242.1 …).
+  Schrift = TextMesh (eingebauter Font) auf Layer 8 mit Shader `LeGamez/SignText` (Tiefentest, keine Rückseite;
+  `SignTextFont` hält die Font-Textur aktuell), Material `Assets/Generated/Materials/SignText.mat`.
 - `PropPlacer`: LiDAR-Bäume (`<id>.trees.json`, Höhe/Krone echt) bzw. ohne Datei OSM-Bäume, Baumgruppen in Parks/Wäldern (mit Abstand zu Wegen), Büsche auf Dünen/Heide, Straßenlaternen.
   Kronen = facettierter Hauptklumpen + Ring kleinerer Klumpen bis zum gemessenen Radius (~40–100 Dreiecke), Nadelbäume 3 Kegel.
   Pflanzen-Builder ziehen aus dem gemeinsamen `rng` genau so viele Zahlen wie früher (`Fork`), sonst verschieben sich IDs/Edits.
-- `Lod2Builder`: zusätzlich Fensterbänke unter jedem Shader-Fenster (gleiches Raster wie `FacadeMask`) im Bucket `Details`
-  (Layer 8, keine Schatten/Kollider, 25-m-Chunks; die Spielkamera blendet Layer 8 ab 120 m aus).
-- `PoiExtractor`: benannte Sehenswürdigkeiten → Stempelheft.
+- Nahdetails an LoD2-Häusern (`FacadeRecords` im Importer → `Assets/Generated/<id>/<id>_facade.bytes`, nicht im Repo):
+  je Shader-Fenster (gleiches Raster wie `FacadeMask`) 3D-Rahmen mit Sprossen, Fensterbank, bei Klinker Rollschicht-Sturz;
+  Ladenfenster mit dunklem Rahmen; Haustür mit Vordach + Stufe; Dachrinne + Fallrohr an Traufkanten; weiße Ortgangbretter
+  an Giebelkanten (Dachkanten, die nur eine Dachfläche hat); Firstziegel; Sockelband. Gebaut wird erst zur Laufzeit
+  (`World/FacadeDetails`): 32-m-Zellen im Umkreis von ~95 m um die Kamera, max. 3 Zellen pro Tick, weiter weg wieder
+  verworfen – fern bleiben die Shader-Fenster. Datensatz: 10 floats (kind, x, y, z, along x/z, a, b, c, RGB);
+  Außennormale = (−along.z, along.x). Neue Teile: Kind-Konstante + Builder in `FacadeDetails`, Erfassen in `Lod2Builder`.
+- `PoiExtractor`: benannte Sehenswürdigkeiten → Punkte/Namen auf Mini- und Großkarte (Beam-Ziele). Kein Stempelheft mehr.
+- Straßenindex (`StreetIndex`, `<id>_streets.asset`): benannte OSM-Wege + Plätze als Segmente → HUD zeigt unter dem
+  Ortsnamen die aktuelle Straße (`UI/StreetDisplay`, nächste Straße ≤ 30 m, 4 m Trägheit gegen Flackern).
 - `MeshSink`: Geometrie pro Material und 100-m-Chunk; Kollider für Gebäude, Stämme, Props
   (Stämme/Props liegen auf Layer 2, damit die Kamera sie ignoriert).
 - Shader `Assets/Shaders/VertexColorLit.shader`: Vertex-Farben, Fenster/Sprossen (Laibungsschatten, Gardinen), Klinker, Putz,
@@ -126,6 +168,7 @@ Skill: **`/create-map`** (`.claude/skills/create-map/SKILL.md`) führt durch den
 ```bash
 # 1. Eintrag in Tools/osm/areas.json
 python3 Tools/osm/fetch_area.py <id>
+python3 Tools/osm/fetch_traffic.py <id>    # Ampeln/Schilder (OSM)
 python3 Tools/lod2/fetch_lod2.py <id>      # nur Niedersachsen
 python3 Tools/dgm/fetch_dgm.py <id>        # Gelände, nur Niedersachsen
 python3 Tools/dgm/fetch_trees.py <id>      # Bäume aus DOM1, nach lod2
@@ -139,7 +182,8 @@ Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen sp�
   plus eines am Startpunkt (`spawnBikeSpot`). Rennen-Knopf = zweiter Gang auf dem Rad.
 - `Core/PositionMemory`: letzte Position, Blickrichtung und Fahrstatus pro Gebiet (PlayerPrefs; Schlüssel enthält Größe+Zentrum,
   wird also bei Gebietsänderung verworfen). Figurenwahl: `PlayerAvatar.SelectedIndex`.
-- `UI/FullMap`: Tipp auf Minikarte → große Karte, Beamen. `UI/Navigation`: Minikarte + Ziel-Pille.
+- `UI/FullMap`: Tipp auf Minikarte → große Karte, Beamen. Zoom bis 6× per Zwei-Finger-Pinch, Mausrad oder ＋/−, Ziehen verschiebt;
+  Marker behalten ihre Bildschirmgröße. Kartentextur `AreaInfo.mapTexture` (`Generated/<id>/<id>_map.png`) ~2 px/m (max. 4096). `UI/Navigation`: Minikarte.
 
 ## Bauen
 - Projekt-Setup (Player-Settings, URP, Materialien, Figuren, Logo/Icon): `-executeMethod LeGamez.Editor.ProjectSetup.Run`
@@ -156,7 +200,7 @@ Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen sp�
 ### Android
 - Unity-Module `android`, `android-sdk-ndk-tools`, `android-open-jdk` (über Unity Hub installiert). ARM64, IL2CPP, Vulkan + GLES3, minSdk 26,
   gleiche Bundle-ID. Einstellungen: `ProjectSetup.ConfigureAndroid` (läuft auch vor jedem Android-Build).
-- APK: `-buildTarget Android -executeMethod LeGamez.Editor.BuildScript.BuildAndroid` → `Builds/Android/Nordisch.apk` (~200 MB, alle Gebiete).
+- APK: `-buildTarget Android -executeMethod LeGamez.Editor.BuildScript.BuildAndroid` → `Builds/Android/Nordisch.apk` (ohne Karten – die kommen per Download).
 - Emulator (AVD `nordisch`, Pixel 7, Android 36.1 Play-Image, GPU host):
   ```bash
   ~/Library/Android/sdk/emulator/emulator -avd nordisch -no-snapshot-save -no-boot-anim &
@@ -166,7 +210,7 @@ Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen sp�
   Querformat testen: `adb emu sensor set acceleration 9.81:0:0` (zurück: `0:9.81:0`). Logs: `adb logcat -s Unity`.
 - Eigenheiten: Unitys Auto-Rotation bleibt auf Android im Start-Format hängen → `Core/AppOrientation` dreht selbst nach
   `Input.deviceOrientation` (respektiert Rotationssperre). Back-Taste = Escape (Predictive Back aus): schließt große Karte,
-  sonst zurück ins Menü, im Menü App in den Hintergrund. `Assets/link.xml` hält Collider-Klassen fürs Engine-Stripping (`CreatePrimitive`).
+  sonst zurück ins Menü, im Menü App in den Hintergrund. `Assets/link.xml` hält Collider-Klassen fürs Engine-Stripping (`CreatePrimitive`) und alles, was Kartenszenen brauchen.
 
 ## Release (GitHub, öffentlich: https://github.com/1letzgo/nordisch)
 - Android: `Tools/release/release_android.sh` (Unity zu, versionierte Dateien sauber) → Version = Datum (`2026.10.13`, `.2` …),
@@ -176,6 +220,7 @@ Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen sp�
 - Release-APKs laufen **15 Tage** nach dem Build ab: `BuildScript.BuildAndroidRelease` bettet `Resources/BuildInfo.txt`
   (nur während des Builds) ein, `Core/BuildExpiry` + Sperrbildschirm im Hauptmenü mit Link auf das neueste Release.
   Normale Builds (BuildAndroid/BuildIOS) laufen nie ab.
+- Karten: `Tools/release/publish_maps.sh` (siehe „Karten-Downloads“), unabhängig vom App-Release.
 - iOS/TestFlight: Skill `/testflight-build` auf `Builds/iOS` nach `BuildIOS`; vorher in `Builds/iOS/Info.plist`
   `CFBundleShortVersionString` = Release-Version, `CFBundleVersion` = versionCode, `ITSAppUsesNonExemptEncryption` = false.
 - Generierte Meshes (`Assets/Generated/*/*_meshes.asset`) sind nicht im Repo (>100 MB) – nach dem Klonen `ImportAllBatch`.

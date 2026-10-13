@@ -300,7 +300,7 @@ namespace LeGamez.Editor.OsmImport
         // ---------------------------------------------------------------- primitives
 
         /// <summary>Axis-aligned (in local yaw frame) box with outward faces, all six sides.</summary>
-        static void Box(MeshSink.Batch b, Vector3 centre, Vector3 size, float yaw, Color32 c)
+        internal static void Box(MeshSink.Batch b, Vector3 centre, Vector3 size, float yaw, Color32 c)
         {
             var rot = Quaternion.Euler(0, yaw, 0);
             Vector3 h = size * 0.5f;
@@ -316,7 +316,7 @@ namespace LeGamez.Editor.OsmImport
             MeshSink.Quad(b, b0, b1, b2, b3, c); // bottom
         }
 
-        static void Cylinder(MeshSink.Batch b, Vector3 basePos, float r, float h, int sides, Color32 side, Color32 top, bool cap = true)
+        internal static void Cylinder(MeshSink.Batch b, Vector3 basePos, float r, float h, int sides, Color32 side, Color32 top, bool cap = true)
         {
             for (int i = 0; i < sides; i++)
             {

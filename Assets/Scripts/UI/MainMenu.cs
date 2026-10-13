@@ -21,8 +21,20 @@ namespace LeGamez.UI
     {
         const float PreviewFov = 30f;
 
-        AreaCatalog catalog;
         GameObject canvasGo;
+        int builtRevision = -1;
+        readonly List<CardUi> cards = new List<CardUi>();
+        readonly Dictionary<Texture2D, Sprite> thumbSprites = new Dictionary<Texture2D, Sprite>();
+
+        /// <summary>Live parts of an area card, refreshed every frame from <see cref="MapStore"/>.</summary>
+        class CardUi
+        {
+            public MapStore.Map map;
+            public Text status;
+            public RectTransform progressFill;
+            public Text deleteLabel;
+            public float deleteArmedUntil;
+        }
         bool? builtPortrait;
         Camera cam;
         CharacterPreview preview;
@@ -31,7 +43,7 @@ namespace LeGamez.UI
         void Start()
         {
             Application.targetFrameRate = 60;
-            catalog = AreaCatalog.Load();
+            MapStore.Init();
             cam = Camera.main;
             if (cam != null)
             {
@@ -65,12 +77,14 @@ namespace LeGamez.UI
                 activity.Call<bool>("moveTaskToBack", true);
             }
             bool portrait = Screen.height > Screen.width;
-            if (builtPortrait != portrait)
+            if (builtPortrait != portrait || builtRevision != MapStore.Revision)
             {
                 builtPortrait = portrait;
+                builtRevision = MapStore.Revision;
                 if (canvasGo != null) Destroy(canvasGo);
                 BuildUi(portrait);
             }
+            RefreshCards();
             PlacePreview(portrait);
             RefreshUpdateUi();
         }
@@ -88,6 +102,7 @@ namespace LeGamez.UI
 
         void BuildUi(bool portrait)
         {
+            cards.Clear();
             canvasGo = new GameObject("Menu", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             canvasGo.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
             var scaler = canvasGo.GetComponent<CanvasScaler>();
@@ -280,29 +295,35 @@ namespace LeGamez.UI
             UiKit.Label(sheet, "Karte © OpenStreetMap-Mitwirkende · 3D-Gebäude © LGLN · Figuren: Kenney (CC0)", 20, UiKit.InkSoft, TextAnchor.LowerCenter)
                 .Place(new Vector2(0.5f, 0f), new Vector2(0, 74), new Vector2(size.x, 30));
 
-            if (catalog == null || catalog.areas.Count == 0)
+            var maps = MapStore.Maps;
+            if (maps.Count == 0)
             {
-                UiKit.Label(sheet, "Noch keine Gebiete importiert.", 36, UiKit.InkSoft, TextAnchor.MiddleCenter)
-                    .Place(new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(size.x, 60));
+                string msg = MapStore.Fetching ? "Lade Kartenliste …"
+                    : Application.isEditor ? "Noch keine Gebiete importiert."
+                    : "Keine Karten geladen.\nFür den Download Internet einschalten.";
+                UiKit.Label(sheet, msg, 36, UiKit.InkSoft, TextAnchor.MiddleCenter)
+                    .Place(new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(size.x - 2 * padding, 120));
                 return;
             }
 
             const float gap = 28f;
             float top = padding * 0.8f + 90f, bottom = 120f;
-            int cols = 2, rows = Mathf.CeilToInt(catalog.areas.Count / 2f);
+            int cols = 2, rows = Mathf.CeilToInt(maps.Count / 2f);
             float cardW = (size.x - 2 * padding - gap * (cols - 1)) / cols;
             float cardH = Mathf.Min((size.y - top - bottom - gap * (rows - 1)) / rows, cardW * 0.95f);
-            for (int i = 0; i < catalog.areas.Count; i++)
+            for (int i = 0; i < maps.Count; i++)
             {
                 int c = i % cols, r = i / cols;
                 var pos = new Vector2(padding + c * (cardW + gap), -(top + r * (cardH + gap)));
-                AreaCard(sheet, catalog.areas[i], pos, new Vector2(cardW, cardH));
+                AreaCard(sheet, maps[i], pos, new Vector2(cardW, cardH));
             }
         }
 
-        void AreaCard(RectTransform parent, AreaCatalog.Entry area, Vector2 pos, Vector2 size)
+        void AreaCard(RectTransform parent, MapStore.Map map, Vector2 pos, Vector2 size)
         {
-            var card = UiKit.Rect($"Card {area.displayName}", parent, new Vector2(0, 1), pos, size);
+            var ui = new CardUi { map = map };
+            cards.Add(ui);
+            var card = UiKit.Rect($"Card {map.entry.name}", parent, new Vector2(0, 1), pos, size);
             UiKit.DropShadow(card, 16f, -6f, 0.28f);
             var bg = UiKit.Panel(card.gameObject, Color.white);
             var btn = card.gameObject.AddComponent<Button>();
@@ -310,8 +331,12 @@ namespace LeGamez.UI
             var colors = btn.colors;
             colors.pressedColor = new Color(0.9f, 0.92f, 0.95f);
             btn.colors = colors;
-            string scene = area.sceneName;
-            btn.onClick.AddListener(() => SceneManager.LoadSceneAsync(scene));
+            // Installed → play (also while an update downloads); otherwise the card starts the download.
+            btn.onClick.AddListener(() =>
+            {
+                if (map.Playable) MapStore.Play(map);
+                else MapStore.Download(map);
+            });
 
             // Thumbnail, clipped to rounded corners.
             float thumbH = size.y * 0.58f;
@@ -326,7 +351,7 @@ namespace LeGamez.UI
             UiKit.Stretch(thumb);
             var thumbImg = thumb.gameObject.AddComponent<Image>();
             thumbImg.raycastTarget = false;
-            var sprite = Resources.Load<Sprite>("AreaThumbs/" + area.id);
+            var sprite = ThumbSprite(map.thumb);
             if (sprite != null)
             {
                 thumbImg.sprite = sprite;
@@ -335,24 +360,116 @@ namespace LeGamez.UI
                 fit.aspectRatio = sprite.rect.width / sprite.rect.height;
             }
             else thumbImg.color = UiKit.Sea;
+            // Not on the device yet: washed out.
+            if (!map.Playable)
+            {
+                var veil = UiKit.Rect("Veil", mask);
+                UiKit.Stretch(veil);
+                veil.gameObject.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.45f);
+                veil.GetComponent<Image>().raycastTarget = false;
+            }
 
             // Type badge on the thumbnail.
-            bool island = area.vehicles.Contains("carriage");
+            bool island = map.HasVehicle("carriage");
             var badge = UiKit.Rect("Badge", mask, new Vector2(0, 1), new Vector2(16, -16), new Vector2(116, 46));
             UiKit.Panel(badge.gameObject, island ? UiKit.Island : UiKit.City);
             UiKit.Stretch(UiKit.Label(badge, island ? "Insel" : "Stadt", 26, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform);
 
+            // Download state: pill on the thumbnail (bottom), progress bar along its lower edge.
+            var pill = UiKit.Rect("Status", mask, new Vector2(1, 0), new Vector2(-14, 14), new Vector2(Mathf.Min(size.x - 44, 420), 50));
+            var pillImg = UiKit.Panel(pill.gameObject, UiKit.Mustard);
+            ui.status = UiKit.Label(pill, "", 26, UiKit.Navy, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UiKit.Stretch(ui.status.rectTransform, 6f);
+            if (map.status == MapStore.Status.UpdateAvailable || (map.status == MapStore.Status.Failed && map.Playable))
+            {
+                // Playable map with a newer version: the pill itself fetches it, the card still plays.
+                var upd = pill.gameObject.AddComponent<Button>();
+                upd.targetGraphic = pillImg;
+                upd.onClick.AddListener(() => MapStore.Download(map));
+            }
+            var track = UiKit.Rect("Progress", mask);
+            track.anchorMin = new Vector2(0, 0); track.anchorMax = new Vector2(1, 0);
+            track.pivot = new Vector2(0.5f, 0f);
+            track.sizeDelta = new Vector2(0, 8);
+            track.anchoredPosition = Vector2.zero;
+            track.gameObject.AddComponent<Image>().color = new Color(UiKit.Navy.r, UiKit.Navy.g, UiKit.Navy.b, 0.35f);
+            ui.progressFill = UiKit.Rect("Fill", track);
+            ui.progressFill.anchorMin = Vector2.zero; ui.progressFill.anchorMax = new Vector2(0, 1);
+            ui.progressFill.offsetMin = ui.progressFill.offsetMax = Vector2.zero;
+            ui.progressFill.gameObject.AddComponent<Image>().color = UiKit.Mustard;
+
             float textTop = thumbH + 22;
-            UiKit.Label(card, area.displayName, 40, UiKit.Ink, TextAnchor.UpperLeft, FontStyle.Bold)
+            UiKit.Label(card, map.entry.name, 40, UiKit.Ink, TextAnchor.UpperLeft, FontStyle.Bold)
                 .Place(new Vector2(0, 1), new Vector2(26, -textTop), new Vector2(size.x - 52, 50));
 
             // How you get around there.
             var ways = new List<string> { "zu Fuß" };
-            if (area.vehicles.Contains("bicycle")) ways.Add("Fahrrad");
-            if (area.vehicles.Contains("car")) ways.Add("Auto");
-            if (area.vehicles.Contains("carriage")) ways.Add("Kutsche");
+            if (map.HasVehicle("bicycle")) ways.Add("Fahrrad");
+            if (map.HasVehicle("car")) ways.Add("Auto");
+            if (map.HasVehicle("carriage")) ways.Add("Kutsche");
             UiKit.Label(card, string.Join(" · ", ways), 26, UiKit.InkSoft, TextAnchor.UpperLeft)
                 .Place(new Vector2(0, 1), new Vector2(26, -textTop - 54), new Vector2(size.x - 52, 34));
+
+            // Remove from the device (tap twice). Not in the editor – there the scenes are the project's.
+            if (map.Playable && !map.Busy && !Application.isEditor)
+            {
+                var del = UiKit.Rect("Delete", card, new Vector2(1, 0), new Vector2(-14, 10), new Vector2(170, 52));
+                var delImg = del.gameObject.AddComponent<Image>();
+                delImg.color = new Color(0, 0, 0, 0);
+                var delBtn = del.gameObject.AddComponent<Button>();
+                delBtn.targetGraphic = delImg;
+                ui.deleteLabel = UiKit.Label(del, "Löschen", 24, UiKit.InkSoft, TextAnchor.MiddleRight);
+                UiKit.Stretch(ui.deleteLabel.rectTransform);
+                delBtn.onClick.AddListener(() =>
+                {
+                    if (Time.unscaledTime < ui.deleteArmedUntil) MapStore.Delete(map);
+                    else ui.deleteArmedUntil = Time.unscaledTime + 3f;
+                });
+            }
+            RefreshCard(ui);
+        }
+
+        Sprite ThumbSprite(Texture2D tex)
+        {
+            if (tex == null) return null;
+            if (!thumbSprites.TryGetValue(tex, out var sprite))
+                thumbSprites[tex] = sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+            return sprite;
+        }
+
+        void RefreshCards()
+        {
+            foreach (var ui in cards) RefreshCard(ui);
+        }
+
+        static void RefreshCard(CardUi ui)
+        {
+            var m = ui.map;
+            string size = m.latest != null ? MapStore.Megabytes(m.latest.size) : "";
+            string text;
+            switch (m.status)
+            {
+                case MapStore.Status.Available: text = $"Laden · {size}"; break;
+                case MapStore.Status.Queued: text = "Wartet …"; break;
+                case MapStore.Status.Downloading: text = $"Lädt … {Mathf.RoundToInt(m.progress * 100f)} %"; break;
+                case MapStore.Status.Installing: text = "Wird eingerichtet …"; break;
+                case MapStore.Status.UpdateAvailable: text = $"Update · {size}"; break;
+                case MapStore.Status.UpdateRequired: text = $"Update nötig · {size}"; break;
+                case MapStore.Status.Unavailable: text = "Neue App-Version nötig"; break;
+                case MapStore.Status.Failed: text = (m.error ?? "Fehler") + " – nochmal"; break;
+                default: text = ""; break;
+            }
+            ui.status.text = text;
+            ui.status.transform.parent.gameObject.SetActive(text.Length > 0);
+            bool loading = m.status == MapStore.Status.Downloading || m.status == MapStore.Status.Installing;
+            ui.progressFill.parent.gameObject.SetActive(loading);
+            ui.progressFill.anchorMax = new Vector2(Mathf.Clamp01(m.progress), 1f);
+            if (ui.deleteLabel != null)
+            {
+                bool armed = Time.unscaledTime < ui.deleteArmedUntil;
+                ui.deleteLabel.text = armed ? "Wirklich löschen?" : "Löschen";
+                ui.deleteLabel.color = armed ? new Color(0.75f, 0.2f, 0.15f) : UiKit.InkSoft;
+            }
         }
 
         /// <summary>Drag horizontally to spin the preview.</summary>

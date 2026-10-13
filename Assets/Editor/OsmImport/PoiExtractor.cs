@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace LeGamez.Editor.OsmImport
 {
-    /// <summary>Picks visit-worthy named places (no hotels, shops, restaurants) as stamp-book POIs.</summary>
+    /// <summary>Picks visit-worthy named places (no hotels, shops, restaurants) as landmarks (map labels, beam targets).</summary>
     public static class PoiExtractor
     {
         const int MaxPerArea = 30;

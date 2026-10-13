@@ -41,43 +41,23 @@ namespace LeGamez.Core
             }
             var player = CreatePlayer(spawn);
             if (resumed) player.transform.rotation = Quaternion.Euler(0f, savedYaw, 0f);
-            else FaceNearestPoi(player.transform, area);
             if (area != null) player.gameObject.AddComponent<PositionMemory>().areaId = area.MemoryKey;
             var cam = CreateCamera(player.transform);
             player.cameraTransform = cam.transform;
 
             NavState.Player = player.transform;
             NavState.View = cam.transform;
-            NavState.Target = null;
 
             var hud = Hud.Create(area != null ? area.displayName : "Nordisch",
                 area != null ? area.attribution : "© OpenStreetMap-Mitwirkende");
 
-            var poiManager = new GameObject("POIs").AddComponent<PoiManager>();
-            poiManager.player = player.transform;
-            poiManager.hud = hud;
+            // Current street name under the area title.
+            var street = hud.gameObject.AddComponent<StreetDisplay>();
+            street.label = hud.infoLabel;
 
             var vehicles = new GameObject("Vehicles").AddComponent<LeGamez.Vehicles.VehicleManager>();
             vehicles.player = player;
             vehicles.hud = hud;
-        }
-
-        /// <summary>Start looking at the closest stamp target instead of whatever wall happens to be north.</summary>
-        static void FaceNearestPoi(Transform player, AreaInfo area)
-        {
-            if (area == null || area.pois == null || area.pois.entries.Count == 0) return;
-            Vector3 best = Vector3.zero;
-            float bestDist = float.MaxValue;
-            foreach (var poi in area.pois.entries)
-            {
-                if (StampBook.Has(area.areaId, poi.id)) continue;
-                float d = Vector3.Distance(poi.position, player.position);
-                if (d < bestDist) { bestDist = d; best = poi.position; }
-            }
-            if (bestDist == float.MaxValue) return;
-            Vector3 dir = best - player.position;
-            dir.y = 0f;
-            if (dir.sqrMagnitude > 0.01f) player.rotation = Quaternion.LookRotation(dir);
         }
 
         static void EnsureEventSystem()

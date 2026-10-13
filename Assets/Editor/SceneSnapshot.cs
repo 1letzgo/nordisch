@@ -89,18 +89,17 @@ namespace LeGamez.Editor
             }
         }
 
-        const string ThumbDir = "Assets/Resources/AreaThumbs";
-        const string MapDir = "Assets/Resources/AreaMaps";
-
-        /// <summary>Oblique bird's-eye thumbnails per area for the main menu cards.</summary>
+        /// <summary>
+        /// Oblique bird's-eye thumbnails per area for the main menu cards, plus the top-down map texture, which is
+        /// assigned to AreaInfo.mapTexture (the scene is saved) so it ends up in the map's download bundle.
+        /// </summary>
         [MenuItem("LeGamez/Render Menu Thumbnails")]
         public static void RenderThumbnails()
         {
-            OsmImport.OsmAreaImporter.EnsureFolder(ThumbDir);
             var activeScene = EditorSceneManager.GetActiveScene().path;
             foreach (var guid in AssetDatabase.FindAssets("t:Scene", new[] { "Assets/Scenes/Areas" }))
             {
-                EditorSceneManager.OpenScene(AssetDatabase.GUIDToAssetPath(guid), OpenSceneMode.Single);
+                var scene = EditorSceneManager.OpenScene(AssetDatabase.GUIDToAssetPath(guid), OpenSceneMode.Single);
                 var area = Object.FindAnyObjectByType<AreaInfo>();
                 if (area == null) continue;
 
@@ -122,21 +121,20 @@ namespace LeGamez.Editor
                 camGo.transform.LookAt(focus);
                 bool fog = RenderSettings.fog;
                 RenderSettings.fog = false;
-                string file = Path.Combine(ThumbDir, area.areaId + ".png");
+                string file = AreaCatalog.ThumbPath(area.areaId);
                 RenderTo(cam, file, 768, 512);
                 RenderSettings.fog = fog;
 
                 // Minimap: orthographic top-down render of the whole area (+60 m margin), north up.
-                // Covers the (possibly non-square, off-centre) area rectangle; ~1 px per metre up to 2048 px.
+                // Covers the (possibly non-square, off-centre) area rectangle; ~2 px per metre up to 4096 px (full map zooms 6×).
                 Vector2 mapSize = area.MapSize, mapCenter = area.BoundsCenter;
                 cam.orthographic = true;
                 cam.orthographicSize = mapSize.y * 0.5f;
                 camGo.transform.SetPositionAndRotation(new Vector3(mapCenter.x, 500f, mapCenter.y), Quaternion.Euler(90f, 0f, 0f));
                 RenderSettings.fog = false;
-                OsmImport.OsmAreaImporter.EnsureFolder(MapDir);
-                string mapFile = Path.Combine(MapDir, area.areaId + ".png");
+                string mapFile = AreaCatalog.MapPath(area.areaId);
                 float longest = Mathf.Max(mapSize.x, mapSize.y);
-                int texLong = longest > 1500f ? 2048 : 1024;
+                int texLong = Mathf.Clamp(Mathf.NextPowerOfTwo(Mathf.CeilToInt(longest * 2f)), 1024, 4096); // ~2 px/m: sharp when zoomed in
                 int texW = Mathf.RoundToInt(texLong * mapSize.x / longest), texH = Mathf.RoundToInt(texLong * mapSize.y / longest);
                 RenderTo(cam, mapFile, texW, texH); // camera aspect follows the render target
                 RenderSettings.fog = fog;
@@ -146,7 +144,7 @@ namespace LeGamez.Editor
                     mi.textureType = TextureImporterType.Default;
                     mi.mipmapEnabled = true;
                     mi.wrapMode = TextureWrapMode.Clamp;
-                    mi.maxTextureSize = 2048;
+                    mi.maxTextureSize = 4096;
                     mi.npotScale = TextureImporterNPOTScale.None;
                     mi.SaveAndReimport();
                 }
@@ -161,6 +159,11 @@ namespace LeGamez.Editor
                     ti.maxTextureSize = 1024;
                     ti.SaveAndReimport();
                 }
+
+                area.mapTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(mapFile);
+                EditorUtility.SetDirty(area);
+                EditorSceneManager.MarkSceneDirty(scene);
+                EditorSceneManager.SaveScene(scene);
             }
             if (!string.IsNullOrEmpty(activeScene)) EditorSceneManager.OpenScene(activeScene, OpenSceneMode.Single);
         }

@@ -146,6 +146,8 @@ namespace LeGamez.Editor.OsmImport
             bool flipWalls = walls > 0 && agree * 2 < walls;
 
             var wallsForWindows = new List<(List<Vector3> ring, Vector3 normal)>();
+            var gutters = new List<(Vector3 a, Vector3 b, Vector3 outward, float drop)>();
+            var pitchedRoofs = new List<List<Vector3>>();
             var sills = new List<Sill>();
             var doorWalls = new List<Doors.Wall>();
             Vector3 ridgeA = Vector3.zero, ridgeB = Vector3.zero;
@@ -170,6 +172,7 @@ namespace LeGamez.Editor.OsmImport
                                  : WithCode(style.roof, CodeRoofTiles);
                     if (flat && aerialFlat != null) color = WithCode(aerialFlat.Value, CodeRoofFlat);
                     uvMode = new Vector4(0, 0, 1, 0); // roof: planar tile coordinates
+                    if (!flat) { CollectGutters(ring, normal, gutters); pitchedRoofs.Add(ring); }
                     foreach (var p in ring)
                     {
                         if (p.y > ridgeY + 0.05f) { ridgeY = p.y; ridgeA = p; ridgeB = p; }
@@ -184,6 +187,7 @@ namespace LeGamez.Editor.OsmImport
                 }
                 EmitPolygon(batch, ring, holes, normal, color, uvMode);
                 if (kind == "W") wallsForWindows.Add((ring, normal));
+                if (kind == "W") CollectPlinth(ring, normal, style, groundY);
                 if (kind == "W" && wantDoor && DoorWall(ring, normal, out var dw)) doorWalls.Add(dw);
                 if (kind == "W" && style.windows) CollectSills(ring, holes, normal, sills);
             }
@@ -191,23 +195,27 @@ namespace LeGamez.Editor.OsmImport
                 GableWindows(batch, wallsForWindows, custom.gableWindows, custom.gableWindowFloor);
 
             Vector2? door = null;
+            (Vector3 pos, Vector3 normal, float head)? frontDoor = null;
             if (doorWalls.Count > 0 && osm != null && Doors.Pick(osm, doorWalls, out var front, out float bay, doorSide == "street" ? null : doorSide))
             {
                 Doors.Emit(batch, front, bay, custom?.doorColor);
                 door = front.start + front.dir * bay;
+                if (front.top <= 7f)
+                    frontDoor = (new Vector3(door.Value.x, 0f, door.Value.y), new Vector3(front.normal.x, 0f, front.normal.y),
+                                 Mathf.Max(2.25f, 2.36f / Mathf.Max(0.5f, front.heightScale)));
             }
-            if (sills.Count > 0)
+            // Close-up detail (frames, sills, lintels, door canopy, gutters) is built at runtime near the camera.
+            var groundOffset = Vector3.up * groundY;
+            foreach (var sl in sills)
             {
-                var details = sink.Get(WorldStyle.MatDetails, new Vector2(centre.x, centre.z));
-                int firstDetail = details.vertices.Count;
-                var sillColor = WithCode(WorldStyle.Tint(new Color32(222, 220, 214, 255), rng, 0.03f), CodePlain);
-                foreach (var sl in sills)
-                {
-                    if (sl.ground && door.HasValue && (new Vector2(sl.centre.x, sl.centre.z) - door.Value).sqrMagnitude < 0.5f) continue;
-                    EmitSill(details, sl, sillColor);
-                }
-                TerrainDrape.Offset(details, firstDetail, groundY);
+                if (sl.ground && door.HasValue && (new Vector2(sl.centre.x, sl.centre.z) - door.Value).sqrMagnitude < 0.5f) continue;
+                var wn = new Vector3(sl.normal.x, 0f, sl.normal.z).normalized;
+                if (sl.shop) FacadeRecords.Window(sl.centre + groundOffset, wn, 0.95f, 2.1f / sl.k, true, false, style.wall);
+                else FacadeRecords.Window(sl.centre + groundOffset, wn, 0.52f, 1.35f / sl.k, false, style.wallCode == CodeBrick, style.wall);
             }
+            foreach (var (a, b2, outward, dropY) in gutters) FacadeRecords.Gutter(a + groundOffset, b2 + groundOffset, outward, dropY);
+            CollectRoofEdges(pitchedRoofs, style.roof, groundOffset);
+            if (frontDoor.HasValue) { var fd = frontDoor.Value; FacadeRecords.Door(fd.pos + groundOffset, fd.normal, 0.66f, fd.head); }
 
             if (style.chimney && pitched && ridgeY > 4f && (ridgeB - ridgeA).magnitude > 4f)
                 Chimney(batch, Vector3.Lerp(ridgeA, ridgeB, 0.25f + (float)rng.NextDouble() * 0.5f), rng);
@@ -410,7 +418,93 @@ namespace LeGamez.Editor.OsmImport
             return p => new Vector4(Vector3.Dot(p, dir) - offset, (p.y - baseY) * k, top, span);
         }
 
-        struct Sill { public Vector3 centre, along, normal; public bool ground; }
+        /// <summary>Plinth band along the bottom edge of a wall (same colours as the shader's Sockel).</summary>
+        static void CollectPlinth(List<Vector3> ring, Vector3 normal, Style style, float groundY)
+        {
+            var n = new Vector3(normal.x, 0f, normal.z);
+            if (n.sqrMagnitude < 0.5f) return;
+            n.Normalize();
+            float low = float.MaxValue;
+            foreach (var p in ring) low = Mathf.Min(low, p.y);
+            if (low > 0.3f) return;
+            var colour = style.wallCode == CodeBrick
+                ? new Color32((byte)(style.wall.r * 0.68f), (byte)(style.wall.g * 0.68f), (byte)(style.wall.b * 0.68f), 255)
+                : new Color32(133, 133, 128, 255);
+            for (int i = 0; i < ring.Count; i++)
+            {
+                Vector3 a = ring[i], b = ring[(i + 1) % ring.Count];
+                if (Mathf.Abs(a.y - low) > 0.05f || Mathf.Abs(b.y - low) > 0.05f) continue;
+                var up = Vector3.up * groundY;
+                FacadeRecords.Plinth(a + up, b + up, n, 0.45f, colour);
+            }
+        }
+
+        /// <summary>
+        /// Verge boards on unshared sloped roof edges (gable ends) and ridge caps on shared horizontal top edges.
+        /// </summary>
+        static void CollectRoofEdges(List<List<Vector3>> roofs, Color32 roofColour, Vector3 offset)
+        {
+            Vector3Int Q(Vector3 p) => new Vector3Int(Mathf.RoundToInt(p.x * 20f), Mathf.RoundToInt(p.y * 20f), Mathf.RoundToInt(p.z * 20f));
+            var count = new Dictionary<(Vector3Int, Vector3Int), int>();
+            (Vector3Int, Vector3Int) K(Vector3 a, Vector3 b)
+            {
+                var qa = Q(a); var qb = Q(b);
+                return qa.x < qb.x || qa.x == qb.x && (qa.z < qb.z || qa.z == qb.z && qa.y <= qb.y) ? (qa, qb) : (qb, qa);
+            }
+            foreach (var r in roofs)
+                for (int i = 0; i < r.Count; i++)
+                {
+                    var k = K(r[i], r[(i + 1) % r.Count]);
+                    count.TryGetValue(k, out int c); count[k] = c + 1;
+                }
+            var ridgesDone = new HashSet<(Vector3Int, Vector3Int)>();
+            foreach (var r in roofs)
+            {
+                var centre = Vector3.zero; float top = float.MinValue;
+                foreach (var p in r) { centre += p; top = Mathf.Max(top, p.y); }
+                centre /= r.Count;
+                for (int i = 0; i < r.Count; i++)
+                {
+                    Vector3 a = r[i], b = r[(i + 1) % r.Count];
+                    var e = new Vector3(b.x - a.x, 0f, b.z - a.z);
+                    float horiz = e.magnitude, dy = Mathf.Abs(b.y - a.y);
+                    if (horiz < 0.3f) continue;
+                    var k = K(a, b);
+                    int c = count[k];
+                    if (c == 1 && dy > 0.4f)
+                    {
+                        var perp = new Vector3(-e.z, 0f, e.x) / horiz;
+                        if (Vector3.Dot(perp, (a + b) * 0.5f - centre) < 0f) perp = -perp;
+                        FacadeRecords.Verge(a + offset, b + offset, perp);
+                    }
+                    else if (c >= 2 && dy < 0.05f && a.y > top - 0.05f && ridgesDone.Add(k))
+                        FacadeRecords.Ridge(a + offset, b + offset, roofColour);
+                }
+            }
+        }
+
+        /// <summary>Eaves of a pitched roof face: horizontal edges at its lowest height, running across the slope.</summary>
+        static void CollectGutters(List<Vector3> ring, Vector3 normal, List<(Vector3, Vector3, Vector3, float)> gutters)
+        {
+            var downhill = new Vector3(normal.x, 0f, normal.z);
+            if (downhill.sqrMagnitude < 0.01f) return;
+            downhill.Normalize();
+            float low = float.MaxValue;
+            foreach (var p in ring) low = Mathf.Min(low, p.y);
+            if (low < 2f) return;
+            for (int i = 0; i < ring.Count; i++)
+            {
+                Vector3 a = ring[i], b = ring[(i + 1) % ring.Count];
+                if (Mathf.Abs(a.y - low) > 0.08f || Mathf.Abs(b.y - low) > 0.08f) continue;
+                var e = new Vector3(b.x - a.x, 0f, b.z - a.z);
+                float len = e.magnitude;
+                if (len < 1.5f || Mathf.Abs(Vector3.Dot(e / len, downhill)) > 0.3f) continue;
+                gutters.Add((a, b, downhill, low));
+            }
+        }
+
+        /// <summary>One shader window: centre = bottom centre of the opening on the wall, k = shader units per metre.</summary>
+        struct Sill { public Vector3 centre, along, normal; public bool ground, shop; public float k; }
 
         /// <summary>
         /// Window sills (Fensterbänke) under every procedural window of this wall – same layout as FacadeMask in
@@ -441,40 +535,25 @@ namespace LeGamez.Editor.OsmImport
             int bays = Mathf.RoundToInt(span / WindowSpacing);
             for (int floor = 0; floor * 3f + 2.85f <= top; floor++) // same rule as the shader (lintel ≥ 0.6 under the eaves)
             {
-                if (floor == 0 && top > 7f) continue; // shop fronts: no sills
-                float sillH = floor * 3f + 0.9f, headH = floor * 3f + 2.25f;
+                bool shop = floor == 0 && top > 7f; // shop fronts (same rule as the shader)
+                float sillH = floor * 3f + (shop ? 0.5f : 0.9f), headH = floor * 3f + (shop ? 2.6f : 2.25f);
+                float hw = shop ? 1.1f : 0.65f;
                 for (int bay = 0; bay < bays; bay++)
                 {
                     float cu = (bay + 0.5f) * WindowSpacing;
                     bool inside = true;
-                    foreach (var corner in new[] { new Vector2(cu - 0.65f, sillH - 0.12f), new Vector2(cu + 0.65f, sillH - 0.12f),
-                                                   new Vector2(cu - 0.65f, headH + 0.06f), new Vector2(cu + 0.65f, headH + 0.06f) })
+                    foreach (var corner in new[] { new Vector2(cu - hw, sillH - 0.12f), new Vector2(cu + hw, sillH - 0.12f),
+                                                   new Vector2(cu - hw, headH + 0.06f), new Vector2(cu + hw, headH + 0.06f) })
                     {
                         if (!OsmData.PointInRing(corner, poly)) { inside = false; break; }
                         foreach (var h in holePolys) if (h.Count >= 3 && OsmData.PointInRing(corner, h)) { inside = false; break; }
                         if (!inside) break;
                     }
                     if (!inside) continue;
-                    var c = origin + dir * cu + Vector3.up * (minY + (sillH - 0.1f) / k);
-                    sills.Add(new Sill { centre = c, along = dir, normal = normal, ground = floor == 0 });
+                    var c = origin + dir * cu + Vector3.up * (minY + sillH / k);
+                    sills.Add(new Sill { centre = c, along = dir, normal = normal, ground = floor == 0, shop = shop, k = k });
                 }
             }
-        }
-
-        /// <summary>Stone sill: top and front edge of a slab 1.3 m wide, 13 cm deep (ends/underside are never seen).</summary>
-        static void EmitSill(MeshSink.Batch b, Sill s, Color32 color)
-        {
-            Vector3 n = new Vector3(s.normal.x, 0f, s.normal.z).normalized, u = s.along * 0.65f;
-            Vector3 back = s.centre, front = s.centre + n * 0.13f;
-            Vector3 upB = Vector3.up * 0.05f, upF = Vector3.up * 0.035f, down = Vector3.down * 0.03f;
-            var edge = new Color32((byte)(color.r * 0.86f), (byte)(color.g * 0.86f), (byte)(color.b * 0.86f), color.a);
-            void Face(Vector3 a, Vector3 bb, Vector3 c, Vector3 d, Vector3 outward, Color32 col)
-            {
-                if (Vector3.Dot(Vector3.Cross(bb - a, c - a), outward) < 0f) MeshSink.Quad(b, d, c, bb, a, col);
-                else MeshSink.Quad(b, a, bb, c, d, col);
-            }
-            Face(back - u + upB, back + u + upB, front + u + upF, front - u + upF, Vector3.up, color); // top
-            Face(front - u + upF, front + u + upF, front + u + down, front - u + down, n, edge);      // front edge
         }
 
         /// <summary>Ground-floor wall with window bays, in the same u/height frame as FacadeOrRoofUv.</summary>

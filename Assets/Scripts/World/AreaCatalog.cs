@@ -3,10 +3,17 @@ using UnityEngine;
 
 namespace LeGamez.World
 {
-    /// <summary>All playable areas, maintained by the OSM importer. Loaded from Resources at runtime.</summary>
+    /// <summary>
+    /// All imported areas, maintained by the OSM importer. Editor only: the app lists downloadable maps
+    /// (Core/MapStore); this asset feeds the editor's menu and the map bundle build (Editor/MapBundles).
+    /// </summary>
     public class AreaCatalog : ScriptableObject
     {
-        public const string ResourcePath = "AreaCatalog";
+        public const string AssetPath = "Assets/Generated/AreaCatalog.asset";
+        /// <summary>Menu card image (rendered by SceneSnapshot.RenderThumbnails, published next to the bundle).</summary>
+        public static string ThumbPath(string id) => $"Assets/Generated/{id}/{id}_thumb.png";
+        /// <summary>Top-down map texture for minimap/full map; referenced by AreaInfo.mapTexture, so it travels in the bundle.</summary>
+        public static string MapPath(string id) => $"Assets/Generated/{id}/{id}_map.png";
 
         [System.Serializable]
         public class Entry
@@ -20,7 +27,5 @@ namespace LeGamez.World
         }
 
         public List<Entry> areas = new List<Entry>();
-
-        public static AreaCatalog Load() => Resources.Load<AreaCatalog>(ResourcePath);
     }
 }

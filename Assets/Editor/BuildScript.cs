@@ -51,6 +51,7 @@ namespace LeGamez.Editor
                 locationPathName = outPath,
                 target = BuildTarget.Android,
                 options = BuildOptions.None,
+                assetBundleManifestPath = BundleManifest(BuildTarget.Android),
             });
             Debug.Log($"[LeGamez] Android build {report.summary.result}: {outPath} ({report.summary.totalSize / (1024 * 1024)} MB)");
             return report.summary.result == BuildResult.Succeeded;
@@ -121,11 +122,24 @@ namespace LeGamez.Editor
             return null;
         }
 
+        /// <summary>The app ships only the menu – areas are downloaded map bundles (Editor/MapBundles, Core/MapStore).</summary>
         static string[] EnabledScenes()
         {
-            var scenes = EditorBuildSettings.scenes.Where(s => s.enabled && File.Exists(s.path)).Select(s => s.path).ToArray();
-            if (scenes.Length == 0) throw new System.Exception("No scenes in build settings – run LeGamez/Import All Areas first.");
+            var scenes = EditorBuildSettings.scenes
+                .Where(s => s.enabled && File.Exists(s.path) && !s.path.StartsWith("Assets/Scenes/Areas/"))
+                .Select(s => s.path).ToArray();
+            if (scenes.Length == 0) throw new System.Exception("No scenes in build settings – run LeGamez/Create Main Menu Scene first.");
             return scenes;
+        }
+
+        /// <summary>Last map bundle build of this platform: engine code stripping then also keeps what the maps use
+        /// (besides Assets/link.xml).</summary>
+        static string BundleManifest(BuildTarget target)
+        {
+            string path = MapBundles.ManifestPath(target);
+            if (File.Exists(path)) return path;
+            Debug.LogWarning($"[LeGamez] No map bundle manifest at {path} – stripping relies on link.xml only.");
+            return null;
         }
 
         static void Build(string folder)
@@ -141,6 +155,7 @@ namespace LeGamez.Editor
                 locationPathName = outDir,
                 target = BuildTarget.iOS,
                 options = BuildOptions.None,
+                assetBundleManifestPath = BundleManifest(BuildTarget.iOS),
             };
             var report = BuildPipeline.BuildPlayer(options);
             Debug.Log($"[LeGamez] iOS build {report.summary.result}: {outDir} ({report.summary.totalSize / (1024 * 1024)} MB)");

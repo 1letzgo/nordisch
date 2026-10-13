@@ -81,16 +81,14 @@ namespace LeGamez.Editor.OsmImport
             new GameObject("MainMenu").AddComponent<LeGamez.UI.MainMenu>();
             EditorSceneManager.SaveScene(scene, MenuScenePath);
 
-            // Menu must be build index 0.
-            var scenes = EditorBuildSettings.scenes.Where(s => s.path != MenuScenePath && File.Exists(s.path)).ToList();
-            scenes.Insert(0, new EditorBuildSettingsScene(MenuScenePath, true));
-            EditorBuildSettings.scenes = scenes.ToArray();
+            // The app contains only the menu; area scenes are downloaded as bundles (Core/MapStore, Editor/MapBundles).
+            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(MenuScenePath, true) };
         }
 
         static void UpdateCatalog(OsmAreaMeta meta, int poiCount)
         {
-            EnsureFolder("Assets/Resources");
-            string path = $"Assets/Resources/{AreaCatalog.ResourcePath}.asset";
+            EnsureFolder(GeneratedRoot);
+            string path = AreaCatalog.AssetPath;
             var catalog = AssetDatabase.LoadAssetAtPath<AreaCatalog>(path);
             if (catalog == null)
             {
@@ -131,6 +129,7 @@ namespace LeGamez.Editor.OsmImport
             // Prefer official LGLN LoD2 buildings (real roof shapes); fall back to OSM extrusion.
             string lod2Path = Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".lod2.json");
             bool island = meta.ground == "sand";
+            FacadeRecords.Begin();
             BuildingOverrides.Load(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".buildings.json"));
             bool hasLod2 = Lod2Builder.TryBuild(lod2Path, data, sink, area, island, out int buildings);
             if (!hasLod2) buildings = BuildingBuilder.Build(data, sink, area, rng);
@@ -144,6 +143,7 @@ namespace LeGamez.Editor.OsmImport
             int barriers = GroundBuilder.BuildBarriers(data, sink, area);
             var gardens = GardenBuilder.Build(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".parcels.json"), data, sink, area);
             var furniture = FurniturePlacer.Place(data, sink, area, rng);
+            var traffic = TrafficBuilder.Build(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".traffic.json"), data, sink, area);
             int edits = EditsPlacer.PlaceNew(sink, area);
             var pois = PoiExtractor.Extract(data, area);
             foreach (var poi in pois) poi.position.y = terrain.Height(poi.position.x, poi.position.z);
@@ -161,6 +161,9 @@ namespace LeGamez.Editor.OsmImport
             EditsPlacer.SaveRecords($"{areaDir}/{meta.id}_objects.json"); // object list for the map editor
             BuildingOverrides.SaveCatalog($"{areaDir}/{meta.id}_buildings.json"); // houses (id, address, footprint) for the map editor
             GardenBuilder.SaveCatalog($"{areaDir}/{meta.id}_gardens.json"); // hedges/fences/walls for the map editor
+            string facadePath = $"{areaDir}/{meta.id}_facade.bytes";            // close-up building detail, built at runtime
+            FacadeRecords.Save(facadePath);
+            AssetDatabase.ImportAsset(facadePath);
             EnsureFolder(AreaScenesDir);
             var materials = EnsureMaterials();
 
@@ -213,6 +216,11 @@ namespace LeGamez.Editor.OsmImport
             }
 
             AddGroundAndBounds(worldRoot.transform, area);
+            TrafficBuilder.Spawn(worldRoot.transform, terrain, materials[WorldStyle.MatTrees]);
+            var facade = new GameObject("FacadeDetails").AddComponent<FacadeDetails>();
+            facade.transform.SetParent(worldRoot.transform, false);
+            facade.data = AssetDatabase.LoadAssetAtPath<TextAsset>(facadePath);
+            facade.material = materials[WorldStyle.MatTrees];
             AddLighting(EnsureSkyMaterial());
 
             // POI database asset.
@@ -240,6 +248,7 @@ namespace LeGamez.Editor.OsmImport
             info.boundsMax = new Vector2(area.xMax, area.zMax);
             info.allowedVehicles = new List<string>(meta.vehicles);
             info.pois = poiDb;
+            info.streets = BuildStreets(data, $"{areaDir}/{meta.id}_streets.asset");
             info.spawnPoint = spawn;
             info.bikeSpots = BikeSpots(data, area, terrain);
             info.carSpots = CarSpots(data, area, terrain);
@@ -255,14 +264,55 @@ namespace LeGamez.Editor.OsmImport
 
             string scenePath = $"{AreaScenesDir}/{meta.name}.unity";
             EditorSceneManager.SaveScene(scene, scenePath);
-            AddSceneToBuild(scenePath);
             UpdateCatalog(meta, pois.Count);
             AssetDatabase.SaveAssets();
 
             Debug.Log($"[OSM] {meta.name}: {buildings} buildings (+{osmExtra} OSM-only), {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, gardens {gardens.plots} plots/{gardens.measured} measured hedges/{gardens.hedges} hedges/{gardens.fences} fences/{gardens.walls} walls/{gardens.drawn} drawn, terrain {(terrain.IsFlat ? "flat" : "DGM1")}, aerial {(aerial != null ? "DOP20" : "-")}, trees {(lidarTrees != null ? "LiDAR" : "OSM")}, " +
-                      $"furniture {furniture.mapped} mapped/{furniture.benches} benches/{furniture.planters} planters/{furniture.seating} café tables/{furniture.fountains} fountains, {edits} hand-placed/{EditsPlacer.ChangedCount} edited, {pois.Count} POIs, " +
+                      $"furniture {furniture.mapped} mapped/{furniture.benches} benches/{furniture.planters} planters/{furniture.seating} café tables/{furniture.fountains} fountains, {edits} hand-placed/{EditsPlacer.ChangedCount} edited, " +
+                      $"facade {FacadeRecords.Windows} windows/{FacadeRecords.Doors} doors/{FacadeRecords.Gutters} gutters/{FacadeRecords.Verges} verges/{FacadeRecords.Ridges} ridges, traffic {traffic.junctionSignals} signal junctions/{traffic.crossingSignals} signal crossings/{traffic.heads} heads/{traffic.zebras} zebras/{traffic.lanes} lanes/{traffic.stops} stop/{traffic.giveWays} give way/{traffic.priority} priority/{traffic.speed} speed/{traffic.oneway} one-way/{traffic.names} names/{traffic.mapped} mapped, {pois.Count} POIs, " +
                       $"{sink.Batches.Count()} meshes in {sw.ElapsedMilliseconds} ms -> {scenePath}");
             return scenePath;
+        }
+
+        /// <summary>Named OSM streets/paths as segments (asset next to the meshes) for the HUD street display.</summary>
+        static StreetIndex BuildStreets(OsmData data, string path)
+        {
+            var idx = AssetDatabase.LoadAssetAtPath<StreetIndex>(path);
+            if (idx == null)
+            {
+                idx = ScriptableObject.CreateInstance<StreetIndex>();
+                AssetDatabase.CreateAsset(idx, path);
+            }
+            idx.names.Clear(); idx.segments.Clear(); idx.nameOf.Clear();
+            var ids = new Dictionary<string, int>();
+            foreach (var w in data.ways)
+            {
+                if (w.tags.Get("highway") == null || w.tags.Is("area", "yes")) continue;
+                string name = w.tags.Get("name");
+                if (string.IsNullOrEmpty(name)) continue;
+                if (!ids.TryGetValue(name, out int n)) { n = idx.names.Count; ids[name] = n; idx.names.Add(name); }
+                for (int i = 0; i < w.points.Count - 1; i++)
+                {
+                    idx.segments.Add(new Vector4(w.points[i].x, w.points[i].y, w.points[i + 1].x, w.points[i + 1].y));
+                    idx.nameOf.Add(n);
+                }
+            }
+            // Named squares / pedestrian areas: their outline counts as street too.
+            foreach (var poly in data.polygons)
+            {
+                if (!(poly.tags.Is("highway", "pedestrian") || poly.tags.Is("place", "square"))) continue;
+                string name = poly.tags.Get("name");
+                if (string.IsNullOrEmpty(name)) continue;
+                if (!ids.TryGetValue(name, out int n)) { n = idx.names.Count; ids[name] = n; idx.names.Add(name); }
+                for (int i = 0; i < poly.outer.Count; i++)
+                {
+                    var a = poly.outer[i]; var b = poly.outer[(i + 1) % poly.outer.Count];
+                    idx.segments.Add(new Vector4(a.x, a.y, b.x, b.y));
+                    idx.nameOf.Add(n);
+                }
+            }
+            EditorUtility.SetDirty(idx);
+            return idx;
         }
 
         static Vector3 FindSpawn(OsmData data, AreaRect area)
@@ -551,14 +601,6 @@ namespace LeGamez.Editor.OsmImport
                 result[name] = mat;
             }
             return result;
-        }
-
-        static void AddSceneToBuild(string scenePath)
-        {
-            var scenes = EditorBuildSettings.scenes.ToList();
-            if (scenes.Any(s => s.path == scenePath)) return;
-            scenes.Add(new EditorBuildSettingsScene(scenePath, true));
-            EditorBuildSettings.scenes = scenes.ToArray();
         }
 
         public static void EnsureFolder(string path)

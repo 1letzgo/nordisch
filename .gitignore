@@ -35,3 +35,5 @@ xcuserdata/
 # Unity crash dumps / tooling
 mono_crash.*
 /.utmp/
+/Assets/Generated/*/*_facade.bytes
+/Assets/Generated/*/*_facade.bytes.meta

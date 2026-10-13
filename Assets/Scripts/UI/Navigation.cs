@@ -6,12 +6,11 @@ using UnityEngine.UI;
 
 namespace LeGamez.UI
 {
-    /// <summary>Shared navigation state: the player, the view camera and the current target POI.</summary>
+    /// <summary>Shared navigation state: the player and the view camera.</summary>
     public static class NavState
     {
         public static Transform Player;
         public static Transform View;
-        public static PoiEntry Target;
 
         /// <summary>Camera heading in degrees, clockwise from north (+Z).</summary>
         public static float ViewYaw => View != null ? View.eulerAngles.y : 0f;
@@ -34,17 +33,13 @@ namespace LeGamez.UI
 
     /// <summary>
     /// Round heading-up minimap: pre-rendered top-down area image under a circular mask,
-    /// POI dots (target pulses), player arrow in the centre, "N" on the rim.
+    /// landmark dots, player arrow in the centre, "N" on the rim.
     /// </summary>
     public class MiniMap : MonoBehaviour
     {
         public float metersVisible = 130f;   // radius shown, in metres
 
-        RectTransform rotator, map, playerArrow, north, targetEdge;
-        Text targetLabel;
-        RectTransform pillRect;
-        const float PillWidth = 400f;
-        string pillText;
+        RectTransform rotator, map, playerArrow, north;
         float radius;
         float pixelsPerMeter;
         Vector2 mapCenter;
@@ -76,7 +71,7 @@ namespace LeGamez.UI
             mask.gameObject.AddComponent<Mask>().showMaskGraphic = true;
 
             rotator = UiKit.Rect("Rotator", mask, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-            var tex = area != null ? Resources.Load<Texture2D>("AreaMaps/" + area.areaId) : null;
+            var tex = area != null ? area.mapTexture : null;
             mapCenter = area != null ? area.BoundsCenter : Vector2.zero;
             Vector2 mapSize = area != null ? area.MapSize : new Vector2(1120f, 1120f);
             map = UiKit.Rect("Map", rotator, new Vector2(0.5f, 0.5f), Vector2.zero, mapSize * pixelsPerMeter);
@@ -104,25 +99,6 @@ namespace LeGamez.UI
             arrow.raycastTarget = false;
             playerArrow.gameObject.AddComponent<Outline>().effectColor = Color.white;
 
-            // Target indicator on the rim when the target is outside the visible radius.
-            targetEdge = UiKit.Rect("TargetEdge", root, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(26, 26));
-            var te = targetEdge.gameObject.AddComponent<Image>();
-            te.sprite = ArrowSprite();
-            te.color = UiKit.Mustard;
-            te.raycastTarget = false;
-
-            // Next target name + distance, as a pill under the map.
-            // Right-aligned under the map, grows to the left and downwards for long names.
-            var pill = UiKit.Rect("TargetPill", root, new Vector2(1f, 0f), new Vector2(0, -12), new Vector2(PillWidth, 52));
-            pill.pivot = new Vector2(1f, 1f);
-            UiKit.Panel(pill.gameObject, new Color(UiKit.Navy.r, UiKit.Navy.g, UiKit.Navy.b, 0.9f));
-            targetLabel = UiKit.Label(pill, "", 24, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
-            UiKit.Stretch(targetLabel.rectTransform);
-            targetLabel.rectTransform.offsetMin = new Vector2(18, 8);
-            targetLabel.rectTransform.offsetMax = new Vector2(-18, -8);
-            targetLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
-            pillRect = pill;
-
             north = UiKit.Rect("North", root, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(40, 40));
             UiKit.Panel(north.gameObject, UiKit.Mustard, UiKit.Circle);
             UiKit.Stretch(UiKit.Label(north, "N", 24, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform);
@@ -139,45 +115,12 @@ namespace LeGamez.UI
             map.anchoredPosition = -(new Vector2(p.x, p.z) - mapCenter) * pixelsPerMeter;
             playerArrow.localRotation = Quaternion.Euler(0, 0, viewYaw - NavState.Player.eulerAngles.y);
 
-            float pulse = 1f + Mathf.Sin(Time.time * 6f) * 0.25f;
-            foreach (var (poi, dot) in dots)
-            {
-                bool visited = area != null && StampBook.Has(area.areaId, poi.id);
-                bool target = NavState.Target == poi;
-                dot.color = target ? UiKit.Mustard : visited ? UiKit.Done : Color.white;
-                dot.rectTransform.sizeDelta = Vector2.one * (target ? 26f * pulse : 16f);
+            foreach (var (_, dot) in dots)
                 dot.rectTransform.localRotation = Quaternion.Euler(0, 0, -viewYaw);
-            }
 
             // North marker sits on the rim at the screen-angle of world north.
             north.anchoredPosition = RimPoint(-viewYaw, radius + 2f);
 
-            var t = NavState.Target;
-            targetLabel.transform.parent.gameObject.SetActive(t != null);
-            if (t != null)
-            {
-                string text = $"{t.name} · {Mathf.RoundToInt(NavState.DistanceTo(t.position))} m";
-                if (text != pillText)
-                {
-                    pillText = text;
-                    targetLabel.text = text;
-                    // Fit the pill: shrink to short names, wrap long ones onto a second line.
-                    var gen = targetLabel.cachedTextGeneratorForLayout;
-                    var settings = targetLabel.GetGenerationSettings(new Vector2(PillWidth - 36, 0));
-                    float w = gen.GetPreferredWidth(text, settings) / targetLabel.pixelsPerUnit + 40f;
-                    float h = gen.GetPreferredHeight(text, settings) / targetLabel.pixelsPerUnit + 18f;
-                    pillRect.sizeDelta = new Vector2(Mathf.Clamp(w, 180f, PillWidth), Mathf.Max(52f, h));
-                }
-            }
-
-            if (NavState.Target != null && NavState.DistanceTo(NavState.Target.position) > metersVisible * 0.92f)
-            {
-                float rel = NavState.BearingTo(NavState.Target.position) - viewYaw;
-                targetEdge.gameObject.SetActive(true);
-                targetEdge.anchoredPosition = RimPoint(rel, radius - 16f);
-                targetEdge.localRotation = Quaternion.Euler(0, 0, -rel);
-            }
-            else targetEdge.gameObject.SetActive(false);
         }
 
         /// <summary>Point on a circle for a bearing relative to "up" (clockwise degrees).</summary>

@@ -194,9 +194,9 @@ namespace LeGamez.Player
             // Steering: build up while held, return to centre faster when released.
             float steerIn = InputEnabled ? GameInput.Steer : 0f;
             bool steeringOut = Mathf.Abs(steerIn) > Mathf.Abs(steerSmoothed) && steerIn * steerSmoothed >= 0f;
-            steerSmoothed = Mathf.MoveTowards(steerSmoothed, steerIn, (steeringOut ? 2.2f : 4f) * dt);
+            steerSmoothed = Mathf.MoveTowards(steerSmoothed, steerIn, (steeringOut ? 3f : 4.5f) * dt);
             float v = Mathf.Abs(driveSpeed);
-            SteerAngle = steerSmoothed * s.maxSteer * Mathf.Lerp(1f, 0.35f, Mathf.Clamp01(v / s.maxSpeed));
+            SteerAngle = steerSmoothed * s.maxSteer * Mathf.Lerp(1f, 0.5f, Mathf.Clamp01(v / s.maxSpeed));
 
             float rate = driveSpeed / s.axleBase * Mathf.Tan(SteerAngle * Mathf.Deg2Rad) * Mathf.Rad2Deg;
             float grip = s.lateralAccel / Mathf.Max(v, 0.1f) * Mathf.Rad2Deg;

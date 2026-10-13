@@ -27,8 +27,8 @@ namespace LeGamez.Vehicles
         public override float ColliderRadius => 0.95f;
         public override float AxleBase => Length - 1.4f;          // wheels sit 0.7 m in from each end
         public override float RearAxle => Length * 0.5f - 0.7f;
-        public override float MaxSteer => 31f;                    // ~4.5 m turning radius
-        public override float LateralAccel => 6.5f;
+        public override float MaxSteer => 38f;                    // ~3.2 m turning radius at walking pace
+        public override float LateralAccel => 12f;                // arcade grip: tight turns at town speed
         public override float TopSpeed => 25f;                    // ~90 km/h
         public override float AccelTime => 4.5f;
         public override float BrakeDecel => 11f;
