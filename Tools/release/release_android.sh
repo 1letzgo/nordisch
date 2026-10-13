@@ -38,6 +38,9 @@ cp Builds/Android/Nordisch.apk "$apk"
 echo "Built $apk ($(du -h "$apk" | cut -f1))"
 [[ $DRY == 1 ]] && exit 0
 
+# Unity rewrites an empty keystore name to "{inproject}: " – harmless, put the file back.
+if git diff --unified=0 ProjectSettings/ProjectSettings.asset | grep -E '^[+-] ' | grep -qv 'AndroidKeystoreName'; then :; \
+elif [[ -n "$(git diff --name-only ProjectSettings/ProjectSettings.asset)" ]]; then git checkout -- ProjectSettings/ProjectSettings.asset; fi
 # Unity may have touched project files during the build (it should not) – never tag a dirty tree.
 after=$(git status --porcelain --untracked-files=no)
 [[ "$before" == "$after" ]] || { echo "Tracked files changed during the build:"; diff <(echo "$before") <(echo "$after"); exit 1; }
