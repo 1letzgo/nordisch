@@ -144,6 +144,7 @@ namespace LeGamez.Editor.OsmImport
             var gardens = GardenBuilder.Build(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".parcels.json"), data, sink, area);
             var furniture = FurniturePlacer.Place(data, sink, area, rng);
             var traffic = TrafficBuilder.Build(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".traffic.json"), data, sink, area);
+            CommercialBuilder.Build(data, sink, area); // petrol stations etc.; after traffic (adds sign texts)
             int edits = EditsPlacer.PlaceNew(sink, area);
             var pois = PoiExtractor.Extract(data, area);
             foreach (var poi in pois) poi.position.y = terrain.Height(poi.position.x, poi.position.z);

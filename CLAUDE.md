@@ -138,6 +138,19 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
   (`World/FacadeDetails`): 32-m-Zellen im Umkreis von ~95 m um die Kamera, max. 3 Zellen pro Tick, weiter weg wieder
   verworfen – fern bleiben die Shader-Fenster. Datensatz: 10 floats (kind, x, y, z, along x/z, a, b, c, RGB);
   Außennormale = (−along.z, along.x). Neue Teile: Kind-Konstante + Builder in `FacadeDetails`, Erfassen in `Lod2Builder`.
+- `CommercialBuilder` (+ `CommercialBuilder.Retail.cs`): Gewerbeimmobilien erkennbar. **Tankstellen** (`amenity=fuel`, Knoten
+  oder Fläche): Tankdach = LoD2-„Gebäude“ mit ALKIS-Funktion `31001_2130` (Tankstelle) oder `51009_1610` (Überdachung),
+  flach, ≤ 9 m, ≤ 45 m von der Tankstelle – `Lod2Builder` ruft `ClaimLod2` und baut dann keinen Kasten. Der Shop hat oft
+  denselben Code: Ein OSM-Gebäude ≠ `building=roof` darüber oder eine Adresse hält ihn als normales Haus. Ohne LoD2-Dach:
+  OSM `building=roof`, sonst generiertes 14×9-m-Dach auf gepflastertem Vorplatz (`AerialImage.IsPaved`). Dach mit Blende
+  in Markenfarben + Markenname (`PickBrand`: Esso, Shell, Aral, JET, star/Orlen, Q1, SCORE, Total, AVIA, Westfalen,
+  Raiffeisen, HEM, eni, bft, Hoyer, team; sonst weiß/blau mit Name), Säulen, Zapfinseln mit Säulen/Rammschutz/Lampen,
+  Preismast an der Straße (außerhalb Fahrbahn/Einfahrten/Gehwegen/Gebäuden, ≥ 3 m vom Dach). **Supermärkte**
+  (`shop=supermarket`, `building=supermarket`): größtes LoD2-Teil darunter, Wand Richtung Parkplätze (flächengewichtet,
+  keine Brandwand) bekommt Glasfront mit Schiebetür, Vordach und Markenschild; Parkplätze ≤ 40 m bekommen
+  Stellplatzlinien entlang der Fahrgassen (`highway=service`), sonst Reihen an den Längsseiten. Texte über
+  `TrafficBuilder.AddText` (TextMesh, Layer 8). Kein Zugriff auf den gemeinsamen `rng` (Objekt-IDs bleiben stabil).
+  Prüfen: `-executeMethod LeGamez.Editor.CommercialSnapshot.ImportAndRender -area <id>` → `Builds/Snapshots/<id>_fuel_*`/`_market_*`.
 - `PoiExtractor`: benannte Sehenswürdigkeiten → Punkte/Namen auf Mini- und Großkarte (Beam-Ziele). Kein Stempelheft mehr.
 - Straßenindex (`StreetIndex`, `<id>_streets.asset`): benannte OSM-Wege + Plätze als Segmente → HUD zeigt unter dem
   Ortsnamen die aktuelle Straße (`UI/StreetDisplay`, nächste Straße ≤ 30 m, 4 m Trägheit gegen Flackern).
