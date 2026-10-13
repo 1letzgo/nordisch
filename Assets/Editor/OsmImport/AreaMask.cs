@@ -9,7 +9,7 @@ namespace LeGamez.Editor.OsmImport
     /// corridors along the roads between them. Everything outside is only terrain (<see cref="CoarseTerrain"/>), water
     /// and railways – no houses, trees, gardens, props or roads. Areas without a mask file are built everywhere
     /// (<see cref="Current"/> is null).
-    /// Pixel values: 0 outside, 32 outside + forest, 192 road corridor, 255 settlement (≥ 128 = inside); top row = north.
+    /// Pixel values: 0 outside, 32 outside + forest, 64 outside + lake, 192 road corridor, 255 settlement (≥ 128 = inside); top row = north.
     /// </summary>
     public class AreaMask
     {
@@ -54,6 +54,7 @@ namespace LeGamez.Editor.OsmImport
         public bool Inside(float x, float z) => Value(x, z) >= 128;
         public bool Inside(Vector2 p) => Value(p.x, p.y) >= 128;
         public bool IsForest(float x, float z) => Value(x, z) == 32;
+        public bool IsLake(float x, float z) => Value(x, z) == 64;
 
         /// <summary>No mask, or the point is inside: the builders may place things here.</summary>
         public static bool Allows(Vector2 p) => Current == null || Current.Inside(p);
@@ -85,13 +86,13 @@ namespace LeGamez.Editor.OsmImport
 
         public struct FilterStats { public int nodes, polygons, ways, pieces; }
 
-        static bool IsWater(Dictionary<string, string> t) =>
-            t.Is("natural", "water") || t.Has("water") || t.Is("waterway", "riverbank") || t.Is("landuse", "basin") ||
-            t.Is("landuse", "reservoir") || t.Is("waterway", "river") || t.Is("waterway", "canal"); // streams/ditches: inside only
+        static bool IsWaterArea(Dictionary<string, string> t) =>
+            t.Is("natural", "water") || t.Has("water") || t.Is("waterway", "riverbank") || t.Is("landuse", "basin") || t.Is("landuse", "reservoir");
 
+        /// <summary>Lines kept outside the mask: rivers, canals, railways (streams and ditches only inside).</summary>
         static bool KeepEverywhere(Dictionary<string, string> t)
         {
-            if (IsWater(t)) return true;
+            if (t.Is("waterway", "river") || t.Is("waterway", "canal")) return true;
             var rw = t.Get("railway");
             return rw == "rail" || rw == "light_rail" || rw == "narrow_gauge";
         }
@@ -99,7 +100,7 @@ namespace LeGamez.Editor.OsmImport
         /// <summary>
         /// Removes everything outside the mask right after loading (the builders stay unchanged): nodes by position,
         /// buildings by centroid, other areas when their centroid and most of the outline are inside, lines are cut to
-        /// the inside runs. Lakes/ponds, rivers, canals and railways stay everywhere.
+        /// the inside runs. Rivers, canals and railways stay everywhere, lakes when they touch the mask.
         /// </summary>
         public FilterStats Filter(OsmData data)
         {
@@ -123,8 +124,15 @@ namespace LeGamez.Editor.OsmImport
 
         bool KeepPolygon(OsmPolygon p)
         {
-            if (KeepEverywhere(p.tags)) return true;
-            if (p.outer.Count == 0 || !Inside(GeoUtil.Centroid(p.outer))) return false;
+            if (p.outer.Count == 0) return false;
+            if (IsWaterArea(p.tags))
+            {
+                // Lakes completely outside are coloured into the coarse terrain (mask value 64) – draping them is costly.
+                if (Inside(GeoUtil.Centroid(p.outer))) return true;
+                foreach (var q in p.outer) if (Inside(q)) return true;
+                return false;
+            }
+            if (!Inside(GeoUtil.Centroid(p.outer))) return false;
             if (p.tags.Has("building") || p.tags.Has("building:part")) return true;
             int inside = 0;
             foreach (var q in p.outer) if (Inside(q)) inside++;

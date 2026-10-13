@@ -6,6 +6,7 @@ fetched inside; terrain and aerial image cover the whole rectangle. Without a ma
 
 Mask PNG (8 bit grey, top row = north edge, like dop.png); pixel values:
     0   outside                      32  outside, forest (coarse terrain is coloured as forest)
+    64  outside, lake / pond (coarse terrain is coloured as water; the OSM water area is dropped)
     192 road corridor                255 settlement
 Anything >= 128 counts as inside. Data/<id>.mask.json: {"xMin", "zMin", "step", "width", "height", ...};
 pixel (col, row) covers x in [xMin + col*step, +step), z in [zMax - (row+1)*step, zMax - row*step).
@@ -19,7 +20,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "Data"
 
-OUTSIDE, FOREST, CORRIDOR, SETTLEMENT = 0, 32, 192, 255
+OUTSIDE, FOREST, WATER, CORRIDOR, SETTLEMENT = 0, 32, 64, 192, 255
 
 
 class AreaMask:

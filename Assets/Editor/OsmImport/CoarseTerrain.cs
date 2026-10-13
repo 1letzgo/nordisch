@@ -11,7 +11,7 @@ namespace LeGamez.Editor.OsmImport
     /// sample inside such a block is replaced by its two triangles (same diagonal as the terrain cells). The field and
     /// the coarse mesh are thus identical – draped water/railways and the detailed blocks next to it fit without cracks.
     /// Colours: majority ground cover of the aerial image (blocks split down to 10 m along field borders), forest from
-    /// the mask. Call <see cref="Build"/> before GroundBuilder.BuildBase, which skips the blocks built here.
+    /// the mask, lakes in water colour. Call <see cref="Build"/> before GroundBuilder.BuildBase, which skips the blocks built here.
     /// </summary>
     public static class CoarseTerrain
     {
@@ -21,7 +21,7 @@ namespace LeGamez.Editor.OsmImport
         const int Smooth = 4;             // samples (±20 m) averaged for a 40 m grid point
         const float Majority = 0.9f;      // share of cell halves with one cover for a block to stay whole
         const int MinCover = 2;           // cells: smallest block for cover borders (10 m)
-        const byte Forest = 5;            // cover code next to AerialImage.Cover
+        const byte Forest = 5, Lake = 6;  // cover codes next to AerialImage.Cover
 
         static byte[] cover;              // per cell: lower half | upper half << 4
         static bool[] fine;               // per 40 m block: detailed (GroundBuilder)
@@ -56,6 +56,7 @@ namespace LeGamez.Editor.OsmImport
                 float x0 = startX + ix * cs, z0 = startZ + iz * cs;
                 byte lo, up;
                 if (mask.IsForest(x0 + cs * 0.5f, z0 + cs * 0.5f)) lo = up = Forest;
+                else if (mask.IsLake(x0 + cs * 0.5f, z0 + cs * 0.5f)) lo = up = Lake;
                 else if (aerial == null) lo = up = 0;
                 else { lo = (byte)aerial.CoverIn(x0, z0, cs, false); up = (byte)aerial.CoverIn(x0, z0, cs, true); }
                 cover[iz * ncx + ix] = (byte)(lo | up << 4);
@@ -231,7 +232,7 @@ namespace LeGamez.Editor.OsmImport
         /// <summary>At least <see cref="Majority"/> of the cell halves share one cover (returned in <paramref name="c"/>).</summary>
         static bool Uniform(int ix, int iz, int n, out byte c)
         {
-            var votes = new int[6];
+            var votes = new int[7];
             for (int k = iz; k < Mathf.Min(iz + n, ncz); k++)
             for (int i = ix; i < Mathf.Min(ix + n, ncx); i++)
             {
@@ -250,6 +251,7 @@ namespace LeGamez.Editor.OsmImport
         static Color32 Colour(byte c, Color32 fallback)
         {
             if (c == Forest) return WorldStyle.Forest;
+            if (c == Lake) return WorldStyle.Water;
             var cover = (AerialImage.Cover)c;
             if (cover == AerialImage.Cover.Paving || cover == AerialImage.Cover.Sand || cover == AerialImage.Cover.Soil) return Field;
             return AerialImage.CoverColor(cover, fallback);

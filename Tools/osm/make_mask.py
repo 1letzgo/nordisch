@@ -13,7 +13,7 @@ Inside (see area_mask.py for the PNG encoding) =
     settlements – OSM landuse residential/commercial/industrial/retail and clusters of buildings (hamlets; single
     farms are left out), grown by settlement_buffer – plus corridors of road_buffer metres along the roads that connect
     them, all clipped to the municipality boundary (admin_level/boundary name). Outside stays terrain coloured by the
-    aerial image; forests outside are marked (value 32) so the coarse terrain can show them dark green.
+    aerial image; forests (32) and lakes (64) outside are marked so the coarse terrain shows them dark green / blue.
 
 Writes Data/<id>.mask.png + Data/<id>.mask.json and prints the masked area in km².
 Data (c) OpenStreetMap contributors, ODbL.
@@ -34,7 +34,7 @@ from scipy import ndimage
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from area_bounds import latlon_bbox, local_bounds  # noqa: E402
-from area_mask import CORRIDOR, FOREST, SETTLEMENT  # noqa: E402
+from area_mask import CORRIDOR, FOREST, SETTLEMENT, WATER  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 AREAS_FILE = Path(__file__).with_name("areas.json")
@@ -98,6 +98,10 @@ out geom;
   way["natural"="wood"]({b});
   relation["landuse"="forest"]({b});
   relation["natural"="wood"]({b});
+  way["natural"="water"]({b});
+  relation["natural"="water"]({b});
+  way["landuse"~"^(basin|reservoir)$"]({b});
+  way["waterway"="riverbank"]({b});
 );
 out geom;
 way["building"]({b});
@@ -278,8 +282,11 @@ def process_area(area, refresh):
     settle &= inside
 
     forest = fill_polygons(r, els, lambda t: t.get("landuse") == "forest" or t.get("natural") == "wood")
+    water = fill_polygons(r, els, lambda t: t.get("natural") == "water" or t.get("landuse") in ("basin", "reservoir")
+                          or t.get("waterway") == "riverbank")
     out = np.zeros((r.h, r.w), dtype=np.uint8)
     out[forest] = FOREST
+    out[water] = WATER
     out[inside] = CORRIDOR
     out[settle] = SETTLEMENT
 

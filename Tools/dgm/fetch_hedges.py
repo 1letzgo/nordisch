@@ -271,6 +271,9 @@ def process_area(area):
 
     free, rng = [], np.random.default_rng(7)
     house_utm = [to_utm(np.array(r)) for r in houses]
+    house_box = np.array([[h[:, 0].min(), h[:, 0].max(), h[:, 1].min(), h[:, 1].max()] for h in house_utm]).reshape(-1, 4)
+    plot_utm = [to_utm(np.array(r)) for r in plots]
+    plot_box = np.array([[h[:, 0].min(), h[:, 0].max(), h[:, 1].min(), h[:, 1].max()] for h in plot_utm]).reshape(-1, 4)
     for key, (bdate, href) in sorted(bdom.items()):
         if key not in dgm or key not in dop:
             print(f"    {key}: no DGM1/DOP tile, skipped")
@@ -283,12 +286,20 @@ def process_area(area):
         red, nir = rgbi[0], rgbi[3]
         ndvi = (nir - red) / np.maximum(nir + red, 1)
         img = Image.new("L", ndom.shape[::-1], 0); dr = ImageDraw.Draw(img)
-        for hu in house_utm:
-            if hu[:, 0].max() < e0 or hu[:, 0].min() > e0 + 1000 or hu[:, 1].max() < n0 - 1000 or hu[:, 1].min() > n0:
-                continue
-            dr.polygon([((p[0] - e0) / RES, (n0 - p[1]) / RES) for p in hu], fill=1)
+        sel = (house_box[:, 1] >= e0) & (house_box[:, 0] <= e0 + 1000) & (house_box[:, 3] >= n0 - 1000) & (house_box[:, 2] <= n0)
+        for hi in np.nonzero(sel)[0]:
+            dr.polygon([((p[0] - e0) / RES, (n0 - p[1]) / RES) for p in house_utm[hi]], fill=1)
         bmask = ndimage.binary_dilation(np.array(img, dtype=bool), iterations=1)
         hedge = (ndom >= MIN_H) & (ndom <= MAX_H) & (ndvi >= NDVI_MIN) & ~bmask
+        free_px = hedge
+        if mask is not None:
+            # Large areas: free hedges count only next to gardens (the importer drops the others) – skips the
+            # hedgerows between the fields, by far the most work.
+            pimg = Image.new("L", ndom.shape[::-1], 0); pdr = ImageDraw.Draw(pimg)
+            psel = (plot_box[:, 1] >= e0 - 10) & (plot_box[:, 0] <= e0 + 1010) & (plot_box[:, 3] >= n0 - 1010) & (plot_box[:, 2] <= n0 + 10)
+            for pi in np.nonzero(psel)[0]:
+                pdr.polygon([((p[0] - e0) / RES, (n0 - p[1]) / RES) for p in plot_utm[pi]], fill=1)
+            free_px = hedge & ndimage.binary_dilation(np.array(pimg, dtype=bool), iterations=int(4 / RES))
 
         # 1. border strips
         c = np.floor((sub_en[:, 0] - e0) / RES).astype(int); r = np.floor((n0 - sub_en[:, 1]) / RES).astype(int)
@@ -298,7 +309,7 @@ def process_area(area):
         sub_h[idx] = np.where(sub_hit[idx], ndom[r[idx], c[idx]], 0)
 
         # 2. free hedges
-        labels, count = ndimage.label(hedge, structure=np.ones((3, 3)))
+        labels, count = ndimage.label(free_px, structure=np.ones((3, 3)))
         found = 0
         for sl, li in zip(ndimage.find_objects(labels), range(1, count + 1)):
             if sl is None:
