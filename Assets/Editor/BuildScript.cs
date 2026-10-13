@@ -85,6 +85,7 @@ namespace LeGamez.Editor
             AssetDatabase.ImportAsset(BuildInfoPath);
             string prevVersion = PlayerSettings.bundleVersion;
             int prevCode = PlayerSettings.Android.bundleVersionCode;
+            string prevKeystore = PlayerSettings.Android.keystoreName, prevAlias = PlayerSettings.Android.keyaliasName;
             bool ok = false;
             try
             {
@@ -104,9 +105,9 @@ namespace LeGamez.Editor
                 PlayerSettings.bundleVersion = prevVersion;
                 PlayerSettings.Android.bundleVersionCode = prevCode;
                 PlayerSettings.Android.useCustomKeystore = false;
-                PlayerSettings.Android.keystoreName = "";
+                PlayerSettings.Android.keystoreName = prevKeystore;
                 PlayerSettings.Android.keystorePass = "";
-                PlayerSettings.Android.keyaliasName = "";
+                PlayerSettings.Android.keyaliasName = prevAlias;
                 PlayerSettings.Android.keyaliasPass = "";
                 AssetDatabase.SaveAssets();
             }

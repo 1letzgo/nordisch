@@ -28,6 +28,7 @@ code=$(( ($(date +%s) - $(date -j -f %Y-%m-%d 2025-01-01 +%s)) / 600 ))
 expires=$(date -v+15d +%d.%m.%Y)
 echo "Release v$version (versionCode $code), runs until $expires"
 
+before=$(git status --porcelain --untracked-files=no)
 log=/tmp/nordisch-release.log
 "$UNITY" -batchmode -quit -projectPath . -buildTarget Android \
   -executeMethod LeGamez.Editor.BuildScript.BuildAndroidRelease -releaseVersion "$version" -versionCode "$code" \
@@ -38,7 +39,8 @@ echo "Built $apk ($(du -h "$apk" | cut -f1))"
 [[ $DRY == 1 ]] && exit 0
 
 # Unity may have touched project files during the build (it should not) – never tag a dirty tree.
-git status --porcelain --untracked-files=no | grep -q . && { echo "Build changed tracked files:"; git status --short; exit 1; }
+after=$(git status --porcelain --untracked-files=no)
+[[ "$before" == "$after" ]] || { echo "Tracked files changed during the build:"; diff <(echo "$before") <(echo "$after"); exit 1; }
 git push origin HEAD
 git tag "v$version" && git push origin "v$version"
 gh release create "v$version" "$apk" -R "$REPO" --latest --title "Nordisch $version" --notes "$(cat <<EOF
