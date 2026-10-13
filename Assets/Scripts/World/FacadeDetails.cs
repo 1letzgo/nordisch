@@ -13,6 +13,8 @@ namespace LeGamez.World
     public class FacadeDetails : MonoBehaviour
     {
         public TextAsset data;
+        /// <summary>Same records from a downloaded map (format 5); used when <see cref="data"/> is null.</summary>
+        [System.NonSerialized] public byte[] bytes;
         public Material material;
         public float radius = 95f;
 
@@ -42,10 +44,10 @@ namespace LeGamez.World
 
         void Start()
         {
-            if (data == null || material == null) { enabled = false; return; }
-            var bytes = data.bytes;
-            rec = new float[bytes.Length / 4];
-            System.Buffer.BlockCopy(bytes, 0, rec, 0, rec.Length * 4);
+            var src = data != null ? data.bytes : bytes;
+            if (src == null || material == null) { enabled = false; return; }
+            rec = new float[src.Length / 4];
+            System.Buffer.BlockCopy(src, 0, rec, 0, rec.Length * 4);
             for (int i = 0; i + Stride <= rec.Length; i += Stride)
             {
                 var k = new Vector2Int(Mathf.FloorToInt(rec[i + 1] / Cell), Mathf.FloorToInt(rec[i + 3] / Cell));

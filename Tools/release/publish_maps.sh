@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the map bundles (iOS + Android) and publishes changed maps to the GitHub release "maps" (catalog maps.json).
+# Exports the maps (format 5, the same files for iOS and Android) and publishes changed ones to the GitHub release "maps" (catalog maps.json).
 #   Tools/release/publish_maps.sh                  # all areas of Assets/Generated/AreaCatalog.asset
 #   Tools/release/publish_maps.sh jever westerstede
 #   Tools/release/publish_maps.sh --dry-run        # build + show what would change, upload nothing
@@ -19,17 +19,15 @@ for a in "$@"; do
 done
 AREA_ARGS=(); [[ ${#AREAS[@]} -gt 0 ]] && AREA_ARGS=(-areas "$(IFS=,; echo "${AREAS[*]}")")
 
-for target in iOS Android; do
-  log=/tmp/nordisch-maps-$target.log
-  echo "Building $target map bundles …"
-  # Unity batchmode occasionally dies with exit 139 during asset import – one retry.
-  for try in 1 2; do
-    if "$UNITY" -batchmode -quit -projectPath . -buildTarget "$target" \
-        -executeMethod LeGamez.Editor.MapBundles.BuildBatch ${AREA_ARGS[@]+"${AREA_ARGS[@]}"} -logFile "$log"; then break; fi
-    [[ $try == 2 ]] && { grep -E "\[Maps\]|error|Exception" "$log" | head -20; exit 1; }
-    echo "  Unity failed, retrying …"
-  done
-  grep "\[Maps\]" "$log" || true
+log=/tmp/nordisch-maps-export.log
+echo "Exporting maps (format 5, one set for iOS and Android) …"
+# Unity batchmode occasionally dies with exit 139 during asset import – one retry.
+for try in 1 2; do
+  if "$UNITY" -batchmode -quit -projectPath . \
+      -executeMethod LeGamez.Editor.MapExport.ExportBatch ${AREA_ARGS[@]+"${AREA_ARGS[@]}"} -logFile "$log"; then break; fi
+  [[ $try == 2 ]] && { grep -E "\[Maps\]|error|Exception" "$log" | head -20; exit 1; }
+  echo "  Unity failed, retrying …"
 done
+grep "\[Maps\]" "$log" || true
 
-python3 Tools/release/publish_maps.py ${PY_ARGS[@]+"${PY_ARGS[@]}"} ios android
+python3 Tools/release/publish_maps.py ${PY_ARGS[@]+"${PY_ARGS[@]}"}

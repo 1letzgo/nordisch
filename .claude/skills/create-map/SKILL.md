@@ -115,7 +115,7 @@ Builds brauchen mehrere GB – bei „Disk full“ nur eigene Simulator-/Derived
 
 - Commit: `Tools/osm/areas.json`, `Data/<id>.*`, `Assets/Generated/<id>/` (ohne `tiles/`, `*_facade.bytes`; mit `<id>_area.asset`),
   `Assets/Generated/AreaCatalog.asset`, `MainMenu.unity`.
-- In die App bringen: `Tools/release/publish_maps.sh <id>` (Unity zu; baut iOS + Android-Bundle, lädt in die GitHub-Release
+- In die App bringen: `Tools/release/publish_maps.sh <id>` (Unity zu; exportiert Format 5 für iOS + Android, lädt in die GitHub-Release
   `maps`, aktualisiert `maps.json`). Erst `--dry-run`, Upload nur nach Rückfrage beim Nutzer (öffentlich).
   Nur eigene Änderungen stagen, wenn parallel eine andere Sitzung im Repo arbeitet.
 - Dem Nutzer berichten: Gebiet/Größe, Häuser (LoD2 + OSM-only), Bäume, Datenstand (Befliegungsjahr), Auffälligkeiten.

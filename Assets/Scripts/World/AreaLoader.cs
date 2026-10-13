@@ -58,10 +58,11 @@ namespace LeGamez.World
             }
             SignTexts.Build(root.transform, d.signTexts, gm != null ? gm.signTextMaterial : null);
 
-            if (d.facade != null)
+            if (d.facade != null || d.facadeBytes != null)
             {
                 var facade = Inactive<FacadeDetails>("FacadeDetails", root.transform);
                 facade.data = d.facade;
+                facade.bytes = d.facadeBytes;
                 facade.material = Mat(WorldTile.MaterialTrees);
                 facade.gameObject.SetActive(true);
             }

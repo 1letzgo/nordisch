@@ -1,31 +1,28 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 using LeGamez.World;
 using UnityEngine;
 
 namespace LeGamez.Core
 {
     /// <summary>
-    /// Tiles for the <see cref="WorldStreamer"/> on devices: each 1 km region is its own bundle in the map folder,
+    /// Tiles for the <see cref="WorldStreamer"/> on devices: each 1 km region is one MapFormat file in the map folder,
     /// downloaded by <see cref="MapStore"/> the first time a tile of it is needed and prefetched when the player comes
-    /// within <see cref="PrefetchRadius"/>. A region bundle stays open while any of its tiles is in the scene.
+    /// within <see cref="PrefetchRadius"/>. A tile is read and decompressed on a worker thread; only the mesh creation
+    /// runs on the main thread (the streamer spaces that out to one tile per frame).
     /// </summary>
     public class RegionTileSource : WorldStreamer.ITileSource
     {
         /// <summary>Regions this close (edge distance) are downloaded ahead of time – ~1 min by car beyond the view.</summary>
         public const float PrefetchRadius = 1600f;
 
-        class Region
-        {
-            public AssetBundle bundle;
-            public int refs;
-            public bool loading;
-        }
-
         readonly MapStore.Map map;
         readonly HashSet<Vector2Int> known = new HashSet<Vector2Int>(); // regions the build has
-        readonly Dictionary<Vector2Int, Region> open = new Dictionary<Vector2Int, Region>();
+        readonly Dictionary<Vector2Int, Dictionary<Vector2Int, (long offset, int length)>> indexes =
+            new Dictionary<Vector2Int, Dictionary<Vector2Int, (long, int)>>();
         float nextPrefetch;
         bool prefetching;
 
@@ -57,48 +54,33 @@ namespace LeGamez.Core
                 yield return MapStore.FetchRegion(map, rk);
                 if (!MapStore.HasRegion(map.Id, rk)) { done(null); yield break; }
             }
-            if (!open.TryGetValue(r, out var region))
+            MapStore.TouchRegion(map.Id, rk);
+            string path = MapStore.RegionPath(map.Id, rk);
+            indexes.TryGetValue(r, out var index);
+            var job = Task.Run(() =>
             {
-                region = new Region { loading = true };
-                open[r] = region;
-                var req = AssetBundle.LoadFromFileAsync(MapStore.RegionPath(map.Id, rk));
-                yield return req;
-                region.bundle = req.assetBundle;
-                region.loading = false;
-            }
-            else
-                while (region.loading) yield return null;
-            if (region.bundle == null)
+                using var fs = File.OpenRead(path);
+                index ??= MapFormat.ReadRegionIndex(fs);
+                if (!index.TryGetValue(key, out var at)) return (index, (MapFormat.TileData)null);
+                var blob = new byte[at.length];
+                fs.Position = at.offset;
+                int read = 0;
+                while (read < blob.Length) { int n = fs.Read(blob, read, blob.Length - read); if (n <= 0) break; read += n; }
+                return (index, MapFormat.DecodeTile(key, blob));
+            });
+            while (!job.IsCompleted) yield return null;
+            if (job.IsFaulted)
             {
-                Debug.LogWarning($"[World] region {map.Id}/{rk} unreadable");
-                if (open.TryGetValue(r, out var o) && o == region) open.Remove(r);
+                Debug.LogWarning($"[World] region {map.Id}/{rk}: {job.Exception?.InnerException?.Message}");
                 done(null);
                 yield break;
             }
-            region.refs++;
-            MapStore.TouchRegion(map.Id, rk);
-            var tileReq = region.bundle.LoadAssetAsync<WorldTile>(WorldStreamer.TileName(areaId, key));
-            yield return tileReq;
-            var tile = tileReq.asset as WorldTile;
-            if (tile == null) Unref(r);
-            done(tile);
+            indexes[r] = job.Result.index;
+            var data = job.Result.Item2;
+            done(data != null ? MapFormat.BuildTile(data, WorldStreamer.TileName(areaId, key)) : null);
         }
 
-        public void Release(Vector2Int key, WorldTile tile)
-        {
-            // Assets from a bundle can be dropped one by one; they load again on the next request.
-            foreach (var part in tile.parts) if (part.mesh != null) Resources.UnloadAsset(part.mesh);
-            Resources.UnloadAsset(tile);
-            Unref(WorldStreamer.RegionOf(key));
-        }
-
-        void Unref(Vector2Int r)
-        {
-            if (!open.TryGetValue(r, out var region) || region.loading) return;
-            if (--region.refs > 0) return;
-            if (region.bundle != null) region.bundle.Unload(true);
-            open.Remove(r);
-        }
+        public void Release(Vector2Int key, WorldTile tile) => MapFormat.DestroyTile(tile);
 
         public void Prefetch(Vector3 focus)
         {
@@ -131,12 +113,6 @@ namespace LeGamez.Core
             float dx = Mathf.Max(x0 - p.x, 0f, p.x - (x0 + s));
             float dz = Mathf.Max(z0 - p.z, 0f, p.z - (z0 + s));
             return Mathf.Sqrt(dx * dx + dz * dz);
-        }
-
-        public void UnloadAll()
-        {
-            foreach (var region in open.Values) if (region.bundle != null) region.bundle.Unload(true);
-            open.Clear();
         }
     }
 }

@@ -30,6 +30,8 @@ namespace LeGamez.World
         public StreetIndex streets;
         public Texture2D mapTexture;
         public TextAsset facade;
+        /// <summary>Facade records of a downloaded map (MapFormat area file) instead of <see cref="facade"/>.</summary>
+        [System.NonSerialized] public byte[] facadeBytes;
         public List<Vector2Int> tileKeys = new List<Vector2Int>();
         public List<TrafficLights.Head> trafficHeads = new List<TrafficLights.Head>();
         public List<TrafficLights.Signal> trafficSignals = new List<TrafficLights.Signal>();

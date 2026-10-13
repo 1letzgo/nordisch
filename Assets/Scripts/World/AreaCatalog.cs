@@ -5,7 +5,7 @@ namespace LeGamez.World
 {
     /// <summary>
     /// All imported areas, maintained by the OSM importer. Editor only: the app lists downloadable maps
-    /// (Core/MapStore); this asset feeds the editor's menu and the map bundle build (Editor/MapBundles).
+    /// (Core/MapStore); this asset feeds the editor's menu and the map export (Editor/MapExport).
     /// </summary>
     public class AreaCatalog : ScriptableObject
     {

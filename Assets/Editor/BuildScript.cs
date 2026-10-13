@@ -90,7 +90,6 @@ namespace LeGamez.Editor
                 locationPathName = outPath,
                 target = BuildTarget.Android,
                 options = BuildOptions.None,
-                assetBundleManifestPath = BundleManifest(BuildTarget.Android),
             });
             Debug.Log($"[LeGamez] Android build {report.summary.result}: {outPath} ({report.summary.totalSize / (1024 * 1024)} MB)");
             return report.summary.result == BuildResult.Succeeded;
@@ -155,7 +154,7 @@ namespace LeGamez.Editor
             return null;
         }
 
-        /// <summary>The app ships only the menu – areas are downloaded map bundles (Editor/MapBundles, Core/MapStore).</summary>
+        /// <summary>The app ships only the menu – areas are downloads (Editor/MapExport, Core/MapStore).</summary>
         static string[] EnabledScenes()
         {
             var scenes = EditorBuildSettings.scenes
@@ -165,15 +164,6 @@ namespace LeGamez.Editor
             return scenes;
         }
 
-        /// <summary>Last map bundle build of this platform: engine code stripping then also keeps what the maps use
-        /// (besides Assets/link.xml).</summary>
-        static string BundleManifest(BuildTarget target)
-        {
-            string path = MapBundles.ManifestPath(target);
-            if (File.Exists(path)) return path;
-            Debug.LogWarning($"[LeGamez] No map bundle manifest at {path} – stripping relies on link.xml only.");
-            return null;
-        }
 
         static void Build(string folder)
         {
@@ -188,7 +178,6 @@ namespace LeGamez.Editor
                 locationPathName = outDir,
                 target = BuildTarget.iOS,
                 options = BuildOptions.None,
-                assetBundleManifestPath = BundleManifest(BuildTarget.iOS),
             };
             // iOS: CFBundleShortVersionString = "1.0", CFBundleVersion = build number.
             var (version, build) = ReadVersion();

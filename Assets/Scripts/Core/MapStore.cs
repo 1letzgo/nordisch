@@ -11,36 +11,38 @@ using UnityEngine.SceneManagement;
 namespace LeGamez.Core
 {
     /// <summary>
-    /// Downloadable maps. The app ships without any area. Each area = map.bundle (World/AreaData: spawn, POIs, streets,
-    /// traffic, facade data, minimap) + one bundle per 1 km region with its world tiles (r&lt;rx&gt;_&lt;rz&gt;.bundle), published
-    /// by Tools/release/publish_maps.sh to GitHub releases and listed in maps.json (release "maps").
+    /// Downloadable maps. The app ships without any area. Each area = area.bin (World/AreaData: spawn, POIs, streets,
+    /// traffic, facade data, minimap) + one file per 1 km region with its world tiles (r&lt;rx&gt;_&lt;rz&gt;.bin) in the
+    /// platform- and engine-independent World/MapFormat (format 5: the same files for iOS and Android), published by
+    /// Tools/release/publish_maps.sh to GitHub releases and listed in maps.json (release "maps").
     ///
     /// Only what is needed lives on the device:
-    /// - "Laden" fetches map.bundle + the regions around the start (build.start); everything else is fetched on demand
+    /// - "Laden" fetches area.bin + the regions around the start (build.start); everything else is fetched on demand
     ///   while playing (<see cref="RegionTileSource"/>: tiles the streamer needs + prefetch ~1.5 km ahead).
     /// - Region files are an LRU cache with <see cref="CacheLimit"/>; least recently used ones are dropped at the next start.
     ///
     /// Update logic:
     /// - The catalog is fetched once per app run (menu); the last copy is kept for offline starts.
-    /// - A build fits this app only if platform, <see cref="Format"/> and Unity version match exactly. The catalog can hold
-    ///   builds for several formats/engines side by side, so older apps keep finding theirs.
+    /// - A build fits this app if its <see cref="Format"/> matches (formats ≤ 4 were AssetBundles and also needed the same
+    ///   platform and Unity version). The catalog holds builds of several formats side by side, so older apps keep theirs.
     /// - Newer fitting build: only files whose SHA-256 changed are fetched (area data + regions already on the device);
     ///   regions not on the device simply come from the new build when needed. On Wi-Fi updates run automatically.
-    /// - Download → size + SHA-256 check → recompress to LZ4 (fast loading, single assets stream from file) → swap in.
+    /// - Download → size + SHA-256 check → into the map folder.
     /// In the editor the local AreaData assets from Assets/Generated are listed instead (nothing to download).
     /// </summary>
     public static class MapStore
     {
         /// <summary>Bump when maps need something only a newer app has (new/changed serialized fields of AreaData, WorldTile,
         /// PoiDatabase, StreetIndex …) or the package layout changes. Then re-publish all maps.
-        /// 1 = scene bundle; 2 = scene + tiles bundle; 3 = AreaData + tiles bundle; 4 = AreaData + one bundle per 1 km region.</summary>
-        public const int Format = 4;
+        /// 1 = scene bundle; 2 = scene + tiles bundle; 3 = AreaData + tiles bundle; 4 = AreaData + one bundle per 1 km region
+        /// (all AssetBundles, per platform/engine); 5 = own MapFormat files, one set for all platforms.</summary>
+        public const int Format = 5;
 
         public const string CatalogUrl = "https://github.com/1letzgo/nordisch/releases/download/maps/maps.json";
         /// <summary>Max. size of downloaded regions on the device (area data files don't count).</summary>
         public const long CacheLimit = 1024L * 1024 * 1024;
         const bool AutoUpdateOnWifi = true;
-        const string AreaFile = "map.bundle";
+        const string AreaFile = "area.bin";
 
         public static string Platform =>
             Application.platform == RuntimePlatform.Android ? "android" :
@@ -51,8 +53,8 @@ namespace LeGamez.Core
         [Serializable]
         public class FileEntry
         {
-            public string name;   // file name in the map folder (map.bundle, r<rx>_<rz>.bundle)
-            public string region; // "rx_rz" for region bundles, empty for the area bundle
+            public string name;   // file name in the map folder (area.bin, r<rx>_<rz>.bin; formats ≤ 4: *.bundle)
+            public string region; // "rx_rz" for regions, empty for the area file
             public string url;
             public long size;
             public string sha256;
@@ -182,23 +184,26 @@ namespace LeGamez.Core
         static string ThumbDir => Path.Combine(Root, "thumbs");
         static string CatalogCache => Path.Combine(Root, "catalog.json");
         static string UsagePath => Path.Combine(Root, "usage.json");
-        public static string RegionName(string region) => $"r{region}.bundle";
+        public static string RegionName(string region) => $"r{region}.bin";
 
         static bool initialized;
         static Runner runner;
-        static AssetBundle loaded;
+        static World.AreaData loaded;
         static RegionTileSource loadedSource;
         static readonly Queue<Map> queue = new Queue<Map>();
         static bool working;
         static bool starting; // a map is being loaded – ignore further taps
         static readonly Dictionary<string, long> usage = new Dictionary<string, long>();
 
+        /// <summary>Format-5 builds are platform "any" with no engine version; older ones were tied to both.</summary>
         public static bool Fits(Build b) =>
-            b != null && b.platform == Platform && b.format == Format && b.unity == Application.unityVersion;
+            b != null && b.format == Format && ForThisPlatform(b) && (string.IsNullOrEmpty(b.unity) || b.unity == Application.unityVersion);
+
+        static bool ForThisPlatform(Build b) => b.platform == "any" || b.platform == Platform;
 
         // ------------------------------------------------------------------ public API
 
-        /// <summary>Main menu start: frees the last map's bundles, lists installed maps and fetches the catalog (once per run).</summary>
+        /// <summary>Main menu start: frees the last map, lists installed maps and fetches the catalog (once per run).</summary>
         public static void Init()
         {
             UnloadLoaded();
@@ -260,7 +265,7 @@ namespace LeGamez.Core
 #endif
         }
 
-        /// <summary>Releases the bundles of the map that was played (the menu scene has replaced the world by now).</summary>
+        /// <summary>Releases the map that was played (the menu scene has replaced the world by now).</summary>
         public static void UnloadLoaded()
         {
             World.WorldStreamer.Source = null;
@@ -269,12 +274,11 @@ namespace LeGamez.Core
             SaveUsage();
         }
 
-        static void Release(ref AssetBundle bundle, ref RegionTileSource source)
+        static void Release(ref World.AreaData area, ref RegionTileSource source)
         {
-            source?.UnloadAll();
-            source = null;
-            if (bundle != null) bundle.Unload(true);
-            bundle = null;
+            source = null; // its tiles went with the world scene's streamer
+            World.MapFormat.Destroy(area);
+            area = null;
         }
 
         // ------------------------------------------------------------------ regions on demand (RegionTileSource)
@@ -343,7 +347,7 @@ namespace LeGamez.Core
 
         static bool HasPlatform(Entry e)
         {
-            if (e.builds != null) foreach (var b in e.builds) if (b != null && b.platform == Platform) return true;
+            if (e.builds != null) foreach (var b in e.builds) if (b != null && ForThisPlatform(b)) return true;
             return false;
         }
 
@@ -352,7 +356,7 @@ namespace LeGamez.Core
         {
             if (e.builds != null)
                 foreach (var b in e.builds)
-                    if (b != null && b.platform == Platform && b.format > Format) return true;
+                    if (b != null && ForThisPlatform(b) && b.format > Format) return true;
             return false;
         }
 
@@ -574,13 +578,13 @@ namespace LeGamez.Core
             Debug.Log($"[Maps] {m.Id} {b.version} {(update ? "updated" : "installed")} ({total / (1024 * 1024)} MB, {files.Count} file(s))");
         }
 
-        /// <summary>Download → size/SHA-256 check → LZ4 → into the map folder, recorded in info.json.</summary>
+        /// <summary>Download → size/SHA-256 check → into the map folder, recorded in info.json.</summary>
         static IEnumerator DownloadFile(Map m, FileEntry f, Action<float> progress, Action<string> fail)
         {
             string tmpDir = Path.Combine(Root, ".download");
             Directory.CreateDirectory(tmpDir);
-            string part = Path.Combine(tmpDir, $"{m.Id}.{f.name}.part"), lz4 = Path.Combine(tmpDir, $"{m.Id}.{f.name}.lz4");
-            TryDelete(part); TryDelete(lz4);
+            string part = Path.Combine(tmpDir, $"{m.Id}.{f.name}.part");
+            TryDelete(part);
             using (var req = new UnityWebRequest(f.url, UnityWebRequest.kHttpVerbGET))
             {
                 req.downloadHandler = new DownloadHandlerFile(part) { removeFileOnAbort = true };
@@ -601,17 +605,12 @@ namespace LeGamez.Core
                     yield break;
                 }
             }
-            // Published bundles are LZMA (small download); LZ4 on disk loads fast and single assets stream from file.
-            var recompress = AssetBundle.RecompressAssetBundleAsync(part, lz4, BuildCompression.LZ4Runtime);
-            yield return recompress;
-            TryDelete(part);
-            if (!recompress.success) { TryDelete(lz4); fail("unreadable " + recompress.humanReadableResult); yield break; }
             try
             {
                 Directory.CreateDirectory(MapDir(m.Id));
                 string target = FilePath(m.Id, f.name);
                 TryDelete(target);
-                File.Move(lz4, target);
+                File.Move(part, target);
                 ExcludeFromBackup(target);
                 m.info ??= new Installed();
                 m.info.files.RemoveAll(x => x.name == f.name);
@@ -619,43 +618,34 @@ namespace LeGamez.Core
                 if (!string.IsNullOrEmpty(f.region)) TouchRegion(m.Id, f.region);
                 if (m.installed != null) SaveInfo(m); // regions on demand: record right away
             }
-            catch (Exception e) { TryDelete(lz4); fail(e.Message); }
+            catch (Exception e) { TryDelete(part); fail(e.Message); }
         }
 
         static IEnumerator PlayRoutine(Map m)
         {
             starting = true;
             // Area switch while playing: the current area stays loaded until the new world scene has replaced it.
-            var oldBundle = loaded;
+            var oldArea = loaded;
             var oldSource = loadedSource;
-            loaded = null;
-            loadedSource = null;
-            var req = AssetBundle.LoadFromFileAsync(FilePath(m.Id, AreaFile));
-            yield return req;
-            var bundle = req.assetBundle;
+            string path = FilePath(m.Id, AreaFile);
+            var read = Task.Run(() => File.ReadAllBytes(path));
+            while (!read.IsCompleted) yield return null;
             World.AreaData data = null;
-            if (bundle != null)
-            {
-                var areq = bundle.LoadAllAssetsAsync<World.AreaData>();
-                yield return areq;
-                data = areq.asset as World.AreaData;
-            }
+            try { if (!read.IsFaulted) data = World.MapFormat.ReadArea(read.Result); }
+            catch (Exception e) { Debug.LogWarning($"[Maps] {m.Id}: {e.Message}"); }
             if (data == null)
             {
                 starting = false;
-                if (bundle != null) bundle.Unload(true);
-                loaded = oldBundle;
-                loadedSource = oldSource;
-                Fail(m, "Karte beschädigt – bitte löschen und neu laden", "bundle without AreaData");
+                Fail(m, "Karte beschädigt – bitte löschen und neu laden", "area file unreadable");
                 yield break;
             }
             Current = m;
-            loaded = bundle;
+            loaded = data;
             loadedSource = new RegionTileSource(m);
             World.WorldStreamer.Source = loadedSource;
             World.AreaLoader.Pending = data;
             yield return SceneManager.LoadSceneAsync(World.AreaLoader.WorldSceneIndex);
-            Release(ref oldBundle, ref oldSource);
+            Release(ref oldArea, ref oldSource);
             SaveUsage();
             starting = false;
         }

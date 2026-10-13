@@ -88,40 +88,40 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
 7. **Veröffentlichen**: `Tools/release/publish_maps.sh [<id> …]` – siehe „Karten-Downloads“.
 
 ### Karten-Downloads (App enthält keine Karten)
-- Jede Stadt = `<id>.bundle` (AreaData + POIs + Straßen + Fassaden + Minimap) + **ein Bundle pro 1-km-Region**
-  (`<id>-r<rx>_<rz>.bundle`, deren 5 × 5 Kacheln) pro Plattform – Format 4. Früher (Format 2/3): ein Kachel-Bundle
-  und `<id>.tiles.bundle` (Welt-Kacheln, einzeln ladbar; Szenen-Bundles dürfen keine anderen Assets enthalten), gebaut von
-  `Editor/MapBundles` (`-buildTarget iOS|Android -executeMethod LeGamez.Editor.MapBundles.BuildBatch [-areas a,b]`)
-  nach `Builds/Maps/<platform>/<id>.bundle` (LZMA) + `index.json`.
-- `Tools/release/publish_maps.sh [--dry-run] [--drop-old] [<id> …]` baut iOS + Android und lädt **nur geänderte** Karten
-  (Inhalts-CRC) in die GitHub-**Pre-Release `maps`** (nie „latest“ → stört den APK-Updater nicht). Katalog
-  `https://github.com/1letzgo/nordisch/releases/download/maps/maps.json`: je Karte Name/Lage/Fahrzeuge/Thumbnail-URL und
-  `builds[]` = {platform, format, unity, version (yyyyMMddHHmm), url, size, sha256, files[] = {name, region, url, size,
-  sha256, crc}, start[] = Regionen ≤ 1,2 km um den Spawn}. Dateien liegen inhaltsadressiert (`…-<sha12>.bundle`) in der
-  Pre-Release **`maps-<id>`** (Asset-Limit pro Release), Katalog + Thumbnails in `maps`. Unveränderte Regionen behalten
-  ihre URL → kein Upload, kein erneuter Download.
-- **Nur Benötigtes auf dem Gerät**: „Laden“ holt `map.bundle` + Startregionen; alle anderen Regionen lädt
+- **Format 5** (`World/MapFormat`, eigenes Binärformat – dieselben Dateien für iOS und Android, unabhängig von der
+  Unity-Version): je Gebiet `area.bin` (AreaData als JSON + Minimap-PNG + Fassaden-Records, Deflate) und **eine Datei pro
+  1-km-Region** `r<rx>_<rz>.bin` (Inhaltsverzeichnis + je Kachel ein Deflate-Block: Positionen, Normalen als sbyte,
+  Farben, Fassaden-UVs, Indizes). Export: `Editor/MapExport` (`-executeMethod LeGamez.Editor.MapExport.ExportBatch
+  [-areas a,b]`, beliebiges Build-Target) → `Builds/Maps/<id>/` + `Builds/Maps/index.json`. Formate 1–4 waren
+  AssetBundles (pro Plattform und Unity-Version) – nicht mehr verwenden.
+- `Tools/release/publish_maps.sh [--dry-run] [--drop-old] [<id> …]` exportiert und lädt **nur geänderte Dateien** (SHA-256)
+  hoch. Katalog `https://github.com/1letzgo/nordisch/releases/download/maps/maps.json` (Pre-Release `maps`, nie „latest“ →
+  stört den APK-Updater nicht): je Karte Name/Lage/Fahrzeuge/Thumbnail-URL und `builds[]` = {platform ("any"), format,
+  unity (leer), version (yyyyMMddHHmm), url, size, sha256, files[] = {name, region, url, size, sha256}, start[] =
+  Regionen ≤ 1,2 km um den Spawn}. Dateien liegen inhaltsadressiert (`<id>-f5-<name>-<sha12>.bin`) in der Pre-Release
+  **`maps-<id>`** (Asset-Limit pro Release), Katalog + Thumbnails in `maps`. Unveränderte Regionen behalten ihre URL →
+  kein Upload, kein erneuter Download. Nicht mehr referenzierte Assets werden gelöscht.
+- **Nur Benötigtes auf dem Gerät**: „Laden“ holt `area.bin` + Startregionen; alle anderen Regionen lädt
   `Core/RegionTileSource` bei Bedarf (Kachel gebraucht oder Spieler ≤ 1,6 km entfernt, eine Region nach der anderen).
+  Kacheln werden im Hintergrund-Thread gelesen/entpackt, auf dem Hauptthread zu Meshes (1 Kachel pro Frame).
   Regionen = LRU-Cache (`MapStore.CacheLimit` 1 GB, `usage.json`), beim nächsten Start gekürzt. Offline: fehlende Kacheln
   werden nach 10 s erneut versucht; Spawn/Beamen warten nicht auf sie. Updates holen nur Dateien, die auf dem Gerät liegen
-  und deren SHA-256 sich geändert hat. Alte, nicht mehr referenzierte Assets werden gelöscht.
+  und deren SHA-256 sich geändert hat.
 - App: `Core/MapStore` – Katalog einmal pro App-Start laden (Kopie für offline), Download → Größe + SHA-256 prüfen →
-  `RecompressAssetBundleAsync` nach LZ4 → `persistentDataPath/maps/<id>/map.bundle` + `info.json` (iOS: kein iCloud-Backup).
-  Spielen = Bundles laden, `AreaLoader.Pending` = AreaData, Welt-Szene (Build-Index 1) laden; zurück im Menü wird entladen.
-  Im Editor listet `MapStore` die lokalen AreaData-Assets. Format 3 (seit „Eine Welt“ Schritt 1).
-- **Update-Logik**: Ein Build passt nur bei gleicher Plattform, `MapStore.Format` und Unity-Version. Neuerer passender Build
-  → „Update“ (im WLAN automatisch, sonst Tipp auf das Pill; die alte Version bleibt bis zum Tausch spielbar).
+  `persistentDataPath/maps/<id>/` + `info.json` (iOS: kein iCloud-Backup). Spielen = `area.bin` lesen
+  (`MapFormat.ReadArea`), `AreaLoader.Pending` = AreaData, Welt-Szene (Build-Index 1) laden. Im Editor listet `MapStore`
+  die lokalen AreaData-Assets, Kacheln kommen direkt aus `Assets/Generated`.
+- **Update-Logik**: Ein Build passt, wenn `MapStore.Format` gleich ist (Plattform "any"). Neuerer passender Build →
+  „Update“ (im WLAN automatisch, sonst Tipp auf das Pill; die alte Version bleibt bis zum Tausch spielbar).
   Installierter Build passt nicht mehr (App-Update) → „Update nötig“. Kein passender Build: nur neuere Formate →
   „Neue App-Version nötig“, nur ältere → „Karte wird aktualisiert“.
 - Testen ohne GitHub: `maps/catalog-url.txt` im App-Datenordner (Android: `/storage/emulated/0/Android/data/de.letzgo.legamez/files/`)
-  enthält eine andere Katalog-URL, z. B. `file://…/catalog.json` mit `file://`-Bundle-URLs (per `adb push`).
-- `MapStore.Format` erhöhen, wenn Kartenszenen etwas brauchen, das ältere Apps nicht haben (neues Skript in Szenen,
-  geänderte serialisierte Felder von AreaInfo/TrafficLights/FacadeDetails/PoiDatabase/StreetIndex …).
-  **Reihenfolge bei neuem Format oder Unity-Update: erst Karten veröffentlichen, dann App releasen** (ohne `--drop-old`,
-  damit alte Apps ihre Builds behalten).
-- Stripping: Engine-Code-Stripping sieht nur das Menü → `Assets/link.xml` (TextMesh, Collider, Light, Assembly-CSharp) und
-  `BuildScript` übergibt das Bundle-Manifest der letzten Kartenbuilds. Fog-Varianten: Grafik-Einstellung „Fog Modes“ = Custom
-  (`MapBundles` setzt das), sonst fehlt in Kartenszenen der Nebel.
+  enthält eine andere Katalog-URL, z. B. `file://…/catalog.json` mit `file://`-Datei-URLs (per `adb push`).
+- `MapStore.Format` erhöhen, wenn Karten etwas brauchen, das ältere Apps nicht haben (Änderungen an MapFormat,
+  `MapFormat.AreaJson`, AreaData/WorldTile-Feldern …). **Reihenfolge bei neuem Format: erst Karten veröffentlichen, dann
+  App releasen** (ohne `--drop-old`, damit alte Apps ihre Builds behalten).
+- Stripping: Engine-Code-Stripping sieht nur Menü + Welt-Szene → `Assets/link.xml` (TextMesh, Collider, Light,
+  Assembly-CSharp). Fog-Varianten: Grafik-Einstellung „Fog Modes“ = Custom.
 
 ### Was der Importer macht (`Assets/Editor/OsmImport/`)
 - `OsmData` + `MiniJson`: Overpass-JSON lesen, `GeoProjection` (äquirektangulär um den Mittelpunkt, 1 Unit = 1 m, +X Ost, +Z Nord).

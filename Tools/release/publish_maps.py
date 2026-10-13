@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Publishes map bundles to GitHub releases of 1letzgo/nordisch and updates the catalog maps.json.
 
-Reads Builds/Maps/<platform>/index.json (written by Unity, LeGamez.Editor.MapBundles.BuildBatch). Each area consists of
-map.bundle (area data) + one bundle per 1 km region (r<rx>_<rz>.bundle). Files are uploaded per area to the pre-release
-"maps-<id>" under content-addressed names, so unchanged regions keep their URL and are neither uploaded again nor
-downloaded again by the app (it compares sha256 per file). The catalog lives in the pre-release "maps":
+Reads Builds/Maps/index.json (written by Unity, LeGamez.Editor.MapExport.ExportBatch). Format 5: each area consists of
+area.bin (area data) + one file per 1 km region (r<rx>_<rz>.bin) – the same files for iOS and Android ("platform": "any"),
+independent of the Unity version. Files are uploaded per area to the pre-release "maps-<id>" under content-addressed
+names, so unchanged regions keep their URL and are neither uploaded again nor downloaded again by the app (it compares
+sha256 per file). The catalog lives in the pre-release "maps":
   https://github.com/1letzgo/nordisch/releases/download/maps/maps.json
 Builds for other app formats / Unity versions stay in the catalog (older apps keep finding theirs) unless --drop-old.
 
-  python3 Tools/release/publish_maps.py [--dry-run] [--drop-old] [platform ...]   # default: ios android
+  python3 Tools/release/publish_maps.py [--dry-run] [--drop-old]
 
 All map releases are pre-releases, so GitHub's "latest release" (used by the Android app updater) never points at them.
 """
@@ -76,18 +77,15 @@ def release_assets(tag):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("platforms", nargs="*", default=["ios", "android"])
     ap.add_argument("--dry-run", action="store_true", help="only show what would change, write Builds/Maps/maps.json")
     ap.add_argument("--drop-old", action="store_true", help="remove builds for other formats/Unity versions")
     a = ap.parse_args()
 
-    indexes = []
-    for p in a.platforms:
-        path = os.path.join(ROOT, "Builds", "Maps", p, "index.json")
-        if not os.path.exists(path):
-            sys.exit(f"{path} missing – build the bundles first (publish_maps.sh)")
-        with open(path) as f:
-            indexes.append(json.load(f))
+    path = os.path.join(ROOT, "Builds", "Maps", "index.json")
+    if not os.path.exists(path):
+        sys.exit(f"{path} missing – export the maps first (publish_maps.sh)")
+    with open(path) as f:
+        indexes = [json.load(f)]
 
     ensure_release(CATALOG_TAG, "Nordisch Karten", a.dry_run)
     catalog = load_catalog()
@@ -97,7 +95,7 @@ def main():
     uploads = {}  # tag -> [local staged paths]
 
     for idx in indexes:
-        platform, unity, fmt = idx["platform"], idx["unity"], idx["format"]
+        platform, unity, fmt = idx.get("platform", "any"), idx.get("unity", ""), idx["format"]
         for m in idx["maps"]:
             tag = f"maps-{m['id']}"
             e = entries.setdefault(m["id"], {"id": m["id"], "builds": []})
@@ -111,16 +109,16 @@ def main():
             files, changed = [], 0
             for f in m["files"]:
                 old = old_files.get(f["name"])
-                if old and str(old.get("crc")) == str(f["crc"]):
+                digest = sha256(f["path"])
+                if old and old.get("sha256") == digest:
                     files.append(old)  # unchanged content: keep URL, no upload, no re-download in the app
                     continue
-                digest = sha256(f["path"])
                 stem = f["name"].rsplit(".", 1)[0]
-                name = f"{m['id']}-{platform}-f{fmt}-{stem}-{digest[:12]}.bundle"
+                name = f"{m['id']}-f{fmt}-{stem}-{digest[:12]}.bin"
                 shutil.copyfile(f["path"], os.path.join(stage, name))
                 uploads.setdefault(tag, []).append(os.path.join(stage, name))
                 entry = {"name": f["name"], "url": url_of(tag, name), "size": os.path.getsize(f["path"]),
-                         "sha256": digest, "crc": f["crc"]}
+                         "sha256": digest}
                 if f.get("region"):
                     entry["region"] = f["region"]
                 files.append(entry)
