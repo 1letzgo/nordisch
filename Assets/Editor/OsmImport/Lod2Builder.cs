@@ -130,6 +130,9 @@ namespace LeGamez.Editor.OsmImport
             Outlines.Add(outline);
             // Removed in the map editor: keep the hull (no OSM stand-in), build nothing.
             if (custom != null && custom.hidden) return false;
+            // Petrol station canopy (Tankdach): CommercialBuilder builds it on pillars instead of a closed box; supermarket
+            // walls are noted there for sign + shop front.
+            if (CommercialBuilder.ClaimLod2(osm, f as string, addresses, outline, eave, maxY, FlatRoofed(surfaces))) return true;
 
             // Some datasets wind wall rings inwards – detect per building and flip if needed.
             int agree = 0, walls = 0;
@@ -300,6 +303,20 @@ namespace LeGamez.Editor.OsmImport
                 for (int i = 0; i < ring.Count; i++) ring[i] = Move(ring[i]);
                 foreach (var h in holes) for (int i = 0; i < h.Count; i++) h[i] = Move(h[i]);
             }
+        }
+
+        static bool FlatRoofed(List<(string kind, List<Vector3> ring, List<List<Vector3>> holes)> surfaces)
+        {
+            bool any = false;
+            foreach (var (kind, ring, _) in surfaces)
+            {
+                if (kind != "R") continue;
+                var n = Newell(ring);
+                if (n.sqrMagnitude < 1e-8f) continue;
+                if (Mathf.Abs(n.normalized.y) < 0.97f) return false;
+                any = true;
+            }
+            return any;
         }
 
         static List<Vector3> ReadRing(List<object> pts)

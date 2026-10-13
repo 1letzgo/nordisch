@@ -931,6 +931,13 @@ namespace LeGamez.Editor.OsmImport
 
         // ================================================================ scene objects
 
+        /// <summary>
+        /// Text from other builders (after <see cref="Build"/>, which clears the list), spawned with the sign texts.
+        /// <paramref name="pos"/>.y is relative to the terrain below; the text faces <paramref name="facing"/>.
+        /// </summary>
+        public static void AddText(Vector3 pos, Vector2 facing, string text, Color32 color, float height) =>
+            texts.Add(new TextItem { pos = pos, facing = facing, text = text, color = color, height = height });
+
         const string TextMaterialPath = "Assets/Generated/Materials/SignText.mat";
 
         static Material TextMaterial(Font font)
