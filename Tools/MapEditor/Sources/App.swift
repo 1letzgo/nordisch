@@ -10,7 +10,11 @@ struct MapEditorApp: App {
         Window("Nordisch Map Editor", id: "main") {
             ContentView(model: model)
                 .frame(minWidth: 1000, minHeight: 640)
-                .onAppear { delegate.model = model }
+                .onAppear {
+                    delegate.model = model
+                    // From a timer, not a main-queue block: the snapshot waits for region images delivered on the main queue.
+                    Timer.scheduledTimer(withTimeInterval: 0.1, repeats: false) { _ in MainActor.assumeIsolated { Snapshot.runIfRequested(model) } }
+                }
         }
         .commands {
             CommandGroup(replacing: .newItem) {
@@ -73,9 +77,9 @@ struct ContentView: View {
         .toolbar {
             ToolbarItemGroup {
                 Toggle(isOn: $model.showMap) { Label("Karte", systemImage: "map") }
-                    .help("Minimap-Bild als Hintergrund")
+                    .help("Draufsicht aus Unity als Hintergrund (Übersicht, beim Hineinzoomen scharfe 1-km-Regionen)")
                 Toggle(isOn: $model.showBuildings) { Label("Gebäude", systemImage: "building.2") }
-                    .help("LoD2-Dachumrisse")
+                    .help("Hausumrisse (ab mittlerem Zoom)")
                 Toggle(isOn: $model.showGenerated) { Label("Erzeugte Objekte", systemImage: "tree") }
                     .help("Vom Importer gesetzte Bäume, Laternen, Bänke … zeigen (geänderte bleiben immer sichtbar)")
                 Button { model.recenterToken += 1 } label: { Label("Ganzes Gebiet", systemImage: "arrow.up.left.and.down.right.magnifyingglass") }
@@ -148,7 +152,7 @@ struct Sidebar: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            let edited = model.objects.filter { !$0.isGenerated || model.isChanged($0) }
+            let edited = model.edited.map { model.objects[$0] }
             Section("Neu & geändert (\(edited.count))") {
                 ForEach(edited) { o in
                     Button { model.focus(o) } label: {
@@ -179,8 +183,9 @@ struct HouseSidebar: View {
         Section("Adresse suchen") {
             TextField("z. B. Alte Weide 4", text: $model.houseQuery)
                 .textFieldStyle(.roundedBorder)
-            ForEach(model.houseMatches(model.houseQuery)) { h in row(h) }
-            if model.houseQuery.count >= 2 && model.houseMatches(model.houseQuery).isEmpty {
+            let matches = model.houseMatches(model.houseQuery)
+            ForEach(matches) { h in row(h) }
+            if model.houseQuery.count >= 2 && matches.isEmpty {
                 Text("Keine Adresse gefunden").font(.caption).foregroundStyle(.secondary)
             }
             if model.houses.isEmpty {
@@ -191,9 +196,7 @@ struct HouseSidebar: View {
         }
         Section("Angepasste Häuser (\(model.houseStyles.count))") {
             ForEach(Array(model.houseStyles.enumerated()), id: \.offset) { _, st in
-                let h = model.houses.first { h in
-                    h.id == st.id || st.address.map { a in h.addr.contains { HouseCatalog.normalize($0) == HouseCatalog.normalize(a) } } == true
-                }
+                let h = model.houses(for: st).first
                 Button { if let h { model.focusHouse(h) } } label: {
                     HStack {
                         Circle().fill(Color(nsColor: st.wall.flatMap(NSColor.init(hexString:)) ?? .tertiaryLabelColor)).frame(width: 12, height: 12)
@@ -223,6 +226,17 @@ struct HouseSidebar: View {
     }
 }
 
+/// Cursor coordinates – observes only the pointer, so mouse moves don't re-render the rest of the window.
+struct CursorLabel: View {
+    @ObservedObject var pointer: PointerState
+
+    var body: some View {
+        if let c = pointer.cursor {
+            Text(String(format: "x %.1f m  z %.1f m", c.x, c.y)).monospacedDigit()
+        }
+    }
+}
+
 struct HouseInspector: View {
     @ObservedObject var model: EditorModel
     let house: House
@@ -235,7 +249,7 @@ struct HouseInspector: View {
             LabeledContent("Grundfläche", value: String(format: "%.0f m²", house.area))
             if house.addr.isEmpty {
                 Text("Ohne Adresse – Änderung gilt nur für dieses Gebäudeteil.").font(.caption).foregroundStyle(.secondary)
-            } else if model.houses.filter({ $0.addr.contains(house.addr[0]) }).count > 1 {
+            } else if (house.norm.first.flatMap { model.housesByAddr[$0] }?.count ?? 0) > 1 {
                 Text("Gilt für alle Teile mit dieser Adresse.").font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -376,9 +390,7 @@ struct StatusBar: View {
         HStack {
             Text(model.status).lineLimit(1).truncationMode(.middle)
             Spacer()
-            if let c = model.cursor {
-                Text(String(format: "x %.1f m  z %.1f m", c.x, c.y)).monospacedDigit()
-            }
+            CursorLabel(pointer: model.pointer)
         }
         .font(.caption)
         .foregroundStyle(.secondary)
