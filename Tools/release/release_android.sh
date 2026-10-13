@@ -14,7 +14,7 @@ DRY=0; [[ "${1:-}" == "--dry-run" ]] && DRY=1
 [[ -f "$ENV_FILE" ]] || { echo "Missing $ENV_FILE (release keystore)"; exit 1; }
 set -a; source "$ENV_FILE"; set +a
 
-if [[ -n "$(git status --porcelain)" ]]; then
+if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
   echo "Working tree not clean – commit first (the release is tagged on HEAD)."; git status --short | head; exit 1
 fi
 
@@ -38,7 +38,7 @@ echo "Built $apk ($(du -h "$apk" | cut -f1))"
 [[ $DRY == 1 ]] && exit 0
 
 # Unity may have touched project files during the build (it should not) – never tag a dirty tree.
-git status --porcelain | grep -q . && { echo "Build changed tracked files:"; git status --short; exit 1; }
+git status --porcelain --untracked-files=no | grep -q . && { echo "Build changed tracked files:"; git status --short; exit 1; }
 git push origin HEAD
 git tag "v$version" && git push origin "v$version"
 gh release create "v$version" "$apk" -R "$REPO" --latest --title "Nordisch $version" --notes "$(cat <<EOF
