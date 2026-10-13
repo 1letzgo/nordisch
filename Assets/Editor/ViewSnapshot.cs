@@ -25,18 +25,9 @@ namespace LeGamez.Editor
             string id = Arg("-area");
             string views = Arg("-views") ?? "top";
 
-            string scenePath = null;
-            foreach (var guid in AssetDatabase.FindAssets("t:Scene", new[] { "Assets/Scenes/Areas" }))
-            {
-                var p = AssetDatabase.GUIDToAssetPath(guid);
-                EditorSceneManager.OpenScene(p, OpenSceneMode.Single);
-                var a = Object.FindAnyObjectByType<AreaInfo>();
-                if (a != null && a.areaId == id) { scenePath = p; break; }
-            }
-            if (scenePath == null) throw new System.ArgumentException("area not found: " + id);
-            var area = Object.FindAnyObjectByType<AreaInfo>();
-            var world = Object.FindAnyObjectByType<WorldStreamer>();
-            if (world != null) world.LoadAllInEditor();
+            var data = AreaPreview.Find(id);
+            if (data == null) throw new System.ArgumentException("area not found: " + id);
+            var area = AreaPreview.Open(data); // all tiles loaded
             Physics.SyncTransforms();
             var terrain = TerrainField.Load(Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Data", id + ".dgm.bin")));
             // Sea level etc. change the terrain; use the scene's colliders for heights instead of the raw field.
@@ -87,7 +78,6 @@ namespace LeGamez.Editor
             }
             Object.DestroyImmediate(volume.gameObject);
             Object.DestroyImmediate(camGo);
-            if (world != null) world.UnloadAllInEditor();
             Debug.Log($"[Snapshot] views {id} -> {outDir}");
         }
     }

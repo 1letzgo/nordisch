@@ -26,6 +26,11 @@ namespace LeGamez.Core
         public Material pedestalMaterial;
         public Material vehicleMaterial;
 
+        [Header("World (maps carry only meshes/data; the app owns materials and shaders)")]
+        [Tooltip("Index = WorldTile.Material*: Buildings, Ground, Water, Trees – filled by the importer.")]
+        public System.Collections.Generic.List<Material> worldMaterials = new System.Collections.Generic.List<Material>();
+        public Material signTextMaterial;
+
         static GameMaterials instance;
 
         public static GameMaterials Instance

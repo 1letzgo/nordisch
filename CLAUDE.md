@@ -5,7 +5,8 @@ App-Name „Nordisch“, Bundle-ID `de.letzgo.legamez`, Team `699G2QY959`.
 
 ## Wie eine Karte (ein Gebiet) entsteht
 
-Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nichts aus dem Netz geladen.
+Pipeline: **Offline-Daten → Unity-Importer → Gebietsdaten + Kacheln → Download-Pakete**. Die App baut jedes Gebiet zur Laufzeit
+in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
 
 1. **Gebiet definieren** – `Tools/osm/areas.json`
    ```json
@@ -71,8 +72,12 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
      -executeMethod LeGamez.Editor.OsmImport.OsmAreaImporter.ImportAllBatch -logFile /tmp/import.log
    grep "\[OSM\]" /tmp/import.log
    ```
-   Ergebnis: `Assets/Scenes/Areas/<Name>.unity`, Eintrag in `Assets/Generated/AreaCatalog.asset`, Thumbnail `Generated/<id>/<id>_thumb.png`,
-   Minimap `Generated/<id>/<id>_map.png` (hängt an `AreaInfo.mapTexture`). Im Editor zeigt das Menü die Szene sofort als Karte;
+   Ergebnis: `Assets/Generated/<id>/<id>_area.asset` (`World/AreaData`: Spawn, Grenzen, POIs, Straßen, Ampeln, Schildertexte,
+   Fassaden-Records, Kachelliste, Minimap), Kacheln `Generated/<id>/tiles/`, Eintrag in `Assets/Generated/AreaCatalog.asset`,
+   Thumbnail `Generated/<id>/<id>_thumb.png`, Minimap `Generated/<id>/<id>_map.png`. Es gibt keine Gebietsszenen mehr:
+   `Assets/Scenes/World.unity` (Licht, Himmel, `World/AreaLoader`) baut das Gebiet aus `AreaData` auf; Materialien/Shader
+   liegen in der App (`GameMaterials.worldMaterials`, `signTextMaterial`, vom Importer gesetzt). Editor-Werkzeuge öffnen ein
+   Gebiet mit `Editor/AreaPreview.Open` (ungespeicherte Szene, alle Kacheln). Im Editor zeigt das Menü das Gebiet sofort als Karte;
    in die App kommt sie erst per **Veröffentlichen** (Schritt 7). Die Build-Settings enthalten nur `MainMenu`.
 5. **Prüfen**: `-executeMethod LeGamez.Editor.SceneSnapshot.RenderAll` rendert Luft-/Straßen-/Wahrzeichen-Bilder nach `Builds/Snapshots/`.
    POI-Auswahl in `Assets/Generated/<id>/<id>_pois.asset` ansehen (max. 30, Hotels/Läden sind ausgefiltert).
@@ -80,7 +85,7 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
 7. **Veröffentlichen**: `Tools/release/publish_maps.sh [<id> …]` – siehe „Karten-Downloads“.
 
 ### Karten-Downloads (App enthält keine Karten)
-- Jede Stadt = zwei AssetBundles pro Plattform: `<id>.bundle` (Szene + POIs + Straßen + Minimap + Materialien/Shader)
+- Jede Stadt = zwei AssetBundles pro Plattform: `<id>.bundle` (AreaData + POIs + Straßen + Fassaden + Minimap)
   und `<id>.tiles.bundle` (Welt-Kacheln, einzeln ladbar; Szenen-Bundles dürfen keine anderen Assets enthalten), gebaut von
   `Editor/MapBundles` (`-buildTarget iOS|Android -executeMethod LeGamez.Editor.MapBundles.BuildBatch [-areas a,b]`)
   nach `Builds/Maps/<platform>/<id>.bundle` (LZMA) + `index.json`.
@@ -91,7 +96,8 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
   (Format 2: `map.bundle` + `tiles.bundle`; Format 1 hatte nur url/size/sha256). Alte, nicht mehr referenzierte Assets werden gelöscht.
 - App: `Core/MapStore` – Katalog einmal pro App-Start laden (Kopie für offline), Download → Größe + SHA-256 prüfen →
   `RecompressAssetBundleAsync` nach LZ4 → `persistentDataPath/maps/<id>/map.bundle` + `info.json` (iOS: kein iCloud-Backup).
-  Spielen = Bundle laden + Szene daraus; zurück im Menü wird es entladen. Im Editor listet `MapStore` die lokalen Szenen.
+  Spielen = Bundles laden, `AreaLoader.Pending` = AreaData, Welt-Szene (Build-Index 1) laden; zurück im Menü wird entladen.
+  Im Editor listet `MapStore` die lokalen AreaData-Assets. Format 3 (seit „Eine Welt“ Schritt 1).
 - **Update-Logik**: Ein Build passt nur bei gleicher Plattform, `MapStore.Format` und Unity-Version. Neuerer passender Build
   → „Update“ (im WLAN automatisch, sonst Tipp auf das Pill; die alte Version bleibt bis zum Tausch spielbar).
   Installierter Build passt nicht mehr (App-Update) → „Update nötig“. Kein passender Build: nur neuere Formate →
@@ -182,9 +188,9 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
   Ortsnamen die aktuelle Straße (`UI/StreetDisplay`, nächste Straße ≤ 30 m, 4 m Trägheit gegen Flackern).
 - `MeshSink`: Geometrie pro Material und 100-m-Chunk; Kollider für Gebäude, Stämme, Props
   (Stämme/Props liegen auf Layer 2, damit die Kamera sie ignoriert).
-- **Nachladen (Streaming)**: Die Szene enthält keine Welt-Meshes. `OsmAreaImporter.WriteTiles` sortiert die Chunks in
+- **Nachladen (Streaming)**: Welt-Meshes stecken nur in Kacheln. `OsmAreaImporter.WriteTiles` sortiert die Chunks in
   200-m-Kacheln (`World/WorldTile`, Meshes als Sub-Assets, `Assets/Generated/<id>/tiles/`, nicht im Repo); Meshes ohne
-  Kollider sind nicht CPU-lesbar (halber Speicher). `World/WorldStreamer` (in der Szene) lädt Kacheln ≤ 760 m um die
+  Kollider sind nicht CPU-lesbar (halber Speicher). `World/WorldStreamer` (vom AreaLoader erzeugt) lädt Kacheln ≤ 760 m um die
   Kamera (nächste zuerst, max. 3 parallel, 1 pro Frame instanziiert) und gibt sie ab 960 m wieder frei.
   `GameBootstrap` wartet mit Ladebildschirm, bis der Start-Umkreis (220 m) steht; Beamen (`FullMap`) lädt das Ziel hinter
   dem Blitz vor. Editor-Werkzeuge, die die ganze Welt brauchen (`SceneSnapshot`), rufen `LoadAllInEditor()` auf.

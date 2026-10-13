@@ -113,7 +113,7 @@ Builds brauchen mehrere GB – bei „Disk full“ nur eigene Simulator-/Derived
 
 ## 6. Abschluss
 
-- Commit: `Tools/osm/areas.json`, `Data/<id>.*`, `Assets/Generated/<id>/`, `Assets/Scenes/Areas/<Name>.unity`,
+- Commit: `Tools/osm/areas.json`, `Data/<id>.*`, `Assets/Generated/<id>/` (ohne `tiles/`, `*_facade.bytes`; mit `<id>_area.asset`),
   `Assets/Generated/AreaCatalog.asset`, `MainMenu.unity`.
 - In die App bringen: `Tools/release/publish_maps.sh <id>` (Unity zu; baut iOS + Android-Bundle, lädt in die GitHub-Release
   `maps`, aktualisiert `maps.json`). Erst `--dry-run`, Upload nur nach Rückfrage beim Nutzer (öffentlich).

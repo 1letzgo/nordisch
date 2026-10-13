@@ -10,9 +10,9 @@ namespace LeGamez.Editor
 {
     /// <summary>
     /// Builds two download bundles per area for the active platform into Builds/Maps/&lt;platform&gt;/, plus index.json for
-    /// Tools/release/publish_maps.py: &lt;id&gt;.bundle = the scene with everything it references (POIs, streets, facade data,
-    /// minimap texture, materials, shaders), &lt;id&gt;.tiles.bundle = the world tiles, loaded one by one by WorldStreamer
-    /// (scene bundles cannot hold other assets). Bundles are LZMA (small download); the app recompresses them to LZ4.
+    /// Tools/release/publish_maps.py: &lt;id&gt;.bundle = the area's AreaData with what it references (POIs, streets, facade
+    /// data, minimap texture), &lt;id&gt;.tiles.bundle = the world tiles, loaded one by one by WorldStreamer. Materials and
+    /// shaders stay in the app (GameMaterials) – the world scene builds the area at runtime (AreaLoader). Bundles are LZMA (small download); the app recompresses them to LZ4.
     /// Batch: Unity -batchmode -quit -projectPath . -buildTarget iOS|Android -executeMethod LeGamez.Editor.MapBundles.BuildBatch [-areas a,b]
     /// </summary>
     public static class MapBundles
@@ -66,11 +66,11 @@ namespace LeGamez.Editor
             var builds = new List<AssetBundleBuild>();
             foreach (var a in areas)
             {
-                string scene = $"Assets/Scenes/Areas/{a.sceneName}.unity";
-                if (!File.Exists(scene)) { Debug.LogError($"[Maps] {a.id}: {scene} missing"); return false; }
+                string areaAsset = OsmImport.OsmAreaImporter.AreaDataPath(a.id);
+                if (!File.Exists(areaAsset)) { Debug.LogError($"[Maps] {a.id}: {areaAsset} missing – re-import the area"); return false; }
                 if (!File.Exists(AreaCatalog.MapPath(a.id)) || !File.Exists(AreaCatalog.ThumbPath(a.id)))
                     Debug.LogWarning($"[Maps] {a.id}: thumbnail/map texture missing – run SceneSnapshot.RenderThumbnails");
-                builds.Add(new AssetBundleBuild { assetBundleName = a.id + ".bundle", assetNames = new[] { scene } });
+                builds.Add(new AssetBundleBuild { assetBundleName = a.id + ".bundle", assetNames = new[] { areaAsset } });
                 var tiles = AssetDatabase.FindAssets("t:WorldTile", new[] { $"Assets/Generated/{a.id}/tiles" })
                     .Select(AssetDatabase.GUIDToAssetPath).ToArray();
                 if (tiles.Length == 0) { Debug.LogError($"[Maps] {a.id}: no world tiles – re-import the area"); return false; }

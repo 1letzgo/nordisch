@@ -24,15 +24,12 @@ namespace LeGamez.Editor
             string Arg(string k) { int i = System.Array.IndexOf(args, k); return i >= 0 && i + 1 < args.Length ? args[i + 1] : null; }
             string id = Arg("-area") ?? "westerstede", views = Arg("-views") ?? "centre:0,0,0,3,8";
 
-            string scenePath = null;
-            foreach (var guid in AssetDatabase.FindAssets("t:Scene", new[] { "Assets/Scenes/Areas" }))
-            {
-                var p = AssetDatabase.GUIDToAssetPath(guid);
-                EditorSceneManager.OpenScene(p, OpenSceneMode.Single);
-                var a = Object.FindAnyObjectByType<AreaInfo>();
-                if (a != null && a.areaId == id) { scenePath = p; break; }
-            }
-            if (scenePath == null) { Debug.LogError($"[View] no scene for {id}"); return; }
+            var data = AreaPreview.Find(id);
+            if (data == null) { Debug.LogError($"[View] no area {id}"); return; }
+            // Like AreaPreview.Open, but without loading every tile (whole municipalities are too big for that).
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            OsmImport.OsmAreaImporter.AddLighting(OsmImport.OsmAreaImporter.EnsureSkyMaterial());
+            AreaLoader.Build(data, null, allTiles: false);
             var world = Object.FindAnyObjectByType<WorldStreamer>();
             field = TerrainField.Load(Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Data", id + ".dgm.bin")));
             string outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Builds", "Snapshots"));
