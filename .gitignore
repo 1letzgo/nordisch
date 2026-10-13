@@ -39,3 +39,6 @@ mono_crash.*
 /Assets/Generated/*/*_facade.bytes.meta
 /Assets/Generated/*/tiles/
 /Assets/Generated/*/tiles.meta
+
+# Agent worktrees
+/.claude/worktrees/
