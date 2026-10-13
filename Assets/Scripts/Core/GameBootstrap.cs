@@ -69,6 +69,7 @@ namespace LeGamez.Core
                 area != null ? area.attribution : "© OpenStreetMap-Mitwirkende");
 
             // Current street name under the area title.
+            PerfOverlay.Create(hud.transform); // three-finger tap / F3
             var street = hud.gameObject.AddComponent<StreetDisplay>();
             street.label = hud.infoLabel;
 

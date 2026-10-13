@@ -6,8 +6,10 @@ namespace LeGamez.World
 {
     /// <summary>
     /// Trees, bushes and lamps of one world tile (<see cref="WorldTile.instances"/>): drawn every frame with
-    /// Graphics.RenderMeshInstanced – one call per prototype (and per 1023 instances), culled by Unity against the
-    /// tile/prototype bounds for the camera and the shadow cascades. Per-instance colour goes in as
+    /// Graphics.RenderMeshInstanced – one call per prototype (and per 1023 instances). Before submitting, each batch is
+    /// culled on the CPU against the main camera (frustum widened by <see cref="ShadowMargin"/> so off-screen trees still
+    /// cast their shadows into view, and <see cref="MaxDistance"/> – fog ends at 650 m); batches beyond
+    /// <see cref="ShadowDistance"/> are drawn without shadow casting (URP draws no shadows that far anyway). Per-instance colour goes in as
     /// <c>_InstanceTint</c> (VertexColorLit, instancing variant). Trunks and lamp poles block the player with capsule
     /// colliders on a child object (layer 2, like the former MeshColliders).
     /// Outside play mode (editor snapshots, thumbnails: camera.Render doesn't see queued instanced draws) the instances
@@ -16,12 +18,13 @@ namespace LeGamez.World
     public class InstancedProps : MonoBehaviour
     {
         const int MaxPerCall = 1023;
+        const float MaxDistance = 700f, ShadowDistance = 140f, ShadowMargin = 25f;
         static readonly int TintId = Shader.PropertyToID("_InstanceTint");
 
         class Batch
         {
             public Mesh mesh;
-            public RenderParams rp;
+            public RenderParams rp, rpNoShadow;
             public Matrix4x4[] matrices;
         }
 
@@ -82,27 +85,58 @@ namespace LeGamez.World
                     }
                     var block = new MaterialPropertyBlock();
                     block.SetVectorArray(TintId, tints);
-                    batches.Add(new Batch
+                    var rp = new RenderParams(mat)
                     {
-                        mesh = mesh,
-                        matrices = matrices,
-                        rp = new RenderParams(mat)
-                        {
-                            layer = 0,
-                            shadowCastingMode = ShadowCastingMode.On,
-                            receiveShadows = true,
-                            lightProbeUsage = LightProbeUsage.BlendProbes,
-                            worldBounds = bounds,
-                            matProps = block,
-                        },
-                    });
+                        layer = 0,
+                        shadowCastingMode = ShadowCastingMode.On,
+                        receiveShadows = true,
+                        lightProbeUsage = LightProbeUsage.BlendProbes,
+                        worldBounds = bounds,
+                        matProps = block,
+                    };
+                    var noShadow = rp;
+                    noShadow.shadowCastingMode = ShadowCastingMode.Off;
+                    batches.Add(new Batch { mesh = mesh, matrices = matrices, rp = rp, rpNoShadow = noShadow });
                 }
             }
         }
 
+        // Camera planes, computed once per frame for all tiles.
+        static readonly Plane[] planes = new Plane[6];
+        static int planesFrame = -1;
+        static Vector3 camPos;
+        static bool haveCamera;
+
+        /// <summary>Batches submitted / skipped in the last frame (all tiles) – for profiling overlays.</summary>
+        public static int Submitted { get; private set; }
+        public static int Culled { get; private set; }
+        static int countFrame = -1;
+
+        static void UpdatePlanes()
+        {
+            if (planesFrame == Time.frameCount) return;
+            planesFrame = Time.frameCount;
+            var cam = Camera.main;
+            haveCamera = cam != null;
+            if (!haveCamera) return;
+            camPos = cam.transform.position;
+            GeometryUtility.CalculateFrustumPlanes(cam, planes);
+            // Widen the side planes so trees just outside the view still cast their shadows into it.
+            for (int i = 0; i < 4; i++) planes[i].distance += ShadowMargin;
+        }
+
         void LateUpdate()
         {
-            foreach (var b in batches) Graphics.RenderMeshInstanced(b.rp, b.mesh, 0, b.matrices);
+            UpdatePlanes();
+            if (countFrame != Time.frameCount) { countFrame = Time.frameCount; Submitted = 0; Culled = 0; }
+            foreach (var b in batches)
+            {
+                var bounds = b.rp.worldBounds;
+                float d = haveCamera ? Mathf.Sqrt(bounds.SqrDistance(camPos)) : 0f;
+                if (haveCamera && (d > MaxDistance || !GeometryUtility.TestPlanesAABB(planes, bounds))) { Culled++; continue; }
+                Submitted++;
+                Graphics.RenderMeshInstanced(d > ShadowDistance ? b.rpNoShadow : b.rp, b.mesh, 0, b.matrices);
+            }
         }
 
         static Bounds TransformBounds(Bounds b, Matrix4x4 m)
