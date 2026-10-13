@@ -80,6 +80,19 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
   Nicht passende Einträge → Warnung im Import-Log.
   Fenster halten ≥ 0,6 m Abstand zum Dach (`BuildingBuilder.RoofGap`, Shader-Regel `head + 0.6` in VertexColorLit, Fensterbänke gleich).
 - `GroundBuilder`: Grund-Kacheln, Flächen (landuse/natural/leisure), Straßen-Bänder mit Mittellinie, Wasser, Hecken/Mauern/Zäune.
+- `GardenBuilder`: Gartengrenzen aus ALKIS-Flurstücken (`Data/<id>.parcels.json`, `Tools/alkis/fetch_parcels.py`, INSPIRE-WFS
+  LGLN). Wohngrundstücke (120–2500 m², adressiertes Haus, nicht Gewerbe/Schule/Park): Straßenseite niedrige Hecke /
+  Jägerzaun / Klinkermäuerchen / offen mit Lücken für Weg + Einfahrt; Nachbar-/Rückgrenzen hohe Hecke / Holz-Sichtschutz /
+  Stabmatte (im Vorgarten im niedrigen Vorgartenstil). Stil pro Flurstück fest (Hash der Flurstücksnummer); Häuser auf der
+  Grenze, Straßen (+1 m) und gepflasterte Flächen im Luftbild (`AerialImage.IsPaved` = Einfahrten/Wege) unterbrechen.
+  Echte Hecken: `Tools/dgm/fetch_hedges.py` → `Data/<id>.hedges.json` aus **bDOM20** (bildbasiertes Oberflächenmodell,
+  gleiche Befliegung wie DOP, also aktuell; STAC `bdom.stac.lgln.niedersachsen.de`) − DGM1, 0,4 m Raster, grün per DOP-NIR.
+  Typ 1 = Grenzhecke: jede Gartengrenze wird abgetastet (±1,2 m Streifen, Lücken ≤ 2 m geschlossen) → durchgängig,
+  exakt auf der Grenze. Typ 0 = frei (nur außerhalb der Gärten, RANSAC, ≥ 6 m). Mit diesen Daten erfindet der
+  Importer keine Hecken mehr (generierte Grenzen nur Zaun/Mauer/offen).
+  Hecken kürzen sich an Straßen/Gehwegen (Abstand 0,5 m + halbe Breite). Map-Editor-Modus „Gärten“: jede gebaute Linie
+  hat eine ID `<art>@<x·10>,<z·10>` (Mitte) in `Assets/Generated/<id>/<id>_gardens.json`; `Data/<id>.garden.json`
+  = `{"removed": [ids], "lines": [{"kind","points","height"}]}` (entfernen ±1,5 m tolerant, gezeichnete Linien werden gebaut).
 - `PropPlacer`: LiDAR-Bäume (`<id>.trees.json`, Höhe/Krone echt) bzw. ohne Datei OSM-Bäume, Baumgruppen in Parks/Wäldern (mit Abstand zu Wegen), Büsche auf Dünen/Heide, Straßenlaternen.
   Kronen = facettierter Hauptklumpen + Ring kleinerer Klumpen bis zum gemessenen Radius (~40–100 Dreiecke), Nadelbäume 3 Kegel.
   Pflanzen-Builder ziehen aus dem gemeinsamen `rng` genau so viele Zahlen wie früher (`Fork`), sonst verschieben sich IDs/Edits.

@@ -142,6 +142,7 @@ namespace LeGamez.Editor.OsmImport
             int trees = PropPlacer.PlaceTrees(data, sink, area, rng, lidarTrees);
             int lamps = PropPlacer.PlaceStreetLamps(data, sink, area);
             int barriers = GroundBuilder.BuildBarriers(data, sink, area);
+            var gardens = GardenBuilder.Build(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".parcels.json"), data, sink, area);
             var furniture = FurniturePlacer.Place(data, sink, area, rng);
             int edits = EditsPlacer.PlaceNew(sink, area);
             var pois = PoiExtractor.Extract(data, area);
@@ -159,6 +160,7 @@ namespace LeGamez.Editor.OsmImport
             EnsureFolder(areaDir);
             EditsPlacer.SaveRecords($"{areaDir}/{meta.id}_objects.json"); // object list for the map editor
             BuildingOverrides.SaveCatalog($"{areaDir}/{meta.id}_buildings.json"); // houses (id, address, footprint) for the map editor
+            GardenBuilder.SaveCatalog($"{areaDir}/{meta.id}_gardens.json"); // hedges/fences/walls for the map editor
             EnsureFolder(AreaScenesDir);
             var materials = EnsureMaterials();
 
@@ -257,7 +259,7 @@ namespace LeGamez.Editor.OsmImport
             UpdateCatalog(meta, pois.Count);
             AssetDatabase.SaveAssets();
 
-            Debug.Log($"[OSM] {meta.name}: {buildings} buildings (+{osmExtra} OSM-only), {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, terrain {(terrain.IsFlat ? "flat" : "DGM1")}, aerial {(aerial != null ? "DOP20" : "-")}, trees {(lidarTrees != null ? "LiDAR" : "OSM")}, " +
+            Debug.Log($"[OSM] {meta.name}: {buildings} buildings (+{osmExtra} OSM-only), {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, gardens {gardens.plots} plots/{gardens.measured} measured hedges/{gardens.hedges} hedges/{gardens.fences} fences/{gardens.walls} walls/{gardens.drawn} drawn, terrain {(terrain.IsFlat ? "flat" : "DGM1")}, aerial {(aerial != null ? "DOP20" : "-")}, trees {(lidarTrees != null ? "LiDAR" : "OSM")}, " +
                       $"furniture {furniture.mapped} mapped/{furniture.benches} benches/{furniture.planters} planters/{furniture.seating} café tables/{furniture.fountains} fountains, {edits} hand-placed/{EditsPlacer.ChangedCount} edited, {pois.Count} POIs, " +
                       $"{sink.Batches.Count()} meshes in {sw.ElapsedMilliseconds} ms -> {scenePath}");
             return scenePath;

@@ -85,6 +85,7 @@ final class MapCanvas: NSView {
         let visible = toWorld(.zero), visible2 = toWorld(CGPoint(x: bounds.maxX, y: bounds.maxY))
         let view = CGRect(x: visible.x, y: visible2.y, width: visible2.x - visible.x, height: visible.y - visible2.y).insetBy(dx: -10, dy: -10)
         drawHouses(ctx, model, view)
+        if model.mode == .gardens { drawGardens(ctx, model, view) }
         for o in model.objects where view.contains(CGPoint(x: o.x, y: o.z)) && model.isVisible(o) {
             let selected = model.selection.contains(o.id)
             if o.deleted {
@@ -191,6 +192,61 @@ final class MapCanvas: NSView {
         switch t.shape {
         case .circle(let r): return CGPath(ellipseIn: CGRect(x: -r, y: -r, width: 2 * r, height: 2 * r), transform: nil)
         case .rect(let w, let d): return CGPath(rect: CGRect(x: -w / 2, y: -d / 2, width: w, height: d), transform: nil)
+        }
+    }
+
+    /// Hedges, fences and walls (gardens mode). Context in world space.
+    private func drawGardens(_ ctx: CGContext, _ model: EditorModel, _ view: CGRect) {
+        ctx.setLineCap(.round)
+        let minW = 2.5 / zoom
+        for g in model.gardenLines {
+            let r = CGRect(x: min(g.a.x, g.b.x), y: min(g.a.y, g.b.y), width: abs(g.a.x - g.b.x), height: abs(g.a.y - g.b.y))
+            guard view.intersects(r.insetBy(dx: -2, dy: -2)) else { continue }
+            let removed = model.gardenRemoved.contains(g.id)
+            let selected = model.gardenSelection == .generated(g.id)
+            ctx.move(to: g.a); ctx.addLine(to: g.b)
+            if removed {
+                ctx.setStrokeColor(NSColor.systemRed.withAlphaComponent(selected ? 1 : 0.7).cgColor)
+                ctx.setLineWidth((selected ? 3 : 1.5) / zoom)
+                ctx.setLineDash(phase: 0, lengths: [4 / zoom, 3 / zoom])
+            } else {
+                ctx.setStrokeColor((selected ? NSColor.controlAccentColor : g.gardenKind.color).cgColor)
+                ctx.setLineWidth(max(g.gardenKind.width, minW) + (selected ? 3 / zoom : 0))
+                ctx.setLineDash(phase: 0, lengths: [])
+            }
+            ctx.strokePath()
+        }
+        ctx.setLineDash(phase: 0, lengths: [])
+        for d in model.drawnLines {
+            let pts = d.cgPoints
+            guard pts.count >= 2 else { continue }
+            let selected = model.gardenSelection == .drawn(d.id)
+            ctx.addLines(between: pts)
+            ctx.setStrokeColor((selected ? NSColor.controlAccentColor : d.gardenKind.color).cgColor)
+            ctx.setLineWidth(max(d.gardenKind.width, minW) + 2 / zoom)
+            ctx.strokePath()
+            ctx.setFillColor(NSColor.white.cgColor)
+            for p in pts { ctx.fillEllipse(in: CGRect(x: p.x - 3 / zoom, y: p.y - 3 / zoom, width: 6 / zoom, height: 6 / zoom)) }
+        }
+        // Snap ring under the cursor.
+        if model.drawingKind != nil, let sp = model.snapPoint {
+            let r = 6 / zoom
+            ctx.setStrokeColor(NSColor.controlAccentColor.cgColor)
+            ctx.setLineWidth(2 / zoom)
+            ctx.strokeEllipse(in: CGRect(x: sp.x - r, y: sp.y - r, width: 2 * r, height: 2 * r))
+        }
+        // Line being drawn, rubber band to the cursor.
+        if let kind = model.drawingKind, !model.drawingPoints.isEmpty {
+            var pts = model.drawingPoints
+            if let c = model.cursor { pts.append(c) }
+            ctx.addLines(between: pts)
+            ctx.setStrokeColor(kind.color.withAlphaComponent(0.85).cgColor)
+            ctx.setLineWidth(max(kind.width, minW) + 2 / zoom)
+            ctx.setLineDash(phase: 0, lengths: [6 / zoom, 4 / zoom])
+            ctx.strokePath()
+            ctx.setLineDash(phase: 0, lengths: [])
+            ctx.setFillColor(NSColor.white.cgColor)
+            for p in model.drawingPoints { ctx.fillEllipse(in: CGRect(x: p.x - 3.5 / zoom, y: p.y - 3.5 / zoom, width: 7 / zoom, height: 7 / zoom)) }
         }
     }
 
@@ -333,6 +389,20 @@ final class MapCanvas: NSView {
 
     private func dist(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }
 
+    /// Drawing cursor: snaps to existing hedges/fences/walls (end points first); otherwise ⇧ = 15° steps.
+    private func drawTarget(_ w: CGPoint, shift: Bool, _ model: EditorModel) -> CGPoint {
+        if let s = model.gardenSnap(w, tolerance: Double(10 / zoom)) { return s }
+        return shift ? snapped(w, model) : w
+    }
+
+    /// ⇧ while drawing: the new segment snaps to multiples of 15° from the previous point.
+    private func snapped(_ w: CGPoint, _ model: EditorModel) -> CGPoint {
+        guard let last = model.drawingPoints.last else { return w }
+        let dx = w.x - last.x, dy = w.y - last.y, len = hypot(dx, dy)
+        let ang = (atan2(dy, dx) / (.pi / 12)).rounded() * (.pi / 12)
+        return CGPoint(x: last.x + cos(ang) * len, y: last.y + sin(ang) * len)
+    }
+
     // MARK: - Mouse
 
     override func updateTrackingAreas() {
@@ -343,14 +413,19 @@ final class MapCanvas: NSView {
     }
 
     override func cursorUpdate(with event: NSEvent) {
-        (model?.placing != nil ? NSCursor.crosshair : NSCursor.arrow).set()
+        (model?.placing != nil || model?.drawingKind != nil ? NSCursor.crosshair : NSCursor.arrow).set()
     }
 
     override func mouseMoved(with event: NSEvent) {
         let v = convert(event.locationInWindow, from: nil)
         model?.cursor = toWorld(v)
-        (model?.placing != nil ? NSCursor.crosshair : NSCursor.arrow).set()
-        if model?.placing != nil { needsDisplay = true }
+        if let model, model.mode == .gardens, model.drawingKind != nil, let c = model.cursor {
+            let snap = model.gardenSnap(c, tolerance: Double(10 / zoom))
+            model.snapPoint = snap
+            model.cursor = snap ?? (event.modifierFlags.contains(.shift) ? snapped(c, model) : c)
+        }
+        (model?.placing != nil || model?.drawingKind != nil ? NSCursor.crosshair : NSCursor.arrow).set()
+        if model?.placing != nil || model?.drawingKind != nil { needsDisplay = true }
     }
 
     override func mouseExited(with event: NSEvent) {
@@ -376,6 +451,19 @@ final class MapCanvas: NSView {
         let w = toWorld(v)
         let shift = event.modifierFlags.contains(.shift)
 
+        if model.mode == .gardens {
+            if model.drawingKind != nil {
+                model.addDrawingPoint(drawTarget(w, shift: shift, model))
+                model.snapPoint = nil
+            } else if let hit = model.gardenHit(w, tolerance: Double(8 / zoom)) {
+                model.gardenSelection = hit
+            } else {
+                model.gardenSelection = nil
+                drag = .pan(lastView: v)
+            }
+            needsDisplay = true
+            return
+        }
         if model.mode == .houses {
             if let h = model.house(at: w) {
                 model.selectedHouse = h.id
@@ -523,9 +611,18 @@ final class MapCanvas: NSView {
         let shift = event.modifierFlags.contains(.shift)
         let step = shift ? 5.0 : 0.5
         switch event.keyCode {
-        case 51, 117: model.deleteSelected()                      // ⌫ / ⌦
+        case 51, 117:                                             // ⌫ / ⌦
+            if model.mode == .gardens {
+                if model.drawingKind != nil, !model.drawingPoints.isEmpty { model.drawingPoints.removeLast() }
+                else if let i = model.selectedDrawnIndex { model.deleteDrawn(model.drawnLines[i].id) }
+                else if let g = model.selectedGardenLine, !model.gardenRemoved.contains(g.id) { model.toggleRemoved(g.id) }
+            } else { model.deleteSelected() }
         case 53:                                                  // Esc
-            if model.placing != nil { model.placing = nil } else { model.selection = []; model.selectedHouse = nil }
+            if model.drawingKind != nil {
+                if model.drawingPoints.isEmpty { model.startDrawing(nil) } else { model.drawingPoints = [] }
+            } else if model.placing != nil { model.placing = nil } else { model.selection = []; model.selectedHouse = nil; model.gardenSelection = nil }
+        case 36, 76:                                              // Return / Enter: finish the line
+            model.finishDrawing()
         case 123: model.nudgeSelected(dx: -step, dz: 0)
         case 124: model.nudgeSelected(dx: step, dz: 0)
         case 125: model.nudgeSelected(dx: 0, dz: -step)

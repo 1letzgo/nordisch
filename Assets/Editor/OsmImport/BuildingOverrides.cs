@@ -102,6 +102,12 @@ namespace LeGamez.Editor.OsmImport
             return list;
         }
 
+        /// <summary>Footprints of every house built in this import (addressed = main house, not a shed).</summary>
+        public static IEnumerable<(List<Vector2> ring, bool addressed, bool osm)> Footprints()
+        {
+            foreach (var c in catalog) yield return (c.ring, c.addr != null && c.addr.Count > 0, c.src == "osm");
+        }
+
         public static void Register(string id, string src, List<string> addresses, List<Vector2> ring, int floors = 0)
         {
             if (ring == null || ring.Count < 3) return;

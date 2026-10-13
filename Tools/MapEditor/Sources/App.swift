@@ -108,11 +108,14 @@ struct Sidebar: View {
                 Picker("Bearbeiten", selection: $model.mode) {
                     Text("Objekte").tag(EditorModel.Mode.objects)
                     Text("Häuser").tag(EditorModel.Mode.houses)
+                    Text("Gärten").tag(EditorModel.Mode.gardens)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
             }
-            if model.mode == .houses {
+            if model.mode == .gardens {
+                GardenSidebar(model: model)
+            } else if model.mode == .houses {
                 HouseSidebar(model: model)
             } else {
                 objectSections
@@ -391,7 +394,9 @@ struct Inspector: View {
     var body: some View {
         Form {
             let sel = model.selectedObjects
-            if model.mode == .houses {
+            if model.mode == .gardens {
+                GardenInspector(model: model)
+            } else if model.mode == .houses {
                 if let h = model.currentHouse {
                     HouseInspector(model: model, house: h)
                 } else {
@@ -532,5 +537,127 @@ struct NumberField: View {
             return
         }
         commit(v)
+    }
+}
+
+
+struct GardenSidebar: View {
+    @ObservedObject var model: EditorModel
+
+    var body: some View {
+        Section("Zeichnen") {
+            ForEach(GardenKind.allCases) { k in
+                Button {
+                    model.startDrawing(model.drawingKind == k ? nil : k)
+                } label: {
+                    HStack {
+                        RoundedRectangle(cornerRadius: 2).fill(Color(nsColor: k.color)).frame(width: 18, height: k.isHedge ? 8 : 4)
+                            .frame(width: 22)
+                        Text(k.name)
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                    .padding(.vertical, 2)
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(model.drawingKind == k ? Color.accentColor.opacity(0.25) : nil)
+            }
+            Text(model.drawingKind == nil
+                 ? "Art wählen, dann Punkte in die Karte klicken."
+                 : "1. Klick = Anfang, 2. Klick = Ende (fertig). Rastet an vorhandenen Hecken/Zäunen ein (Kreis) – zum Verlängern am Ende ansetzen. ⇧ = 15°-Raster · Esc = abbrechen")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        Section("Gezeichnet (\(model.drawnLines.count))") {
+            ForEach(model.drawnLines) { d in
+                Button { model.focusGarden(.drawn(d.id)) } label: {
+                    HStack {
+                        RoundedRectangle(cornerRadius: 2).fill(Color(nsColor: d.gardenKind.color)).frame(width: 18, height: 6).frame(width: 22)
+                        Text(d.gardenKind.name)
+                        Spacer()
+                        Text(String(format: "%.0f m", d.length)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(model.gardenSelection == .drawn(d.id) ? Color.accentColor.opacity(0.25) : nil)
+            }
+        }
+        Section("Entfernt (\(model.gardenRemoved.count))") {
+            ForEach(model.gardenRemoved.sorted(), id: \.self) { id in
+                let g = model.gardenLines.first { $0.id == id }
+                Button { if g != nil { model.focusGarden(.generated(id)) } } label: {
+                    HStack {
+                        Image(systemName: "xmark").foregroundStyle(.red).frame(width: 22)
+                        Text(g?.title ?? id).lineLimit(1)
+                        Spacer()
+                        if let g { Text(String(format: "%.0f m", g.length)).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(model.gardenSelection == .generated(id) ? Color.accentColor.opacity(0.25) : nil)
+            }
+            if model.gardenLines.isEmpty {
+                Text("Keine Liste – einmal „In Unity übernehmen“.").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+struct GardenInspector: View {
+    @ObservedObject var model: EditorModel
+
+    var body: some View {
+        if let g = model.selectedGardenLine {
+            let removed = model.gardenRemoved.contains(g.id)
+            Section(g.title) {
+                LabeledContent("Länge", value: String(format: "%.1f m", g.length))
+                LabeledContent("Höhe", value: String(format: "%.1f m", g.h))
+                if removed {
+                    Text("Wird beim Import nicht gebaut.").font(.caption).foregroundStyle(.secondary)
+                    Button("Wiederherstellen") { model.toggleRemoved(g.id) }
+                } else {
+                    Button("Entfernen", role: .destructive) { model.toggleRemoved(g.id) }
+                    Text("Tipp: ⌫ entfernt die ausgewählte Linie.").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        } else if let i = model.selectedDrawnIndex {
+            let d = model.drawnLines[i]
+            Section("Gezeichnet") {
+                Picker("Art", selection: Binding(get: { d.gardenKind }, set: { k in
+                    model.snapshot()
+                    model.updateDrawn(d.id) { $0.kind = k.rawValue; $0.height = k.isHedge ? ($0.height ?? k.defaultHeight) : nil }
+                })) {
+                    ForEach(GardenKind.allCases) { Text($0.name).tag($0) }
+                }
+                if d.gardenKind.isHedge {
+                    Slider(value: Binding(get: { d.height ?? d.gardenKind.defaultHeight },
+                                          set: { v in model.updateDrawn(d.id) { $0.height = (v * 10).rounded() / 10 } }), in: 0.5...4) {
+                        Text("Höhe")
+                    } onEditingChanged: { if $0 { model.snapshot() } }
+                    LabeledContent("Höhe", value: String(format: "%.1f m", d.height ?? d.gardenKind.defaultHeight))
+                }
+                LabeledContent("Länge", value: String(format: "%.1f m (%d Punkte)", d.length, d.points.count))
+                Button("Löschen", role: .destructive) { model.deleteDrawn(d.id) }
+            }
+        } else {
+            Section("Nichts ausgewählt") {
+                Text("Hecke, Zaun oder Mauer in der Karte anklicken – oder links eine Art wählen und zeichnen.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        Section("Legende") {
+            ForEach(GardenKind.allCases) { k in
+                HStack {
+                    RoundedRectangle(cornerRadius: 2).fill(Color(nsColor: k.color)).frame(width: 18, height: 6)
+                    Text(k.name).font(.caption)
+                }
+            }
+            HStack {
+                RoundedRectangle(cornerRadius: 2).stroke(Color.red, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])).frame(width: 18, height: 6)
+                Text("entfernt").font(.caption)
+            }
+            Text("Gemessene Hecken (Luftbild-Höhenmodell) erscheinen dunkelgrün wie „Hecke hoch“.").font(.caption).foregroundStyle(.secondary)
+        }
     }
 }

@@ -181,6 +181,24 @@ namespace LeGamez.Editor.OsmImport
             return Cover.Paving;
         }
 
+        /// <summary>
+        /// Paved (driveway, path, road, parking) around a point: most visible pixels within <paramref name="radius"/>
+        /// are grey/non-vegetated. Shadows and tree-covered pixels don't vote.
+        /// </summary>
+        public bool IsPaved(Vector2 p, float radius = 0.8f)
+        {
+            int paved = 0, other = 0;
+            for (float dx = -radius; dx <= radius + 1e-3f; dx += step)
+            for (float dz = -radius; dz <= radius + 1e-3f; dz += step)
+            {
+                if (!TryPixel(p.x + dx, p.y + dz, out var c)) continue;
+                var k = Classify(c);
+                if (k == Cover.Unknown) continue;
+                if (k == Cover.Paving) paved++; else other++;
+            }
+            return paved > other && paved >= 2;
+        }
+
         /// <summary>Majority ground cover in a triangle of a terrain cell (lower = below the x0z0–x1z1 diagonal).</summary>
         public Cover CoverIn(float x0, float z0, float size, bool upper, bool wide = false)
         {

@@ -34,15 +34,179 @@ final class EditorModel: ObservableObject {
         focusToken += 1
     }
 
-    private struct UndoState { var objects: [PlacedObject]; var styles: [HouseStyle] }
+    private struct UndoState { var objects: [PlacedObject]; var styles: [HouseStyle]; var removed: Set<String>; var drawn: [DrawnLine] }
     private var undoStack: [UndoState] = []
     private var redoStack: [UndoState] = []
-    private var undoState: UndoState { UndoState(objects: objects, styles: houseStyles) }
+    private var undoState: UndoState { UndoState(objects: objects, styles: houseStyles, removed: gardenRemoved, drawn: drawnLines) }
+
+    // MARK: - Gardens (hedges, fences, walls)
+
+    @Published var gardenLines: [GardenLine] = []
+    /// Ids of generated lines removed in the editor.
+    @Published var gardenRemoved: Set<String> = []
+    @Published var drawnLines: [DrawnLine] = []
+    @Published var gardenSelection: GardenSelection?
+    /// Armed drawing tool and the points placed so far.
+    @Published var drawingKind: GardenKind?
+    @Published var drawingPoints: [CGPoint] = []
+    var lastDrawHeight: [GardenKind: Double] = [:]
+
+    private func gardenURL(_ a: Area) -> URL? { repo?.appendingPathComponent("Data/\(a.id).garden.json") }
+
+    func reloadGardens() {
+        guard let a = area else { return }
+        gardenLines = repo.map { GardenCatalog.load($0.appendingPathComponent("Assets/Generated/\(a.id)/\(a.id)_gardens.json")) } ?? []
+    }
+
+    /// Loads Data/<area>.garden.json; returns true if removed ids were re-matched to slightly moved lines.
+    private func loadGardenEdits(_ a: Area) -> Bool {
+        gardenRemoved = []
+        drawnLines = []
+        guard let url = gardenURL(a), let data = try? Data(contentsOf: url),
+              let file = try? JSONDecoder().decode(GardenEditsFile.self, from: data) else { return false }
+        drawnLines = file.lines
+        let ids = Set(gardenLines.map(\.id))
+        var rematched = false
+        for id in file.removed {
+            if ids.contains(id) || gardenLines.isEmpty { gardenRemoved.insert(id); continue }
+            // Same rule as GardenBuilder.Record: same kind within 1.5 m.
+            let parts = id.split(separator: "@")
+            let xz = parts.count == 2 ? parts[1].split(separator: "#")[0].split(separator: ",").compactMap { Double($0) } : []
+            guard xz.count == 2 else { continue }
+            let p = CGPoint(x: xz[0] / 10, y: xz[1] / 10)
+            if let near = gardenLines.filter({ $0.kind == String(parts[0]) && !gardenRemoved.contains($0.id) })
+                .min(by: { hypot($0.mid.x - p.x, $0.mid.y - p.y) < hypot($1.mid.x - p.x, $1.mid.y - p.y) }),
+               hypot(near.mid.x - p.x, near.mid.y - p.y) < 1.5 {
+                gardenRemoved.insert(near.id)
+                rematched = true
+            } else {
+                gardenRemoved.insert(id) // keep it (maybe the line comes back after a re-import)
+            }
+        }
+        return rematched
+    }
+
+    var selectedGardenLine: GardenLine? {
+        if case .generated(let id)? = gardenSelection { return gardenLines.first { $0.id == id } }
+        return nil
+    }
+
+    var selectedDrawnIndex: Int? {
+        if case .drawn(let id)? = gardenSelection { return drawnLines.firstIndex { $0.id == id } }
+        return nil
+    }
+
+    func toggleRemoved(_ id: String) {
+        snapshot()
+        if gardenRemoved.contains(id) { gardenRemoved.remove(id) } else { gardenRemoved.insert(id) }
+    }
+
+    func startDrawing(_ kind: GardenKind?) {
+        drawingKind = kind
+        drawingPoints = []
+        if kind != nil { gardenSelection = nil }
+    }
+
+    /// Where the drawing cursor snaps to (shown as a ring); nil = free.
+    @Published var snapPoint: CGPoint?
+
+    /// One click = start, second click = end: every drawn line is a single element (extend it by snapping to its end).
+    func addDrawingPoint(_ p: CGPoint) {
+        guard drawingKind != nil else { return }
+        if let last = drawingPoints.last, hypot(p.x - last.x, p.y - last.y) < 0.3 { return } // double click
+        drawingPoints.append(p)
+        if drawingPoints.count >= 2 { finishDrawing() }
+    }
+
+    /// Snap target near `p`: an end point of an existing hedge/fence/wall (preferred) or the nearest point on one.
+    func gardenSnap(_ p: CGPoint, tolerance: Double) -> CGPoint? {
+        var bestEnd: (CGPoint, Double)?
+        var bestOn: (CGPoint, Double)?
+        func consider(_ a: CGPoint, _ b: CGPoint) {
+            for e in [a, b] {
+                let d = hypot(e.x - p.x, e.y - p.y)
+                if d < tolerance, d < (bestEnd?.1 ?? .infinity) { bestEnd = (e, d) }
+            }
+            let abx = b.x - a.x, aby = b.y - a.y, l2 = abx * abx + aby * aby
+            guard l2 > 1e-9 else { return }
+            let t = max(0, min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / l2))
+            let q = CGPoint(x: a.x + abx * t, y: a.y + aby * t)
+            let d = hypot(q.x - p.x, q.y - p.y)
+            if d < tolerance, d < (bestOn?.1 ?? .infinity) { bestOn = (q, d) }
+        }
+        for g in gardenLines where !gardenRemoved.contains(g.id) {
+            guard abs(g.mid.x - p.x) < g.length / 2 + tolerance + 1, abs(g.mid.y - p.y) < g.length / 2 + tolerance + 1 else { continue }
+            consider(g.a, g.b)
+        }
+        for d in drawnLines {
+            let pts = d.cgPoints
+            for (a, b) in zip(pts, pts.dropFirst()) { consider(a, b) }
+        }
+        return bestEnd?.0 ?? bestOn?.0
+    }
+
+    /// Finishes the current line (≥ 2 points) and keeps the tool armed for the next one.
+    func finishDrawing() {
+        guard let kind = drawingKind else { return }
+        if drawingPoints.count >= 2 {
+            snapshot()
+            let r = { (v: Double) in (v * 100).rounded() / 100 }
+            var line = DrawnLine(kind: kind.rawValue, points: drawingPoints.map { [r($0.x), r($0.y)] })
+            if kind.isHedge { line.height = lastDrawHeight[kind] ?? kind.defaultHeight }
+            drawnLines.append(line)
+            gardenSelection = .drawn(line.id)
+        }
+        drawingPoints = []
+    }
+
+    func deleteDrawn(_ id: UUID) {
+        snapshot()
+        drawnLines.removeAll { $0.id == id }
+        if gardenSelection == .drawn(id) { gardenSelection = nil }
+    }
+
+    func updateDrawn(_ id: UUID, _ change: (inout DrawnLine) -> Void) {
+        guard let i = drawnLines.firstIndex(where: { $0.id == id }) else { return }
+        change(&drawnLines[i])
+        if let h = drawnLines[i].height { lastDrawHeight[drawnLines[i].gardenKind] = h }
+    }
+
+    /// Nearest garden line within `tolerance` metres: drawn lines first, then generated ones.
+    func gardenHit(_ p: CGPoint, tolerance: Double) -> GardenSelection? {
+        var best: (GardenSelection, Double)?
+        for d in drawnLines {
+            let pts = d.cgPoints
+            for (a, b) in zip(pts, pts.dropFirst()) {
+                let dist = segmentDistance(p, a, b)
+                if dist < tolerance, dist < (best?.1 ?? .infinity) { best = (.drawn(d.id), dist) }
+            }
+        }
+        if best != nil { return best?.0 }
+        for g in gardenLines {
+            guard abs(g.mid.x - p.x) < g.length / 2 + tolerance + 1, abs(g.mid.y - p.y) < g.length / 2 + tolerance + 1 else { continue }
+            let dist = segmentDistance(p, g.a, g.b)
+            if dist < tolerance, dist < (best?.1 ?? .infinity) { best = (.generated(g.id), dist) }
+        }
+        return best?.0
+    }
+
+    func focusGarden(_ sel: GardenSelection) {
+        mode = .gardens
+        gardenSelection = sel
+        var p: CGPoint?
+        switch sel {
+        case .generated(let id): p = gardenLines.first { $0.id == id }?.mid
+        case .drawn(let id): p = drawnLines.first { $0.id == id }?.cgPoints.first
+        }
+        if let p { focusPoint = p; focusToken += 1 }
+    }
 
     // MARK: - Houses
 
-    enum Mode: String { case objects, houses }
-    @Published var mode: Mode = .objects { didSet { if mode != oldValue { placing = nil; selection = []; selectedHouse = nil } } }
+    enum Mode: String { case objects, houses, gardens }
+    @Published var mode: Mode = .objects {
+        didSet { if mode != oldValue { placing = nil; selection = []; selectedHouse = nil; gardenSelection = nil; drawingKind = nil; drawingPoints = [] } }
+    }
     @Published var houses: [House] = [] { didSet { rebuildStyleCache() } }
     /// Entries of Data/<area>.buildings.json (also hand-written ones, kept as they are).
     @Published var houseStyles: [HouseStyle] = [] { didSet { rebuildStyleCache() } }
@@ -188,6 +352,11 @@ final class EditorModel: ObservableObject {
         redoStack = []
         selectedHouse = nil
         reloadHouses()
+        reloadGardens()
+        gardenSelection = nil
+        drawingKind = nil
+        drawingPoints = []
+        let gardenRematched = loadGardenEdits(a)
         houseStyles = []
         if let url = stylesURL(a), let data = try? Data(contentsOf: url) {
             houseStyles = (try? JSONDecoder().decode(HouseStylesFile.self, from: data).buildings) ?? []
@@ -231,7 +400,7 @@ final class EditorModel: ObservableObject {
             } catch { status = "\(a.id).edits.json unlesbar: \(error.localizedDescription)" }
         }
         objects = list
-        dirty = rematched > 0 // re-save under the new ids
+        dirty = rematched > 0 || gardenRematched // re-save under the new ids
         loadBackground()
         recenterToken += 1
         status = "\(a.name): \(genCount) erzeugte, \(objects.count - genCount) neue Objekte"
@@ -318,6 +487,8 @@ final class EditorModel: ObservableObject {
         redoStack.append(undoState)
         objects = last.objects
         houseStyles = last.styles
+        gardenRemoved = last.removed
+        drawnLines = last.drawn
         dirty = true
         selection = selection.filter { id in objects.contains { $0.id == id } }
     }
@@ -327,6 +498,8 @@ final class EditorModel: ObservableObject {
         undoStack.append(undoState)
         objects = next.objects
         houseStyles = next.styles
+        gardenRemoved = next.removed
+        drawnLines = next.drawn
         dirty = true
     }
 
@@ -458,8 +631,13 @@ final class EditorModel: ObservableObject {
                 if houseStyles.isEmpty { try? FileManager.default.removeItem(at: surl) }
                 else { try enc.encode(HouseStylesFile(buildings: houseStyles)).write(to: surl, options: .atomic) }
             }
+            if let gurl = gardenURL(a) {
+                if gardenRemoved.isEmpty && drawnLines.isEmpty { try? FileManager.default.removeItem(at: gurl) }
+                else { try enc.encode(GardenEditsFile(removed: gardenRemoved.sorted(), lines: drawnLines)).write(to: gurl, options: .atomic) }
+            }
             dirty = false
-            status = "Gespeichert: \(rounded.count) neue, \(changes.count) geänderte Objekte, \(houseStyles.count) angepasste Häuser"
+            status = "Gespeichert: \(rounded.count) neue, \(changes.count) geänderte Objekte, \(houseStyles.count) angepasste Häuser, "
+                + "\(gardenRemoved.count) entfernte / \(drawnLines.count) gezeichnete Zäune & Hecken"
             return true
         } catch {
             status = "Speichern fehlgeschlagen: \(error.localizedDescription)"
@@ -518,7 +696,7 @@ final class EditorModel: ObservableObject {
                 self.unityLog = lines
                 if code == 0 {
                     self.status = "Import fertig – Szene \(a.name).unity aktualisiert"
-                    if self.area?.id == a.id { self.reloadHouses(); self.loadBackground() }
+                    if self.area?.id == a.id { self.reloadHouses(); self.reloadGardens(); self.loadBackground() }
                 } else {
                     self.status = code == 139 ? "Unity abgestürzt (139) – einfach nochmal starten" : "Unity-Import fehlgeschlagen (Exit \(code)), Log: \(log.path)"
                 }
