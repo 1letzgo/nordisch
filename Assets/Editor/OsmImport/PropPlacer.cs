@@ -341,7 +341,7 @@ namespace LeGamez.Editor.OsmImport
         /// measured top (a second lobe on top for tall narrow ones), conifers are three stacked cones; colours become
         /// per-instance tints. <paramref name="rng"/> is the tree's own forked generator (shape choice, bark, lean).
         /// </summary>
-        static void TreeMesh(MeshSink sink, Vector2 p, float height, float crownR, float trunkFrac, bool conifer, float rot,
+        internal static void TreeMesh(MeshSink sink, Vector2 p, float height, float crownR, float trunkFrac, bool conifer, float rot,
             Color32 leaves, System.Random rng)
         {
             var basePos = new Vector3(p.x, 0f, p.y);

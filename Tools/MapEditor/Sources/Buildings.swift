@@ -6,6 +6,8 @@ struct House: Identifiable {
     let id: String          // LoD2 gml id or "osm:<way id>"
     let src: String         // "lod2" | "osm"
     let addr: [String]
+    /// `addr` normalised (HouseCatalog.normalize), for search and style matching.
+    let norm: [String]
     let ring: [CGPoint]     // footprint, x east / y north
     let floors: Int         // storeys up to the eaves as built (measured / estimated)
     let path: CGPath
@@ -64,7 +66,7 @@ enum HouseCatalog {
                 let p = pts[i], q = pts[(i + 1) % pts.count]
                 a += p.x * q.y - q.x * p.y
             }
-            return House(id: b.id, src: b.src, addr: b.addr, ring: pts, floors: b.floors ?? 0, path: path, bounds: path.boundingBoxOfPath, area: abs(a) / 2)
+            return House(id: b.id, src: b.src, addr: b.addr, norm: b.addr.map(normalize), ring: pts, floors: b.floors ?? 0, path: path, bounds: path.boundingBoxOfPath, area: abs(a) / 2)
         }
     }
 

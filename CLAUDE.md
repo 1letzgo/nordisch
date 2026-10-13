@@ -54,7 +54,7 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    Liest nur eine Übersichtsstufe der COG-Kacheln (schnell). Der Importer (`AerialImage`) nutzt es für
    **Dachfarben** (Median der sonnigen Dachpixel, Bäume per NDVI raus, auf Palette gezogen: Ziegelrot, Anthrazit,
    Braun, Moos, Solar, Flachdach Bitumen/Kies/grün; `buildings.json`-Overrides und OSM `roof:colour` gehen vor) und
-   **Bodenbedeckung** je Geländedreieck (Rasen/Pflaster/Sand/Erde; unter LiDAR-Kronen entscheidet die Umgebung).
+   **Bodenbedeckung** je Geländedreieck (Rasen/Pflaster/Sand/Erde; unter LiDAR-Kronen entscheidet die Umgebung; im offenen Land geglättet Wiese/Acker, s. 3e).
    Mit Luftbild entfallen die flächigen OSM-Flächen residential/commercial/retail/industrial, damit Gärten/Höfe sichtbar werden.
 3e. **Große Gebiete (ganze Gemeinde) – Maske** (`Tools/osm/make_mask.py <id>`, vor allen anderen Fetchern):
    `"mask"` im Gebiet (`boundary` = Gemeindename, `admin_level`, `settlement_buffer`, `road_buffer`, `roads` …) →
@@ -68,8 +68,15 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    Maske geschnitten; Seen/Teiche, Flüsse, Kanäle + Bahn bleiben, Bäche/Gräben nur innen), auch LoD2/LiDAR/Flurstücke/
    Hecken/Verkehrsknoten; Straßenlaternen nur in Siedlungen (Landstraßen sind unbeleuchtet). `CoarseTerrain` vereinfacht
    das Höhenfeld außerhalb der 40-m-Detailblöcke (40-m-Raster geglättet, bis 160 m zusammengelegt, Samples durch die
-   Blockdreiecke ersetzt → Mesh = Feld, keine Risse) und baut dort nur große Dreiecke (Farbe aus Luftbild, Wald aus Maske);
-   `GroundBuilder.BuildBase` überspringt diese Blöcke. Ohne Maske ändert sich nichts. Ansichten einzelner Stellen ohne
+   Blockdreiecke ersetzt → Mesh = Feld, keine Risse) und baut dort nur große Dreiecke; `GroundBuilder.BuildBase` überspringt diese Blöcke.
+   Farben: Klassenfeld auf 20-m-Knoten (Wiese/Acker aus `AerialImage.FieldScore`, Wald/See aus Maske, 2× 3×3-Mehrheit),
+   einheitliche Blöcke bleiben ganz (Vertex-Farbe = gemessener Ton je Feld), an Klassengrenzen werden die 20-m-Dreiecke
+   entlang der interpolierten Grenze geschnitten (Marching Triangles) → glatte Feldränder statt Treppen. Wälder ≤ 100 m
+   vom Detailgelände bekommen lockere Instanz-Bäume (Rand dicht; eigener Zufall, keine Editor-Objekte).
+   **Offenes Land** (alle Gebiete außer Inseln, `AerialImage.SetBuiltUp`): Zellen ≥ 30 m von Gebäuden und außerhalb
+   bebauter landuse/Parkplätze nehmen auch im Detailgelände Wiese/Acker (`Cover.Field`) aus derselben geglätteten Karte
+   (10 m, 3× [1 2 1]-Blur, Ton = Helligkeit) – keine falschen „Pflaster“-Flecken auf Äckern, Feldformen laufen über den Maskenrand
+   (gilt auch ohne Maske, z. B. Felder am Rand kleiner Karten; CoarseTerrain/Waldbäume nur mit Maske). Ansichten einzelner Stellen ohne
    alle Kacheln zu laden: `-executeMethod LeGamez.Editor.AreaViewSnapshot.Render -area <id> -views "name:x,z,yaw,höhe,neigung;…"`.
 3f. **Autobahn + zweite Stadt im selben Gebiet** (Westerstede: A28 bis Oldenburg, Gebiet bis 20,4 km Ost / 14,2 km Süd;
    Gebiete haben je ein eigenes Koordinatensystem, deshalb ein Gebiet statt zwei verbundener Karten). In `"mask"`:
@@ -262,8 +269,15 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
   HDR + Bloom/Farbkorrektur in `ProjectSetup` (`ConfigureUrp`, `CreatePostProfile`).
 
 ### Map-Editor (macOS-App, `Tools/MapEditor`)
-Draufsicht je Gebiet (Minimap + LoD2-Dachumrisse). Neue Objekte setzen, außerdem alle vom Importer erzeugten
+Draufsicht je Gebiet (Unity-Renders + Hausumrisse). Neue Objekte setzen, außerdem alle vom Importer erzeugten
 (Bäume, Büsche, Laternen, Bänke, Kübel, Brunnen, Café-Tische, Denkmäler …) verschieben/drehen/skalieren/löschen.
+- Hintergrund (`MapImages.swift`): Übersicht `Assets/Generated/<id>/<id>_map.jpg` (Gebiet + 60 m Rand), ab mittlerem Zoom
+  die 1-km-Regionsbilder `regions~/r<rx>_<rz>.jpg` (Region rx = x ∈ [rx·1000, (rx+1)·1000), Norden oben; gitignored,
+  entstehen bei `RenderThumbnails`/Import) – nur sichtbare, im Hintergrund dekodiert in 256/512/1024 px, LRU-Cache ~256 MB.
+- Große Gebiete (Westerstede ~93 000 Objekte, ~37 000 Häuser): Gitter-Indizes (`GridIndex`, 100 m) für Objekte/Häuser,
+  unveränderte erzeugte Objekte als Punkte (< 0,25 pt/m ausgeblendet), Hausumrisse ab 0,6 pt/m, Garten-Linien ab 0,35 pt/m;
+  Undo speichert nur Abweichungen vom Import. Prüfen ohne UI: App mit
+  `-snapshot <dir> -snapshotAreas spiekeroog,westerstede [-repoPath <repo>]` starten → PNGs je Zoomstufe + Zeiten in `snapshot.log`.
 - Speichert nach `Data/<id>.edits.json`: `objects` = neue Objekte, `changes` = Overrides erzeugter Objekte per ID
   (`<typ>@<x·10>,<z·10>`, Liste in `Assets/Generated/<id>/<id>_objects.json`, schreibt der Importer).
 - Importer: `EditsPlacer` – alle Placer laufen über `EditsPlacer.Emit` (baut auch gelöschte, damit die Zufallsfolge
