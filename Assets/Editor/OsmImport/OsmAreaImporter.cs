@@ -134,9 +134,11 @@ namespace LeGamez.Editor.OsmImport
             var aerial = AerialImage.Load(Path.GetDirectoryName(jsonPath), meta.id);
             aerial?.SetCanopy(lidarTrees);
             CoastBuilder.Prepare(data, area, terrain, aerial); // islands: sea level, water, tidal flats (rewrites the terrain)
+            aerial?.SetBuiltUp(data); // open country: smoothed fields/meadows instead of per-pixel cover
             var sink = new MeshSink();
             CoarseTerrain.Build(sink, area, WorldStyle.GroundColor(meta.ground), terrain); // before BuildBase: simplifies the field
             GroundBuilder.BuildBase(sink, area, WorldStyle.GroundColor(meta.ground), terrain);
+            int terrainTris = CoarseTerrain.TerrainTriangles(sink);
             GroundBuilder.BuildAreas(data, sink, area);
             int lines = GroundBuilder.BuildLines(data, sink, area);
             // Prefer official LGLN LoD2 buildings (real roof shapes); fall back to OSM extrusion.
@@ -235,7 +237,7 @@ namespace LeGamez.Editor.OsmImport
             Debug.Log($"[OSM] {meta.name}: {buildings} buildings (+{osmExtra} OSM-only), {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, gardens {gardens.plots} plots/{gardens.measured} measured hedges/{gardens.hedges} hedges/{gardens.fences} fences/{gardens.walls} walls/{gardens.drawn} drawn, terrain {(terrain.IsFlat ? "flat" : "DGM1")}, aerial {(aerial != null ? "DOP20" : "-")}, trees {(lidarTrees != null ? "LiDAR" : "OSM")}, " +
                       $"furniture {furniture.mapped} mapped/{furniture.benches} benches/{furniture.planters} planters/{furniture.seating} café tables/{furniture.fountains} fountains, {edits} hand-placed/{EditsPlacer.ChangedCount} edited, " +
                       $"facade {FacadeRecords.Windows} windows/{FacadeRecords.Doors} doors/{FacadeRecords.Gutters} gutters/{FacadeRecords.Verges} verges/{FacadeRecords.Ridges} ridges, traffic {traffic.junctionSignals} signal junctions/{traffic.crossingSignals} signal crossings/{traffic.heads} heads/{traffic.zebras} zebras/{traffic.lanes} lanes/{traffic.stops} stop/{traffic.giveWays} give way/{traffic.priority} priority/{traffic.speed} speed/{traffic.oneway} one-way/{traffic.names} names/{traffic.mapped} mapped, {pois.Count} POIs, " +
-                      $"{(maskStats.HasValue ? $"mask -{maskStats.Value.nodes} nodes/-{maskStats.Value.polygons} areas/-{maskStats.Value.ways} ways/{maskStats.Value.pieces} cut, {CoarseTerrain.Blocks} coarse terrain blocks, " : "")}" +
+                      $"{(maskStats.HasValue ? $"mask -{maskStats.Value.nodes} nodes/-{maskStats.Value.polygons} areas/-{maskStats.Value.ways} ways/{maskStats.Value.pieces} cut, {CoarseTerrain.Blocks} coarse terrain blocks ({CoarseTerrain.Triangles} of {terrainTris} terrain tris, {CoarseTerrain.Trees} forest-edge trees), " : "")}" +
                       $"{sink.Batches.Count()} meshes + {sink.instances.Count} instances in {sw.ElapsedMilliseconds} ms -> {areaPath}");
             return areaPath;
         }

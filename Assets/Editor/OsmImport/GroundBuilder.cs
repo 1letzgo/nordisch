@@ -386,8 +386,8 @@ namespace LeGamez.Editor.OsmImport
                 Color32 cUpper = c, cLower = c;
                 if (aerial != null)
                 {
-                    cUpper = Shade(AerialImage.CoverColor(aerial.CoverIn(x0, z0, cs, true), color), f, noise);
-                    cLower = Shade(AerialImage.CoverColor(aerial.CoverIn(x0, z0, cs, false), color), f, noise);
+                    cUpper = Shade(aerial.ColorAt(aerial.CoverIn(x0, z0, cs, true), x0 + cs * 0.33f, z0 + cs * 0.67f, color), f, noise);
+                    cLower = Shade(aerial.ColorAt(aerial.CoverIn(x0, z0, cs, false), x0 + cs * 0.67f, z0 + cs * 0.33f, color), f, noise);
                 }
                 // Clockwise from above → facing up.
                 MeshSink.Tri(batch, p00, p01, p11, cUpper);
@@ -395,11 +395,11 @@ namespace LeGamez.Editor.OsmImport
                 return;
             }
             // Merged block: one cover, colour variation per corner (blends smoothly across the block).
-            var cover = aerial != null ? AerialImage.CoverColor(aerial.CoverIn(x0, z0, cs, true), color) : color;
+            var kind = aerial != null ? aerial.CoverIn(x0, z0, cs, true) : AerialImage.Cover.Unknown;
             Color32 C(Vector3 p)
             {
                 float noise = Mathf.PerlinNoise(p.x * 0.012f + 31.7f, p.z * 0.012f + 11.3f) - 0.5f;
-                return Shade(cover, 1f + noise * 0.14f, noise);
+                return Shade(aerial != null ? aerial.ColorAt(kind, p.x, p.z, color) : color, 1f + noise * 0.14f, noise);
             }
             Color32 c00 = C(p00), c10 = C(p10), c01 = C(p01), c11 = C(p11);
             Tri3(batch, p00, p01, p11, c00, c01, c11);
