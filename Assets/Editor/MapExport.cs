@@ -9,16 +9,15 @@ using UnityEngine;
 namespace LeGamez.Editor
 {
     /// <summary>
-    /// Writes the download files of each area (format 5, World/MapFormat – the same files for iOS and Android, independent
-    /// of the Unity version) to Builds/Maps/&lt;id&gt;/: area.bin (AreaData + small overview map) and one r&lt;rx&gt;_&lt;rz&gt;.bin per
-    /// 1 km region with its tiles, facade records and minimap image (<see cref="RegionContent"/>), plus index.json for
-    /// Tools/release/publish_maps.py.
+    /// Writes the download files of each area (format 6, World/MapFormat – the same files for iOS and Android, independent
+    /// of the Unity version) to Builds/Maps/&lt;id&gt;/: area.bin (AreaData + small overview map + index of the world pack) and
+    /// world.bin (every tile, the facade records and minimap image per 1 km region as separate entries – the app fetches
+    /// single entries with HTTP Range requests), plus index.json for Tools/release/publish_maps.py.
     /// Batch: Unity -batchmode -quit -projectPath . -executeMethod LeGamez.Editor.MapExport.ExportBatch [-areas a,b]
     /// </summary>
     public static class MapExport
     {
         public static string OutDir => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Builds", "Maps"));
-        const float StartRadius = 1200f;
 
         [MenuItem("LeGamez/Export Maps")]
         public static void ExportMenu() => Export(null);
@@ -34,8 +33,8 @@ namespace LeGamez.Editor
         [System.Serializable]
         class IndexFile
         {
-            public string name;   // installed file name: area.bin or r<rx>_<rz>.bin
-            public string region; // "rx_rz" for regions, empty for the area file
+            public string name;   // area.bin or world.bin
+            public string region; // unused since format 6 (was "rx_rz" for region files)
             public string path;
         }
 
@@ -76,37 +75,43 @@ namespace LeGamez.Editor
                     thumb = Path.GetFullPath(AreaCatalog.ThumbPath(a.id)),
                 };
 
-                string areaFile = Path.Combine(dir, "area.bin");
-                File.WriteAllBytes(areaFile, MapFormat.WriteArea(data, OverviewImage(a.id)));
-                m.files.Add(new IndexFile { name = "area.bin", region = "", path = areaFile });
+                // World pack: every entry back to back, grouped by region (neighbouring tiles lie close together).
                 var facade = RegionContent.SplitFacade(data.facade != null ? RegionContent.ToFloats(data.facade.bytes) : null);
+                var pack = new Dictionary<string, MapFormat.PackEntry>();
+                string packFile = Path.Combine(dir, "world.bin");
                 int noMap = 0;
-
-                long total = new FileInfo(areaFile).Length;
-                foreach (var g in data.tileKeys.GroupBy(WorldStreamer.RegionOf).OrderBy(g => g.Key.x).ThenBy(g => g.Key.y))
+                using (var fs = new FileStream(packFile, FileMode.Create, FileAccess.Write))
                 {
-                    var tiles = g.Select(k => AssetDatabase.LoadAssetAtPath<WorldTile>(WorldStreamer.EditorTilePath(a.id, k)))
-                        .Where(t => t != null).ToList();
-                    string rk = $"{g.Key.x}_{g.Key.y}";
-                    string file = Path.Combine(dir, $"r{rk}.bin");
-                    var sections = new List<(string, byte[])>();
-                    if (facade.TryGetValue(g.Key, out var rec)) sections.Add((RegionContent.FacadeSection, MapFormat.Deflate(RegionContent.ToBytes(rec))));
-                    string mapFile = WorldStreamer.EditorRegionMapPath(a.id, g.Key);
-                    if (File.Exists(mapFile)) sections.Add((RegionContent.MapSection, File.ReadAllBytes(mapFile)));
-                    else noMap++;
-                    File.WriteAllBytes(file, MapFormat.WriteRegion(tiles, sections));
-                    total += new FileInfo(file).Length;
-                    m.files.Add(new IndexFile { name = $"r{rk}.bin", region = rk, path = file });
-                    var sp = data.spawn;
-                    float s = WorldStreamer.RegionSize, x0 = g.Key.x * s, z0 = g.Key.y * s;
-                    float dx = Mathf.Max(x0 - sp.x, 0f, sp.x - (x0 + s)), dz = Mathf.Max(z0 - sp.z, 0f, sp.z - (z0 + s));
-                    if (dx * dx + dz * dz <= StartRadius * StartRadius) m.start.Add(rk);
-                    foreach (var t in tiles) Resources.UnloadAsset(t); // keep editor memory flat on big areas
-                    if (g.Key.x % 4 == 0) EditorUtility.UnloadUnusedAssetsImmediate();
+                    void Put(string name, byte[] bytes)
+                    {
+                        pack[name] = new MapFormat.PackEntry { offset = fs.Position, length = bytes.Length, hash = MapFormat.Hash64(bytes) };
+                        fs.Write(bytes, 0, bytes.Length);
+                    }
+                    foreach (var g in data.tileKeys.GroupBy(WorldStreamer.RegionOf).OrderBy(g => g.Key.x).ThenBy(g => g.Key.y))
+                    {
+                        foreach (var k in g.OrderBy(k => k.x).ThenBy(k => k.y))
+                        {
+                            var t = AssetDatabase.LoadAssetAtPath<WorldTile>(WorldStreamer.EditorTilePath(a.id, k));
+                            if (t == null) continue;
+                            Put(MapFormat.TileEntry(k), MapFormat.TileBlob(t));
+                            Resources.UnloadAsset(t); // keep editor memory flat on big areas
+                        }
+                        if (facade.TryGetValue(g.Key, out var rec)) Put(MapFormat.FacadeEntry(g.Key), MapFormat.Deflate(RegionContent.ToBytes(rec)));
+                        string mapFile = WorldStreamer.EditorRegionMapPath(a.id, g.Key);
+                        if (File.Exists(mapFile)) Put(MapFormat.MapEntry(g.Key), File.ReadAllBytes(mapFile));
+                        else noMap++;
+                        if (g.Key.x % 4 == 0) EditorUtility.UnloadUnusedAssetsImmediate();
+                    }
                 }
+
+                string areaFile = Path.Combine(dir, "area.bin");
+                File.WriteAllBytes(areaFile, MapFormat.WriteArea(data, OverviewImage(a.id), pack));
+                m.files.Add(new IndexFile { name = "area.bin", region = "", path = areaFile });
+                m.files.Add(new IndexFile { name = "world.bin", region = "", path = packFile });
+                long areaSize = new FileInfo(areaFile).Length, packSize = new FileInfo(packFile).Length;
                 index.maps.Add(m);
                 if (noMap > 0) Debug.LogWarning($"[Maps] {a.id}: {noMap} regions without minimap image – run SceneSnapshot.RenderThumbnailsBatch -area {a.id}");
-                Debug.Log($"[Maps] {a.id}: area {new FileInfo(areaFile).Length / 1024} KB + {m.files.Count - 1} regions, total {total / (1024 * 1024)} MB, start {m.start.Count} regions");
+                Debug.Log($"[Maps] {a.id}: area {areaSize / 1024} KB, world pack {packSize / (1024 * 1024)} MB ({pack.Count} entries)");
             }
             File.WriteAllText(Path.Combine(OutDir, "index.json"), JsonUtility.ToJson(index, true));
             return true;

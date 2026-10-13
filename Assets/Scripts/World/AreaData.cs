@@ -33,6 +33,8 @@ namespace LeGamez.World
         /// <summary>All facade records (editor only – downloads carry them per region, see <see cref="RegionContent"/>).</summary>
         public TextAsset facade;
         public List<Vector2Int> tileKeys = new List<Vector2Int>();
+        /// <summary>Downloaded maps (format 6): index of the area's world pack – entry name → offset/length/hash.</summary>
+        [System.NonSerialized] public Dictionary<string, MapFormat.PackEntry> pack;
         public List<TrafficLights.Head> trafficHeads = new List<TrafficLights.Head>();
         public List<TrafficLights.Signal> trafficSignals = new List<TrafficLights.Signal>();
         public List<SignTexts.Item> signTexts = new List<SignTexts.Item>();

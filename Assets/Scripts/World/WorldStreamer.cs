@@ -9,7 +9,7 @@ namespace LeGamez.World
     /// Keeps only the world tiles (<see cref="WorldTile"/>) around the camera in memory: loads those within
     /// <see cref="loadRadius"/> (nearest first, a few at a time, one instantiated per frame) and drops tiles beyond
     /// <see cref="unloadRadius"/>. Fog ends at 650 m, so nothing further away is ever visible. Lets areas grow far beyond
-    /// what a phone could hold as one scene. On devices the tiles come from 1 km region bundles (Core/RegionTileSource, downloaded on demand),
+    /// what a phone could hold as one scene. On devices single tiles come from the area world pack on GitHub (Core/PackTileSource, HTTP Range, cached),
     /// in the editor straight from Assets/Generated/&lt;id&gt;/tiles/.
     /// </summary>
     public class WorldStreamer : MonoBehaviour
@@ -23,7 +23,7 @@ namespace LeGamez.World
         public float unloadRadius = 960f;
 
         public static WorldStreamer Instance { get; private set; }
-        /// <summary>Where the NEXT streamer gets its tiles on devices (Core/RegionTileSource: region bundles, downloaded on
+        /// <summary>Where the NEXT streamer gets its tiles on devices (Core/PackTileSource: entries of the world pack, fetched on
         /// demand); taken over in Awake, so an area switch can't mix up old and new tiles. Null in the editor: tiles load
         /// straight from Assets/Generated.</summary>
         public static ITileSource Source;

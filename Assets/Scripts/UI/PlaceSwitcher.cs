@@ -23,7 +23,6 @@ namespace LeGamez.UI
 
         readonly List<Row> rows = new List<Row>();
         readonly Dictionary<Texture2D, Sprite> sprites = new Dictionary<Texture2D, Sprite>();
-        MapStore.Map pending; // download running, beam when done
         RectTransform list;
         int builtRevision = -1;
 
@@ -50,7 +49,6 @@ namespace LeGamez.UI
 
         void Close()
         {
-            pending = null;
             gameObject.SetActive(false);
         }
 
@@ -92,13 +90,6 @@ namespace LeGamez.UI
         {
             if (builtRevision != MapStore.Revision) Rebuild();
             foreach (var r in rows) Refresh(r);
-            // Download of the chosen place finished → go.
-            if (pending != null && !pending.Busy)
-            {
-                var m = pending;
-                pending = null;
-                if (m.Playable) Go(m);
-            }
         }
 
         void Rebuild()
@@ -172,8 +163,8 @@ namespace LeGamez.UI
             {
                 case MapStore.Status.Installed:
                 case MapStore.Status.UpdateAvailable: text = "Bereit – hierhin beamen"; break;
-                case MapStore.Status.Available: text = $"Laden und beamen · {MapStore.Megabytes(m.DownloadSize)}"; break;
-                case MapStore.Status.UpdateRequired: text = $"Update und beamen · {MapStore.Megabytes(m.DownloadSize)}"; break;
+                case MapStore.Status.Available:
+                case MapStore.Status.UpdateRequired: text = "Hierhin beamen"; break;
                 case MapStore.Status.Queued: text = "Wartet …"; break;
                 case MapStore.Status.Downloading: text = $"Lädt … {Mathf.RoundToInt(m.progress * 100f)} %"; break;
                 case MapStore.Status.Installing: text = "Wird eingerichtet …"; break;
@@ -190,10 +181,8 @@ namespace LeGamez.UI
 
         void Choose(MapStore.Map m)
         {
-            if (m.Playable && m.status != MapStore.Status.UpdateRequired) { Go(m); return; }
-            if (m.latest == null || m.Busy) return;
-            pending = m;
-            MapStore.Download(m);
+            if (m.Busy) return;
+            Go(m);
         }
 
         void Go(MapStore.Map m)
@@ -201,7 +190,7 @@ namespace LeGamez.UI
             var flash = BeamFlash.Create(transform.parent);
             flash.StartCoroutine(flash.Fade(0f, 1f, 0.25f)); // world scene reload follows; the loading screen takes over
             gameObject.SetActive(false);
-            MapStore.Play(m);
+            MapStore.Start(m); // small area file if needed, then the world switches; tiles follow on demand
         }
     }
 }

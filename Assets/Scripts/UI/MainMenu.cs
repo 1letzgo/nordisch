@@ -334,8 +334,7 @@ namespace LeGamez.UI
             // Installed → play (also while an update downloads); otherwise the card starts the download.
             btn.onClick.AddListener(() =>
             {
-                if (map.Playable) MapStore.Play(map);
-                else MapStore.Download(map);
+                MapStore.Start(map); // fetches the small area file if needed, then goes – tiles follow on demand
             });
 
             // Thumbnail, clipped to rounded corners.
@@ -380,13 +379,6 @@ namespace LeGamez.UI
             var pillImg = UiKit.Panel(pill.gameObject, UiKit.Mustard);
             ui.status = UiKit.Label(pill, "", 26, UiKit.Navy, TextAnchor.MiddleCenter, FontStyle.Bold);
             UiKit.Stretch(ui.status.rectTransform, 6f);
-            if (map.status == MapStore.Status.UpdateAvailable || (map.status == MapStore.Status.Failed && map.Playable))
-            {
-                // Playable map with a newer version: the pill itself fetches it, the card still plays.
-                var upd = pill.gameObject.AddComponent<Button>();
-                upd.targetGraphic = pillImg;
-                upd.onClick.AddListener(() => MapStore.Download(map));
-            }
             var track = UiKit.Rect("Progress", mask);
             track.anchorMin = new Vector2(0, 0); track.anchorMax = new Vector2(1, 0);
             track.pivot = new Vector2(0.5f, 0f);
@@ -449,12 +441,12 @@ namespace LeGamez.UI
             string text;
             switch (m.status)
             {
-                case MapStore.Status.Available: text = $"Laden · {size}"; break;
+                case MapStore.Status.Available: text = ""; break; // tap = go; only the small area file is fetched
                 case MapStore.Status.Queued: text = "Wartet …"; break;
                 case MapStore.Status.Downloading: text = $"Lädt … {Mathf.RoundToInt(m.progress * 100f)} %"; break;
                 case MapStore.Status.Installing: text = "Wird eingerichtet …"; break;
-                case MapStore.Status.UpdateAvailable: text = $"Update · {size}"; break;
-                case MapStore.Status.UpdateRequired: text = $"Update nötig · {size}"; break;
+                case MapStore.Status.UpdateAvailable: text = ""; break; // refreshed automatically on start
+                case MapStore.Status.UpdateRequired: text = ""; break;
                 case MapStore.Status.Unavailable: text = "Neue App-Version nötig"; break;
                 case MapStore.Status.Pending: text = "Karte wird aktualisiert"; break;
                 case MapStore.Status.Failed: text = (m.error ?? "Fehler") + " – nochmal"; break;

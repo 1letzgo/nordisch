@@ -8,19 +8,21 @@ using UnityEngine;
 namespace LeGamez.World
 {
     /// <summary>
-    /// Platform- and engine-independent map files (format 5) – the same files serve iOS and Android, and they don't
-    /// depend on the Unity version (AssetBundles did on both).
+    /// Platform- and engine-independent map files – the same files serve iOS and Android, and they don't depend on the
+    /// Unity version (AssetBundles did on both).
     ///
-    /// Area file "NWA1": named entries [string name, int length, bytes]: area.json (deflate) = <see cref="AreaJson"/>,
-    /// map.jpg (small overview of the whole area for the full map, raw JPEG; older files: map.png).
-    /// Region file "NWR2" (1 km, 5 × 5 tiles): int count, table [int x, int z, long offset, int length], int sections,
-    /// table [string name, long offset, int length], then one deflate blob per tile (so a single tile can be read without
-    /// the others) and the section blobs: <see cref="RegionContent.FacadeSection"/> (deflate, FacadeDetails records of the
-    /// region), <see cref="RegionContent.MapSection"/> (raw JPEG, sharp top-down image of the region for the minimap).
-    /// "NWR1" = the same without the section table.
-    /// Tile blob: int parts; per part: byte material, byte flags, byte layer, string group, int vertexCount,
+    /// Format 6 ("world pack"): per area two files.
+    /// - Area file "NWA1": named entries [string name, int length, bytes]: area.json (deflate) = <see cref="AreaJson"/>,
+    ///   map.jpg (small overview for the full map), pack.idx (deflate) = index of the world pack:
+    ///   int count, per entry [string name, long offset, int length, ulong hash (first 8 bytes of SHA-256)].
+    /// - World pack: the entries back to back, fetched one by one with HTTP Range requests and cached per entry
+    ///   (the hash is part of the cache file name, so an update re-downloads only entries whose content changed):
+    ///   "t/&lt;x&gt;_&lt;z&gt;" = tile blob (deflate), "f/&lt;rx&gt;_&lt;rz&gt;" = facade records of a 1 km region (deflate),
+    ///   "m/&lt;rx&gt;_&lt;rz&gt;" = top-down JPEG of the region for the minimap.
+    /// Tile blob (inflated): int parts; per part: byte material, byte flags, byte layer, string group, int vertexCount,
     /// int indexCount, bool uvs; positions (3 floats), normals (3 sbytes), colours (RGBA32), [uvs (4 floats)],
     /// indices (ushort if vertexCount ≤ 65535, else int).
+    /// (Format 5 had one file per region with the same tile blobs; formats 1–4 were AssetBundles.)
     /// </summary>
     public static class MapFormat
     {
@@ -48,7 +50,8 @@ namespace LeGamez.World
         }
 
         /// <param name="mapImage">Overview image of the area (JPEG or PNG), or null.</param>
-        public static byte[] WriteArea(AreaData d, byte[] mapImage)
+        /// <param name="pack">Index of the area's world pack (format 6).</param>
+        public static byte[] WriteArea(AreaData d, byte[] mapImage, Dictionary<string, PackEntry> pack = null)
         {
             var j = new AreaJson
             {
@@ -71,6 +74,7 @@ namespace LeGamez.World
                 w.Write(new[] { (byte)'N', (byte)'W', (byte)'A', (byte)'1' });
                 var entries = new List<(string, byte[])> { ("area.json", Deflate(System.Text.Encoding.UTF8.GetBytes(JsonUtility.ToJson(j)))) };
                 if (mapImage != null) entries.Add((IsJpeg(mapImage) ? "map.jpg" : "map.png", mapImage));
+                if (pack != null) entries.Add(("pack.idx", Deflate(WritePackIndex(pack))));
                 w.Write(entries.Count);
                 foreach (var (name, bytes) in entries) { w.Write(name); w.Write(bytes.Length); w.Write(bytes); }
             }
@@ -103,6 +107,7 @@ namespace LeGamez.World
             d.pois.entries = j.pois;
             d.streets = ScriptableObject.CreateInstance<StreetIndex>();
             d.streets.names = j.streetNames; d.streets.segments = j.streetSegments; d.streets.nameOf = j.streetNameOf;
+            if (entries.TryGetValue("pack.idx", out var idx)) d.pack = ReadPackIndex(Inflate(idx));
             if (entries.TryGetValue("map.jpg", out var img) || entries.TryGetValue("map.png", out img))
             {
                 var tex = new Texture2D(2, 2, IsJpeg(img) ? TextureFormat.RGB24 : TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
@@ -121,7 +126,60 @@ namespace LeGamez.World
             UnityEngine.Object.Destroy(d);
         }
 
-        // ------------------------------------------------------------------ region / tiles
+        // ------------------------------------------------------------------ world pack (format 6)
+
+        public struct PackEntry
+        {
+            public long offset;
+            public int length;
+            public ulong hash;
+        }
+
+        public static string TileEntry(Vector2Int k) => $"t/{k.x}_{k.y}";
+        public static string FacadeEntry(Vector2Int r) => $"f/{r.x}_{r.y}";
+        public static string MapEntry(Vector2Int r) => $"m/{r.x}_{r.y}";
+
+        /// <summary>First 8 bytes of the SHA-256 – identifies an entry's content (cache file name, update check).</summary>
+        public static ulong Hash64(byte[] data)
+        {
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            return BitConverter.ToUInt64(sha.ComputeHash(data), 0);
+        }
+
+        public static byte[] WritePackIndex(Dictionary<string, PackEntry> index)
+        {
+            using var ms = new MemoryStream();
+            using (var w = new BinaryWriter(ms))
+            {
+                w.Write(index.Count);
+                foreach (var kv in index) { w.Write(kv.Key); w.Write(kv.Value.offset); w.Write(kv.Value.length); w.Write(kv.Value.hash); }
+            }
+            return ms.ToArray();
+        }
+
+        public static Dictionary<string, PackEntry> ReadPackIndex(byte[] bytes)
+        {
+            using var r = new BinaryReader(new MemoryStream(bytes));
+            int n = r.ReadInt32();
+            var index = new Dictionary<string, PackEntry>(n);
+            for (int i = 0; i < n; i++)
+                index[r.ReadString()] = new PackEntry { offset = r.ReadInt64(), length = r.ReadInt32(), hash = r.ReadUInt64() };
+            return index;
+        }
+
+        /// <summary>Tile geometry as stored in the pack (deflated tile blob).</summary>
+        public static byte[] TileBlob(WorldTile t) => Deflate(EncodeTile(t));
+
+        /// <summary>Thread-safe: region extras from pack entries (either may be null).</summary>
+        public static RegionContent RegionContentFrom(Vector2Int region, byte[] facadeEntry, byte[] mapEntry) =>
+            new RegionContent
+            {
+                key = region,
+                facade = facadeEntry != null ? RegionContent.ToFloats(Inflate(facadeEntry)) : null,
+                mapImage = mapEntry,
+            };
+
+        // ------------------------------------------------------------------ region files (format 5) / tiles
 
         /// <param name="sections">Extra named blobs of the region (see <see cref="RegionContent"/>), stored as given.</param>
         public static byte[] WriteRegion(List<WorldTile> tiles, List<(string name, byte[] bytes)> sections = null)

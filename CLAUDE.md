@@ -88,16 +88,19 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
 6. **Bauen & aufs iPhone** – siehe unten.
 7. **Veröffentlichen**: `Tools/release/publish_maps.sh [<id> …]` – siehe „Karten-Downloads“.
 
-### Karten-Downloads (App enthält keine Karten)
-- **Format 5** (`World/MapFormat`, eigenes Binärformat – dieselben Dateien für iOS und Android, unabhängig von der
-  Unity-Version): je Gebiet `area.bin` (AreaData als JSON + kleine Übersichtskarte `map.jpg` ≤ 2048 px, Deflate;
-  wenige 100 KB) und **eine Datei pro 1-km-Region** `r<rx>_<rz>.bin` („NWR2“: Inhaltsverzeichnis + je Kachel ein
-  Deflate-Block: Positionen, Normalen als sbyte, Farben, Fassaden-UVs, Indizes; dazu Abschnitte (`World/RegionContent`)
-  `facade.bin` = Fassaden-Records der Region und `map.jpg` = scharfes Draufsichtbild der Region, 1024 px ≈ 1 m/px). Export: `Editor/MapExport` (`-executeMethod LeGamez.Editor.MapExport.ExportBatch
-  [-areas a,b]`, beliebiges Build-Target) → `Builds/Maps/<id>/` + `Builds/Maps/index.json`. Formate 1–4 waren
-  AssetBundles (pro Plattform und Unity-Version) – nicht mehr verwenden.
+### Karten-Downloads (App enthält keine Karten, lädt nie ganze Karten)
+- **Format 6** (`World/MapFormat`, dieselben Dateien für iOS und Android, unabhängig von der Unity-Version): je Gebiet
+  `area.bin` (AreaData-JSON + kleine Übersichtskarte + **Index des World-Packs**, ~0,2–1 MB) und `world.bin` (alle
+  Einträge hintereinander: `t/<x>_<z>` = 200-m-Kachel (Deflate), `f/<rx>_<rz>` = Fassaden-Records der 1-km-Region,
+  `m/<rx>_<rz>` = Minimap-JPEG der Region). Die App holt **einzelne Einträge per HTTP-Range** (`Core/PackTileSource`,
+  GitHub-Release-Assets liefern 206) und cached sie unter ihrem Inhalts-Hash (`maps/<id>/cache/<entry>-<hash>.bin`).
+  Export: `Editor/MapExport` (`-executeMethod LeGamez.Editor.MapExport.ExportBatch [-areas a,b]`) → `Builds/Maps/<id>/`
+  + `Builds/Maps/index.json`. Vorher: Format 5 = eine Datei pro Region, Formate 1–4 = AssetBundles.
+- **Starten**: Startpunkt antippen (`MapStore.Start`) → nur `area.bin` holen/auffrischen, Welt-Szene, Ladebildschirm
+  wartet auf die Kacheln um den Start (~1–3 MB). Weitere Kacheln, sobald der Streamer sie braucht, plus Vorladen bis 1,1 km.
+  Cache = LRU (`MapStore.CacheLimit` 1 GB). Offline: gecachte Kacheln, fehlende werden nach 20 s erneut versucht.
 - `Tools/release/publish_maps.sh [--dry-run] [--drop-old] [<id> …]` exportiert und lädt **nur geänderte Dateien** (SHA-256)
-  hoch. Katalog `https://github.com/1letzgo/nordisch/releases/download/maps/maps.json` (Pre-Release `maps`, nie „latest“ →
+  hoch (bei Format 6: `area.bin` + `world.bin` je Gebiet). Katalog `https://github.com/1letzgo/nordisch/releases/download/maps/maps.json` (Pre-Release `maps`, nie „latest“ →
   stört den APK-Updater nicht): je Karte Name/Lage/Fahrzeuge/Thumbnail-URL und `builds[]` = {platform ("any"), format,
   unity (leer), version (yyyyMMddHHmm), url, size, sha256, files[] = {name, region, url, size, sha256}, start[] =
   Regionen ≤ 1,2 km um den Spawn}. Dateien liegen inhaltsadressiert (`<id>-f5-<name>-<sha12>.bin`) in der Pre-Release

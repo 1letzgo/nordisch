@@ -11,22 +11,22 @@ using UnityEngine.SceneManagement;
 namespace LeGamez.Core
 {
     /// <summary>
-    /// Downloadable maps. The app ships without any area. Each area = area.bin (World/AreaData: spawn, POIs, streets,
-    /// traffic, facade data, minimap) + one file per 1 km region with its world tiles (r&lt;rx&gt;_&lt;rz&gt;.bin) in the
-    /// platform- and engine-independent World/MapFormat (format 5: the same files for iOS and Android), published by
-    /// Tools/release/publish_maps.sh to GitHub releases and listed in maps.json (release "maps").
+    /// Downloadable maps. The app ships without any area, and no area is ever downloaded as a whole: an area is area.bin
+    /// (World/AreaData: spawn, POIs, streets, traffic, overview map + the index of its world pack, a few hundred KB) and
+    /// world.bin on GitHub (format 6, World/MapFormat – same files for iOS and Android), from which
+    /// <see cref="PackTileSource"/> fetches single entries (200 m tiles, facade records and minimap image per region) with
+    /// HTTP Range requests exactly when the streamer needs them (+ a little ahead). Published by Tools/release/publish_maps.sh,
+    /// listed in maps.json (release "maps").
     ///
-    /// Only what is needed lives on the device:
-    /// - "Laden" fetches area.bin + the regions around the start (build.start); everything else is fetched on demand
-    ///   while playing (<see cref="RegionTileSource"/>: tiles the streamer needs + prefetch ~1.5 km ahead).
-    /// - Region files are an LRU cache with <see cref="CacheLimit"/>; least recently used ones are dropped at the next start.
+    /// - Starting a place fetches only area.bin; the loading screen then waits for the tiles around the start.
+    /// - Fetched entries are a cache (maps/&lt;id&gt;/cache/&lt;entry&gt;-&lt;hash&gt;.bin, LRU, <see cref="CacheLimit"/>, trimmed at the next start).
     ///
     /// Update logic:
     /// - The catalog is fetched once per app run (menu); the last copy is kept for offline starts.
     /// - A build fits this app if its <see cref="Format"/> matches (formats ≤ 4 were AssetBundles and also needed the same
     ///   platform and Unity version). The catalog holds builds of several formats side by side, so older apps keep theirs.
-    /// - Newer fitting build: only files whose SHA-256 changed are fetched (area data + regions already on the device);
-    ///   regions not on the device simply come from the new build when needed. On Wi-Fi updates run automatically.
+    /// - Newer build: only area.bin is fetched (small, automatically); entries are cached under their content hash, so tiles
+    ///   that did not change stay valid and changed ones are fetched again when needed.
     /// - Download → size + SHA-256 check → into the map folder.
     /// In the editor the local AreaData assets from Assets/Generated are listed instead (nothing to download).
     /// </summary>
@@ -35,14 +35,17 @@ namespace LeGamez.Core
         /// <summary>Bump when maps need something only a newer app has (new/changed serialized fields of AreaData, WorldTile,
         /// PoiDatabase, StreetIndex …) or the package layout changes. Then re-publish all maps.
         /// 1 = scene bundle; 2 = scene + tiles bundle; 3 = AreaData + tiles bundle; 4 = AreaData + one bundle per 1 km region
-        /// (all AssetBundles, per platform/engine); 5 = own MapFormat files, one set for all platforms.</summary>
-        public const int Format = 5;
+        /// (all AssetBundles, per platform/engine); 5 = own MapFormat files, one per region; 6 = area.bin + one world pack
+        /// per area, entries fetched with HTTP Range requests.</summary>
+        public const int Format = 6;
 
         public const string CatalogUrl = "https://github.com/1letzgo/nordisch/releases/download/maps/maps.json";
-        /// <summary>Max. size of downloaded regions on the device (area data files don't count).</summary>
+        /// <summary>Max. size of cached world pack entries on the device (area files don't count).</summary>
         public const long CacheLimit = 1024L * 1024 * 1024;
         const bool AutoUpdateOnWifi = true;
         const string AreaFile = "area.bin";
+        /// <summary>The world pack – never downloaded as a whole, only entries out of it.</summary>
+        public const string PackFile = "world.bin";
 
         public static string Platform =>
             Application.platform == RuntimePlatform.Android ? "android" :
@@ -83,17 +86,8 @@ namespace LeGamez.Core
                 return null;
             }
 
-            /// <summary>Download size for a first install: area data + start regions.</summary>
-            public long StartSize
-            {
-                get
-                {
-                    long n = 0;
-                    foreach (var f in AllFiles)
-                        if (string.IsNullOrEmpty(f.region) || Array.IndexOf(start ?? new string[0], f.region) >= 0) n += f.size;
-                    return n;
-                }
-            }
+            /// <summary>Download size for a first start: the area file (tiles follow on demand).</summary>
+            public long StartSize => File(AreaFile)?.size ?? 0;
         }
 
         [Serializable]
@@ -155,7 +149,7 @@ namespace LeGamez.Core
             public bool Playable => installed != null && Fits(installed);
             public bool Busy => status == Status.Queued || status == Status.Downloading || status == Status.Installing;
             public bool HasVehicle(string v) => Array.IndexOf(entry.vehicles ?? new string[0], v) >= 0;
-            /// <summary>What the next download costs: first install = area data + start regions, update = changed files.</summary>
+            /// <summary>What the next download costs (the area file; tiles follow on demand).</summary>
             public long DownloadSize
             {
                 get
@@ -184,12 +178,11 @@ namespace LeGamez.Core
         static string ThumbDir => Path.Combine(Root, "thumbs");
         static string CatalogCache => Path.Combine(Root, "catalog.json");
         static string UsagePath => Path.Combine(Root, "usage.json");
-        public static string RegionName(string region) => $"r{region}.bin";
 
         static bool initialized;
         static Runner runner;
         static World.AreaData loaded;
-        static RegionTileSource loadedSource;
+        static PackTileSource loadedSource;
         static readonly Queue<Map> queue = new Queue<Map>();
         static bool working;
         static bool starting; // a map is being loaded – ignore further taps
@@ -228,6 +221,25 @@ namespace LeGamez.Core
             if (!CatalogFetched && !Fetching) Run(FetchCatalog());
 #endif
         }
+
+        /// <summary>Start a place: fetch/refresh its small area file if needed (online), then play. Offline with an
+        /// installed area: play right away (cached tiles only).</summary>
+        public static void Start(Map m)
+        {
+            if (m == null || starting) return;
+            bool needsArea = !m.Playable || m.status == Status.UpdateAvailable || m.status == Status.UpdateRequired;
+            bool online = Application.internetReachability != NetworkReachability.NotReachable;
+            if (needsArea && m.latest != null && (online || !m.Playable))
+            {
+                pendingPlay = m;
+                Download(m);
+                if (!m.Busy && m.Playable) { pendingPlay = null; Play(m); } // nothing to fetch after all
+                return;
+            }
+            Play(m);
+        }
+
+        static Map pendingPlay;
 
         public static void Download(Map m)
         {
@@ -274,46 +286,31 @@ namespace LeGamez.Core
             SaveUsage();
         }
 
-        static void Release(ref World.AreaData area, ref RegionTileSource source)
+        static void Release(ref World.AreaData area, ref PackTileSource source)
         {
             source = null; // its tiles went with the world scene's streamer
             World.MapFormat.Destroy(area);
             area = null;
         }
 
-        // ------------------------------------------------------------------ regions on demand (RegionTileSource)
+        // ------------------------------------------------------------------ world pack entries (PackTileSource)
 
-        static readonly Dictionary<string, IEnumerator> regionJobs = new Dictionary<string, IEnumerator>();
-        static readonly Dictionary<string, float> regionFailedAt = new Dictionary<string, float>();
+        static string CacheDir(string id) => Path.Combine(MapDir(id), "cache");
 
-        public static string RegionPath(string id, string region) => FilePath(id, RegionName(region));
-        public static bool HasRegion(string id, string region) => File.Exists(RegionPath(id, region));
+        /// <summary>Cache file of a pack entry; the content hash is part of the name, so updated entries get a new file.</summary>
+        public static string EntryPath(string id, string entry, ulong hash) =>
+            Path.Combine(CacheDir(id), $"{entry.Replace('/', '_')}-{hash:x16}.bin");
 
-        /// <summary>True if fetching the region failed in the last 20 s (offline, missing on the server).</summary>
-        public static bool RegionFailed(string id, string region) =>
-            regionFailedAt.TryGetValue($"{id}/{region}", out var t) && Time.realtimeSinceStartup - t < 20f;
+        /// <summary>URL of the area's world pack in the installed build (null for builds before format 6).</summary>
+        public static string PackUrl(Map m) => m?.installed?.File(PackFile)?.url;
 
-        /// <summary>Downloads one region of the current build (waits for a download already running).</summary>
-        public static IEnumerator FetchRegion(Map m, string region)
+        internal static void TouchEntry(string id, string path) => usage[$"{id}/{Path.GetFileName(path)}"] = DateTime.UtcNow.Ticks;
+
+        internal static void PrepareCache(string id)
         {
-            string key = $"{m.Id}/{region}";
-            if (HasRegion(m.Id, region) || RegionFailed(m.Id, region)) yield break;
-            while (regionJobs.ContainsKey(key)) yield return null; // someone else is fetching it
-            if (HasRegion(m.Id, region)) yield break;
-            var f = m.installed?.File(RegionName(region));
-            if (f == null) { regionFailedAt[key] = Time.realtimeSinceStartup; yield break; } // not part of the map
-            regionJobs[key] = null;
-            string error = null;
-            yield return DownloadFile(m, f, null, e => error = e);
-            regionJobs.Remove(key);
-            if (error != null)
-            {
-                regionFailedAt[key] = Time.realtimeSinceStartup;
-                Debug.LogWarning($"[Maps] region {key}: {error}");
-            }
+            Directory.CreateDirectory(CacheDir(id));
+            ExcludeFromBackup(CacheDir(id));
         }
-
-        internal static void TouchRegion(string id, string region) => usage[$"{id}/{region}"] = DateTime.UtcNow.Ticks;
 
         // ------------------------------------------------------------------ internals
 
@@ -367,6 +364,7 @@ namespace LeGamez.Core
             if (m.latest == null) return list;
             foreach (var f in m.latest.AllFiles)
             {
+                if (f.name == PackFile) continue; // never on the device as a whole
                 bool area = string.IsNullOrEmpty(f.region);
                 FileEntry have = null;
                 if (m.info != null) foreach (var h in m.info.files) if (h.name == f.name) { have = h; break; }
@@ -388,7 +386,7 @@ namespace LeGamez.Core
                 if (ChangedFiles(m).Count > 0) m.status = Status.UpdateAvailable;
                 else
                 {
-                    // Nothing on the device changed: adopt the new build, regions not yet fetched come from it.
+                    // Nothing on the device changed: adopt the new build (its world pack URL).
                     m.installed = m.latest;
                     SaveInfo(m);
                     m.status = Status.Installed;
@@ -525,11 +523,16 @@ namespace LeGamez.Core
             {
                 var m = queue.Dequeue();
                 yield return Install(m);
+                if (pendingPlay == m)
+                {
+                    pendingPlay = null;
+                    if (m.Playable) Play(m);
+                }
             }
             working = false;
         }
 
-        /// <summary>First install (area data + start regions) or update (files on the device whose content changed).</summary>
+        /// <summary>First start (area file) or update (files on the device whose content changed – the area file).</summary>
         static IEnumerator Install(Map m)
         {
             var b = m.latest;
@@ -538,7 +541,7 @@ namespace LeGamez.Core
             if (update) files.AddRange(ChangedFiles(m));
             else
                 foreach (var f in b.AllFiles)
-                    if (string.IsNullOrEmpty(f.region) || Array.IndexOf(b.start ?? new string[0], f.region) >= 0) files.Add(f);
+                    if (f.name != PackFile && string.IsNullOrEmpty(f.region)) files.Add(f);
             long total = 0, done = 0;
             foreach (var f in files) total += Math.Max(1, f.size);
 
@@ -615,8 +618,7 @@ namespace LeGamez.Core
                 m.info ??= new Installed();
                 m.info.files.RemoveAll(x => x.name == f.name);
                 m.info.files.Add(f);
-                if (!string.IsNullOrEmpty(f.region)) TouchRegion(m.Id, f.region);
-                if (m.installed != null) SaveInfo(m); // regions on demand: record right away
+                if (m.installed != null) SaveInfo(m);
             }
             catch (Exception e) { TryDelete(part); fail(e.Message); }
         }
@@ -641,7 +643,7 @@ namespace LeGamez.Core
             }
             Current = m;
             loaded = data;
-            loadedSource = new RegionTileSource(m);
+            loadedSource = new PackTileSource(m, data);
             World.WorldStreamer.Source = loadedSource;
             World.AreaLoader.Pending = data;
             yield return SceneManager.LoadSceneAsync(World.AreaLoader.WorldSceneIndex);
@@ -650,7 +652,7 @@ namespace LeGamez.Core
             starting = false;
         }
 
-        // ------------------------------------------------------------------ cache (LRU over region files)
+        // ------------------------------------------------------------------ cache (LRU over pack entries)
 
         static void LoadUsage()
         {
@@ -672,34 +674,29 @@ namespace LeGamez.Core
             try { File.WriteAllText(UsagePath, JsonUtility.ToJson(u)); } catch (Exception) { }
         }
 
-        /// <summary>Drops least recently used region files until all regions together fit <see cref="CacheLimit"/>.</summary>
+        /// <summary>Drops least recently used cached pack entries until all together fit <see cref="CacheLimit"/>.</summary>
         static void TrimCache()
         {
-            var regions = new List<(string id, string region, long size, long used)>();
+            var files = new List<(string path, long size, long used)>();
             long total = 0;
             foreach (var m in Maps)
             {
-                if (m.info == null) continue;
-                foreach (var f in m.info.files)
+                var dir = new DirectoryInfo(CacheDir(m.Id));
+                if (!dir.Exists) continue;
+                foreach (var fi in dir.GetFiles())
                 {
-                    if (string.IsNullOrEmpty(f.region)) continue;
-                    var fi = new FileInfo(FilePath(m.Id, f.name));
-                    if (!fi.Exists) continue;
-                    usage.TryGetValue($"{m.Id}/{f.region}", out long used);
-                    regions.Add((m.Id, f.region, fi.Length, used));
+                    if (!usage.TryGetValue($"{m.Id}/{fi.Name}", out long used)) used = fi.LastWriteTimeUtc.Ticks;
+                    files.Add((fi.FullName, fi.Length, used));
                     total += fi.Length;
                 }
             }
             if (total <= CacheLimit) return;
-            regions.Sort((a, b) => a.used.CompareTo(b.used));
-            foreach (var r in regions)
+            files.Sort((a, b) => a.used.CompareTo(b.used));
+            foreach (var f in files)
             {
                 if (total <= CacheLimit * 0.9) break;
-                TryDelete(FilePath(r.id, RegionName(r.region)));
-                total -= r.size;
-                usage.Remove($"{r.id}/{r.region}");
-                var m = Maps.Find(x => x.Id == r.id);
-                if (m?.info != null) { m.info.files.RemoveAll(f => f.region == r.region); SaveInfo(m); }
+                TryDelete(f.path);
+                total -= f.size;
             }
             SaveUsage();
             Debug.Log($"[Maps] cache trimmed to {total / (1024 * 1024)} MB");
