@@ -55,6 +55,8 @@ namespace LeGamez.Player
             public float brakeDecel = 9f;      // m/s² at full brake
             public float coastDecel = 1.5f;    // m/s² rolling without pedals
             public float reverseSpeed = 0f;    // 0 = no reverse gear
+            /// <summary>Hard cap (m/s), e.g. while the world ahead is still loading: braked down to it.</summary>
+            public float speedLimit = float.MaxValue;
         }
 
         public VehicleSteering Steering { get; set; }
@@ -190,6 +192,8 @@ namespace LeGamez.Player
                 if (onGas) driveSpeed = Mathf.MoveTowards(driveSpeed, 0f, s.brakeDecel * gas * dt);
             }
             if (!onGas && !onBrake) driveSpeed = Mathf.MoveTowards(driveSpeed, 0f, s.coastDecel * dt);
+            if (Mathf.Abs(driveSpeed) > s.speedLimit)
+                driveSpeed = Mathf.MoveTowards(driveSpeed, Mathf.Sign(driveSpeed) * s.speedLimit, s.brakeDecel * dt);
 
             // Steering: build up while held, return to centre faster when released.
             float steerIn = InputEnabled ? GameInput.Steer : 0f;

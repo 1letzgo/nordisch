@@ -50,6 +50,7 @@ namespace LeGamez.World
             public List<string> streetNames = new List<string>();
             public List<Vector4> streetSegments = new List<Vector4>();
             public List<int> streetNameOf = new List<int>();
+            public List<int> streetFast = new List<int>();
         }
 
         /// <param name="mapImage">Overview image of the area (JPEG or PNG), or null.</param>
@@ -70,6 +71,7 @@ namespace LeGamez.World
                 j.streetNames = d.streets.names;
                 j.streetSegments = d.streets.segments;
                 j.streetNameOf = d.streets.nameOf;
+                j.streetFast = d.streets.fast;
             }
             using var ms = new MemoryStream();
             using (var w = new BinaryWriter(ms))
@@ -110,6 +112,7 @@ namespace LeGamez.World
             d.pois.entries = j.pois;
             d.streets = ScriptableObject.CreateInstance<StreetIndex>();
             d.streets.names = j.streetNames; d.streets.segments = j.streetSegments; d.streets.nameOf = j.streetNameOf;
+            d.streets.fast = j.streetFast ?? new List<int>();
             if (entries.TryGetValue("pack.idx", out var idx)) d.pack = ReadPackIndex(Inflate(idx));
             if (entries.TryGetValue("map.jpg", out var img) || entries.TryGetValue("map.png", out img))
             {

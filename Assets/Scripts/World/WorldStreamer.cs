@@ -35,8 +35,8 @@ namespace LeGamez.World
             IEnumerator Load(string areaId, Vector2Int key, System.Action<WorldTile> done);
             /// <summary>The tile's objects are gone – free its assets.</summary>
             void Release(Vector2Int key, WorldTile tile);
-            /// <summary>Called with the focus a few times per second: fetch what will be needed soon.</summary>
-            void Prefetch(Vector3 focus);
+            /// <summary>Called with the focus (and its velocity, m/s) a few times per second: fetch what will be needed soon.</summary>
+            void Prefetch(Vector3 focus, Vector3 velocity);
             /// <summary>Facade records + minimap image of a region whose tiles are in use; done(null) if unavailable.</summary>
             IEnumerator LoadContent(string areaId, Vector2Int region, System.Action<RegionContent> done);
         }
@@ -78,6 +78,14 @@ namespace LeGamez.World
 
         public int LoadedCount { get { int n = 0; foreach (var s in slots.Values) if (s.root != null) n++; return n; } }
 
+        /// <summary>The tile at this point is in the scene (or there is none to wait for) – vehicles slow down before
+        /// driving onto ground that is still loading.</summary>
+        public bool Ready(Vector3 p)
+        {
+            var k = KeyOf(p.x, p.z);
+            return exists == null || !exists.Contains(k) || slots.TryGetValue(k, out var s) && s.root != null;
+        }
+
         void Awake()
         {
             Instance = this;
@@ -106,9 +114,26 @@ namespace LeGamez.World
         void Update()
         {
             if (Time.unscaledTime < nextSchedule) return;
+            var p = Focus;
+            // Travel direction (driving on the motorway: ~36 m/s) – tiles ahead are loaded first.
+            float dt = Time.unscaledTime - lastFocusTime;
+            if (lastFocusTime > 0f && dt > 0.01f && dt < 2f)
+                velocity = Vector3.Lerp(velocity, Vector3.Scale(p - lastFocus, new Vector3(1f, 0f, 1f)) / dt, 0.5f);
+            else velocity = Vector3.zero;
+            if (velocity.sqrMagnitude > 80f * 80f) velocity = Vector3.zero; // a beam, not a drive
+            lastFocus = p; lastFocusTime = Time.unscaledTime;
             nextSchedule = Time.unscaledTime + 0.2f;
-            Schedule(Focus);
+            Schedule(p);
         }
+
+        Vector3 lastFocus, velocity;
+        float lastFocusTime;
+
+        /// <summary>Smoothed movement of the focus (m/s, horizontal) – for look-ahead loading.</summary>
+        public Vector3 FocusVelocity => velocity;
+
+        /// <summary>Where the focus will be in a few seconds (at most 250 m ahead).</summary>
+        Vector3 Ahead(Vector3 p) => p + Vector3.ClampMagnitude(velocity * 4f, 250f);
 
         static float Distance(Vector2Int k, Vector3 p)
         {
@@ -127,7 +152,7 @@ namespace LeGamez.World
             foreach (var kv in slots)
                 if (!kv.Value.loading && Distance(kv.Key, p) > unloadRadius) scratch.Add(kv.Key);
             foreach (var k in scratch) { Release(k, slots[k]); slots.Remove(k); }
-            source?.Prefetch(p);
+            source?.Prefetch(p, velocity);
 
             // Wanted tiles, nearest first.
             scratch.Clear();
@@ -139,7 +164,9 @@ namespace LeGamez.World
                 var k = new Vector2Int(x, z);
                 if (exists.Contains(k) && !slots.ContainsKey(k) && Distance(k, p) <= loadRadius && !Waiting(k)) scratch.Add(k);
             }
-            scratch.Sort((a, b) => Distance(a, p).CompareTo(Distance(b, p)));
+            // Nearest first – measured from a point a few seconds ahead when moving fast (a beam has velocity 0).
+            var ahead = velocity.sqrMagnitude > 25f ? Ahead(p) : p;
+            scratch.Sort((a, b) => Distance(a, ahead).CompareTo(Distance(b, ahead)));
             foreach (var k in scratch)
             {
                 if (inFlight >= MaxInFlight) break;

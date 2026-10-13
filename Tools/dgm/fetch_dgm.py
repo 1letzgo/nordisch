@@ -5,6 +5,8 @@ height grid in the local game frame.
 Usage:
     python3 Tools/dgm/fetch_dgm.py            # all areas
     python3 Tools/dgm/fetch_dgm.py langeoog   # single area
+    python3 Tools/dgm/fetch_dgm.py westerstede --reuse  # grown area: keep the samples of the existing file,
+                                                        # download only tiles for the new part
 
 Output Data/<id>.dgm.bin (little endian):
     char[4] "DGM2"
@@ -95,7 +97,31 @@ def load_tile(href):
     return arr, e0, n0, sx, sy
 
 
-def process_area(area):
+def read_previous(path, gx0, gz0, step, nx, nz):
+    """Heights (NHN) of an existing output on the same grid, NaN where it has none; None if unusable."""
+    if not path.exists():
+        return None
+    raw = path.read_bytes()
+    if raw[:2] == b"\x1f\x8b":
+        raw = gzip.decompress(raw)
+    magic = raw[:4]
+    onx, onz, ox0, oz0, ostep, obase = struct.unpack("<iiffff", raw[4:28])
+    if ostep != step or (ox0 - gx0) % step or (oz0 - gz0) % step:
+        print(f"  ! {path.name}: different grid, not reused", flush=True)
+        return None
+    old = (np.frombuffer(raw[28:], "<u2").astype(np.float32) / 100 if magic == b"DGMQ"
+           else np.frombuffer(raw[28:], "<f4").astype(np.float32)).reshape(onz, onx) + obase
+    grid = np.full((nz, nx), np.nan, dtype=np.float32)
+    c0, r0 = int(round((ox0 - gx0) / step)), int(round((oz0 - gz0) / step))
+    sc, sr = max(0, -c0), max(0, -r0)
+    w, h = min(onx - sc, nx - max(c0, 0)), min(onz - sr, nz - max(r0, 0))
+    if w > 0 and h > 0:
+        grid[max(r0, 0):max(r0, 0) + h, max(c0, 0):max(c0, 0) + w] = old[sr:sr + h, sc:sc + w]
+    print(f"  reusing {np.isfinite(grid).sum()} of {nx * nz} samples from {path.name}", flush=True)
+    return grid.ravel()
+
+
+def process_area(area, reuse=False):
     lat0, lon0 = area["lat"], area["lon"]
     frame = LocalFrame(lat0, lon0)
     step = float(area.get("dgm_step", STEP))
@@ -116,10 +142,17 @@ def process_area(area):
     order = np.argsort(keys, kind="stable")
     uniq, starts = np.unique(keys[order], return_index=True)
     grid = np.full(nx * nz, np.nan, dtype=np.float32)
+    if reuse:
+        prev = read_previous(OUT_DIR / f"{area['id']}.dgm.bin", gx0, gz0, step, nx, nz)
+        if prev is not None:
+            grid = prev
     missing = 0
     for ui, k in enumerate(uniq):
         idx = order[starts[ui]:(starts[ui + 1] if ui + 1 < len(starts) else len(order))]
         key = (int(k >> 20), int(k & ((1 << 20) - 1)))
+        idx = idx[np.isnan(grid[idx])]  # --reuse: samples the previous file already has
+        if len(idx) == 0:
+            continue
         tile = tiles.get(key)
         if tile is None:
             missing += len(idx)
@@ -163,10 +196,10 @@ def process_area(area):
 
 def main(argv):
     areas = json.loads(AREAS_FILE.read_text())["areas"]
-    wanted = set(argv[1:])
+    wanted = {x for x in argv[1:] if not x.startswith("--")}
     for a in areas:
         if not wanted or a["id"] in wanted:
-            process_area(a)
+            process_area(a, "--reuse" in argv)
 
 
 if __name__ == "__main__":

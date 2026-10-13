@@ -154,7 +154,7 @@ def process_area(area):
     x0, x1, z0, z1 = local_bounds(area)
     s, w, n, e = latlon_bbox(area, MARGIN_M)
     tiles = find_tiles([w, s, e, n])
-    mask = AreaMask.load(area["id"])  # large areas: only tiles/buildings inside the mask (make_mask.py)
+    mask = AreaMask.load(area["id"], detail=True)  # large areas: only tiles/buildings inside the mask (make_mask.py; houses only where the mask is detailed)
     if mask is not None:
         tiles = {k: v for k, v in tiles.items() if mask.utm_tile_inside(k, frame, utm_to_latlon)}
     print(f"[{area['id']}] {len(tiles)} tiles{' (masked)' if mask is not None else ''}", flush=True)

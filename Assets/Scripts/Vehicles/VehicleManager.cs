@@ -72,6 +72,7 @@ namespace LeGamez.Vehicles
             if (player == null || hud == null) return;
             if (riding != null)
             {
+                UpdateLimits();
                 riding.SteerAngle = player.SteerAngle;
                 riding.Animate(player.SignedSpeed);
                 hud.SetGear(player.Reversing);
@@ -89,6 +90,27 @@ namespace LeGamez.Vehicles
             }
             hud.SetInteract(nearest != null ? nearest.MountIcon : (UiKit.IconKind?)null);
             if (nearest != null && GameInput.ConsumeInteract()) Mount(nearest);
+        }
+
+        float nextLimitCheck;
+
+        /// <summary>
+        /// Top speed by road (cars: 130 km/h on motorways and their ramps, see <see cref="Car.MotorwaySpeed"/>) and a
+        /// brake when the tile ahead is not in the scene yet – driving fast must never reach ground that isn't there.
+        /// </summary>
+        void UpdateLimits()
+        {
+            var s = player.Steering;
+            if (s == null || Time.time < nextLimitCheck) return;
+            nextLimitCheck = Time.time + 0.2f;
+            var p = player.transform.position;
+            var area = AreaInfo.Current;
+            if (riding is Car car)
+                s.maxSpeed = area != null && area.streets != null && area.streets.OnFastRoad(p, 9f) ? Car.MotorwaySpeed : car.TopSpeed;
+            var streamer = WorldStreamer.Instance;
+            float v = Mathf.Abs(player.SignedSpeed);
+            var ahead = p + player.transform.forward * Mathf.Max(20f, v * 3f) * Mathf.Sign(player.SignedSpeed == 0f ? 1f : player.SignedSpeed);
+            s.speedLimit = streamer == null || (streamer.Ready(p) && streamer.Ready(ahead)) ? float.MaxValue : 5f;
         }
 
         void Mount(Vehicle v, bool silent = false)

@@ -332,14 +332,20 @@ namespace LeGamez.Editor.OsmImport
                 idx = ScriptableObject.CreateInstance<StreetIndex>();
                 AssetDatabase.CreateAsset(idx, path);
             }
-            idx.names.Clear(); idx.segments.Clear(); idx.nameOf.Clear();
+            idx.names.Clear(); idx.segments.Clear(); idx.nameOf.Clear(); idx.fast.Clear();
             var ids = new Dictionary<string, int>();
             foreach (var w in data.ways)
             {
-                if (w.tags.Get("highway") == null || w.tags.Is("area", "yes")) continue;
+                string hw = w.tags.Get("highway");
+                if (hw == null || w.tags.Is("area", "yes")) continue;
                 string name = w.tags.Get("name");
+                // Motorways are known by their number ("A 28"), their ramps rarely have a name at all.
+                bool motorway = hw == "motorway" || hw == "motorway_link";
+                if (string.IsNullOrEmpty(name) && motorway)
+                    name = hw == "motorway" ? w.tags.Get("ref")?.Split(';')[0].Trim() : "Anschlussstelle";
                 if (string.IsNullOrEmpty(name)) continue;
                 if (!ids.TryGetValue(name, out int n)) { n = idx.names.Count; ids[name] = n; idx.names.Add(name); }
+                if (motorway && !idx.fast.Contains(n)) idx.fast.Add(n);
                 for (int i = 0; i < w.points.Count - 1; i++)
                 {
                     idx.segments.Add(new Vector4(w.points[i].x, w.points[i].y, w.points[i + 1].x, w.points[i + 1].y));

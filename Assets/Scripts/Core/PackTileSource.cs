@@ -20,7 +20,9 @@ namespace LeGamez.Core
     {
         /// <summary>Tiles this close (edge distance) are fetched ahead of time – beyond the 760 m load radius.</summary>
         public const float PrefetchRadius = 1100f;
-        const int MaxRequests = 4;
+        /// <summary>Moving fast (car on the motorway, ~36 m/s): tiles around the point this many seconds ahead come first.</summary>
+        const float LookAheadSeconds = 15f;
+        const int MaxRequests = 6;
 
         readonly MapStore.Map map;
         readonly Dictionary<string, MapFormat.PackEntry> pack;
@@ -157,14 +159,18 @@ namespace LeGamez.Core
             done(job.IsFaulted ? null : job.Result);
         }
 
-        public void Prefetch(Vector3 focus)
+        public void Prefetch(Vector3 focus, Vector3 velocity)
         {
-            if (Time.unscaledTime < nextPrefetch || requests >= MaxRequests - 1) return; // streamer requests go first
-            nextPrefetch = Time.unscaledTime + 0.5f;
+            // Streamer requests go first (two slots stay free for them).
+            bool fast = velocity.sqrMagnitude > 10f * 10f;
+            if (Time.unscaledTime < nextPrefetch || requests >= MaxRequests - 2) return;
+            nextPrefetch = Time.unscaledTime + (fast ? 0.1f : 0.5f);
+            // At speed the disc moves with the car: around the point a few seconds ahead, nearest to it first.
+            var ahead = fast ? focus + Vector3.ClampMagnitude(velocity * LookAheadSeconds, 700f) : focus;
             Vector2Int? best = null;
             float bestD = float.MaxValue;
             int r = Mathf.CeilToInt(PrefetchRadius / WorldStreamer.TileSize) + 1;
-            var c = WorldStreamer.KeyOf(focus.x, focus.z);
+            var c = WorldStreamer.KeyOf(ahead.x, ahead.z);
             for (int x = c.x - r; x <= c.x + r; x++)
             for (int z = c.y - r; z <= c.y + r; z++)
             {
@@ -172,7 +178,7 @@ namespace LeGamez.Core
                 if (!tiles.Contains(k)) continue;
                 string entry = MapFormat.TileEntry(k);
                 if (fetching.Contains(entry) || Failed(entry) || Cached(entry)) continue;
-                float d = Distance(k, focus);
+                float d = Distance(k, ahead);
                 if (d < PrefetchRadius && d < bestD) { bestD = d; best = k; }
             }
             if (best != null) MapStore.Run(Fetch(MapFormat.TileEntry(best.Value), _ => { }));

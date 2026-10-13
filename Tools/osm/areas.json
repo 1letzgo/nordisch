@@ -17,7 +17,7 @@
       "name": "Westerstede",
       "lat": 53.257,
       "lon": 7.9275,
-      "size_m": 20650,
+      "size_m": 29250,
       "vehicles": [
         "bicycle",
         "car"
@@ -25,8 +25,8 @@
       "ground": "grass",
       "extent": {
         "west": 8850,
-        "east": 8850,
-        "south": 10150,
+        "east": 20400,
+        "south": 14200,
         "north": 10500
       },
       "dgm_step": 5,
@@ -38,7 +38,9 @@
         "settlement_buffer": 50,
         "road_buffer": 35,
         "include": [[-2350, 800, -900, 800]],
-        "roads": ["motorway", "trunk", "primary", "secondary", "tertiary", "unclassified"]
+        "roads": ["motorway", "trunk", "primary", "secondary", "tertiary", "unclassified"],
+        "motorway": {"refs": ["A 28"], "clip": [-500, 18100, -12700, 1500], "corridor": 45, "landscape": 220, "strip": 25},
+        "extra": [[17250, 18000, -12650, -11000], [17250, 18650, -12950, -12150], [18550, 19750, -13550, -12350]]
       },
       "car_spots": [
         {
