@@ -10,7 +10,7 @@ namespace LeGamez.Editor.OsmImport
     public static class PropPlacer
     {
         /// <summary>Spatial lookup of everything vegetation must keep clear of.</summary>
-        class Clearance
+        internal class Clearance
         {
             const float Cell = 20f;
             readonly Dictionary<Vector2Int, List<(Vector2 a, Vector2 b, float r)>> segments = new Dictionary<Vector2Int, List<(Vector2, Vector2, float)>>();
@@ -94,7 +94,7 @@ namespace LeGamez.Editor.OsmImport
             const float Cell = 25f;
             readonly Dictionary<Vector2Int, List<(List<Vector2> ring, bool hole)>> grid = new Dictionary<Vector2Int, List<(List<Vector2>, bool)>>();
 
-            public static Footprints FromOsm(OsmData data)
+            public static Footprints Build(OsmData data, bool withLod2)
             {
                 var f = new Footprints();
                 foreach (var poly in data.polygons)
@@ -103,6 +103,7 @@ namespace LeGamez.Editor.OsmImport
                         f.Add(PolygonTriangulator.Clean(poly.outer), false);
                         foreach (var hole in poly.holes) f.Add(PolygonTriangulator.Clean(hole), true); // courtyards
                     }
+                if (withLod2) foreach (var outline in Lod2Builder.Outlines) f.Add(outline, false);
                 return f;
             }
 
@@ -164,7 +165,7 @@ namespace LeGamez.Editor.OsmImport
             var clear = BuildClearance(data);
             int count = 0;
             bool useLidar = lidar != null && lidar.Count > 0;
-            var houses = useLidar ? Footprints.FromOsm(data) : null;
+            var houses = useLidar ? Footprints.Build(data, Lod2Builder.Outlines.Count > 0) : null;
 
             if (useLidar)
             {
@@ -177,8 +178,8 @@ namespace LeGamez.Editor.OsmImport
                     // Crowns often hang over a street – move the trunk to the kerb instead of the carriageway.
                     if (clear.IsBlocked(p, 0f) && !clear.PushOut(ref p, 0.2f)) continue;
                     float h = Mathf.Clamp(t.z, 3f, 32f), r = Mathf.Clamp(t.w, 1f, 9f);
-                    // House beats tree: the laser scan can predate new-build estates (OSM-only houses), so no trunk
-                    // near a footprint and no crown reaching into a wall – the crown shrinks, the tree with it.
+                    // House beats tree (OSM and LoD2 footprints): the laser scan can predate new-build estates, so no
+                    // trunk near a footprint and no crown reaching into a wall – the crown shrinks, the tree with it.
                     float wall = houses.Distance(p, r);
                     if (wall < MinTrunkToHouse) { dropped++; continue; }
                     if (wall < r)
@@ -290,63 +291,190 @@ namespace LeGamez.Editor.OsmImport
             return clear;
         }
 
+        // Every plant builder draws exactly as many numbers from the shared generator as the original simple
+        // version did (object ids and all later positions depend on that sequence); detail comes from Fork().
+
         static void Tree(MeshSink sink, Vector2 p, System.Random rng, float sizeFactor)
         {
-            var crowns = sink.Get(WorldStyle.MatTrees, p);
-            var trunks = sink.Get(WorldStyle.MatTreeTrunks, p);
             float scale = (0.75f + (float)rng.NextDouble() * 0.5f) * sizeFactor;
-            float trunkH = 2.4f * scale, trunkR = 0.2f * scale;
-            float crownR = 1.9f * scale, crownH = 4.0f * scale;
             float rot = (float)rng.NextDouble() * Mathf.PI * 2f;
             var leaves = WorldStyle.Tint(WorldStyle.TreeLeaves, rng, 0.12f);
-            var basePos = new Vector3(p.x, 0f, p.y);
-
-            Prism(trunks, basePos, trunkR, 0f, trunkH + 0.4f, 5, rot, WorldStyle.TreeTrunk);
-            // Crown: low-poly double cone, conifers taller and narrower.
             bool conifer = rng.NextDouble() < 0.25;
-            if (conifer) crownR *= 0.8f;
-            int sides = 7;
-            float midY = trunkH + crownH * (conifer ? 0.15f : 0.4f);
-            float topY = trunkH + crownH * (conifer ? 1.3f : 1f);
-            var top = basePos + Vector3.up * topY;
-            var bottom = basePos + Vector3.up * trunkH;
-            for (int i = 0; i < sides; i++)
-            {
-                float a0 = rot + i * Mathf.PI * 2f / sides, a1 = rot + (i + 1) * Mathf.PI * 2f / sides;
-                var r0 = basePos + new Vector3(Mathf.Cos(a0) * crownR, midY, Mathf.Sin(a0) * crownR);
-                var r1 = basePos + new Vector3(Mathf.Cos(a1) * crownR, midY, Mathf.Sin(a1) * crownR);
-                MeshSink.Tri(crowns, r0, top, r1, leaves);
-                MeshSink.Tri(crowns, r1, bottom, r0, WorldStyle.Tint(leaves, rng, 0.05f));
-            }
+            var local = Fork(rng, 7);
+            float height = 6.4f * scale, crownR = 1.9f * scale * (conifer ? 0.8f : 1f);
+            TreeMesh(sink, p, height, crownR, conifer ? 0.18f : 0.38f, conifer, rot, leaves, local);
         }
 
-        /// <summary>Lean low-poly tree with measured height and crown radius (laser trees can be many).</summary>
+        /// <summary>Low-poly tree with measured height and crown radius (laser trees).</summary>
         static void TreeSized(MeshSink sink, Vector2 p, float height, float crownR, System.Random rng)
+        {
+            bool conifer = rng.NextDouble() < 0.2;
+            float rot = (float)rng.NextDouble() * Mathf.PI * 2f;
+            var leaves = WorldStyle.Tint(WorldStyle.TreeLeaves, rng, 0.14f);
+            var local = Fork(rng, 5);
+            TreeMesh(sink, p, height, conifer ? crownR * 0.7f : crownR, conifer ? 0.18f : 0.32f, conifer, rot, leaves, local);
+        }
+
+        /// <summary>Local generator seeded from <paramref name="draws"/> numbers of the shared one.</summary>
+        internal static System.Random Fork(System.Random rng, int draws)
+        {
+            int seed = 17;
+            for (int i = 0; i < draws; i++) seed = seed * 31 + (int)(rng.NextDouble() * 1e6);
+            return new System.Random(seed);
+        }
+
+        internal static readonly Color32 LeavesLight = WorldStyle.Hex("#7DB04E");
+        static readonly Color32 ConiferLeaves = WorldStyle.Hex("#3F6E3C");
+
+        static void TreeMesh(MeshSink sink, Vector2 p, float height, float crownR, float trunkFrac, bool conifer, float rot,
+            Color32 leaves, System.Random rng)
         {
             var crowns = sink.Get(WorldStyle.MatTrees, p);
             var trunks = sink.Get(WorldStyle.MatTreeTrunks, p);
-            bool conifer = rng.NextDouble() < 0.2;
-            float trunkTop = height * (conifer ? 0.18f : 0.32f);
-            float trunkR = Mathf.Clamp(height * 0.022f, 0.12f, 0.45f);
-            float rot = (float)rng.NextDouble() * Mathf.PI * 2f;
             var basePos = new Vector3(p.x, 0f, p.y);
-            Prism(trunks, basePos, trunkR, 0f, trunkTop + 0.3f, 4, rot, WorldStyle.TreeTrunk);
+            float trunkTop = height * trunkFrac;
+            float trunkR = Mathf.Clamp(height * 0.022f, 0.12f, 0.45f);
+            var bark = WorldStyle.Tint(WorldStyle.TreeTrunk, rng, 0.1f);
+            // Slightly tapered trunk, a touch of lean.
+            var lean = new Vector3((float)rng.NextDouble() - 0.5f, 0f, (float)rng.NextDouble() - 0.5f) * (height * 0.03f);
 
-            var leaves = WorldStyle.Tint(WorldStyle.TreeLeaves, rng, 0.14f);
-            float r = conifer ? crownR * 0.7f : crownR;
-            float midY = conifer ? trunkTop + (height - trunkTop) * 0.2f : trunkTop + (height - trunkTop) * 0.45f;
-            var top = basePos + Vector3.up * height;
-            var bottom = basePos + Vector3.up * trunkTop;
-            const int sides = 5;
+            if (conifer)
+            {
+                Frustum(trunks, basePos, basePos + lean + Vector3.up * (trunkTop + 0.4f), trunkR, trunkR * 0.7f, 4, rot, bark);
+                // Spruce/pine: three stacked cones, each narrower, darker blue-green.
+                var needles = Color32.Lerp(leaves, ConiferLeaves, 0.6f);
+                float crownH = height - trunkTop;
+                float y = trunkTop;
+                for (int tier = 0; tier < 3; tier++)
+                {
+                    float r = crownR * (1f - tier * 0.27f);
+                    float h = crownH * (tier == 2 ? 0.5f : 0.42f);
+                    float y0 = y, y1 = Mathf.Min(height, y + h);
+                    Cone(crowns, basePos + lean + Vector3.up * y0, r, y1 - y0, 6, rot + tier * 0.4f,
+                        WorldStyle.Tint(needles, rng, 0.06f), WorldStyle.Tint(needles, rng, 0.04f));
+                    y += crownH * 0.29f;
+                }
+                return;
+            }
+
+            // Broadleaf: a faceted main lobe plus a ring of smaller lobes out to the measured crown radius – a clumpy
+            // low-poly crown at ~40–120 triangles (Westerstede alone has 13 000 laser trees). Lobes are never much
+            // taller than wide: broad island trees become a wide cluster, tall narrow street trees get a second
+            // lobe on top instead of a spindle. The crown hangs from the measured top; the trunk reaches into it.
+            float crownH2 = Mathf.Max(height - trunkTop, crownR * 0.6f);
+            float mainR = crownR * 0.75f;
+            float halfH = Mathf.Min(crownH2 * 0.5f, mainR * 1.2f);
+            bool stacked = crownH2 > halfH * 2.6f;
+            float topR = mainR * 0.72f, topHalf = halfH * 0.72f;
+            float topOffset = stacked ? halfH * 0.85f + topHalf : halfH;
+            float centreY = Mathf.Max(height - topOffset, 1.8f + halfH * 0.75f); // keep head room under the crown
+            var centre = basePos + lean + Vector3.up * centreY;
+            Frustum(trunks, basePos, centre, trunkR, trunkR * 0.7f, 4, rot, bark);
+            Blob(crowns, centre, mainR, halfH, rot, leaves, rng);
+            if (stacked)
+                Blob(crowns, centre + new Vector3(((float)rng.NextDouble() - 0.5f) * mainR * 0.3f, halfH * 0.85f, ((float)rng.NextDouble() - 0.5f) * mainR * 0.3f),
+                    topR, topHalf, rot + 0.7f, Color32.Lerp(leaves, LeavesLight, 0.25f), rng);
+            float maxR = halfH * 1.35f;
+            float subR = Mathf.Min(crownR * 0.5f, maxR * 0.8f);
+            float d = Mathf.Max(crownR - subR, crownR * 0.35f);
+            int extra = Mathf.Clamp(Mathf.RoundToInt(2f * Mathf.PI * d / (subR * 2.2f)), crownR < 3f ? 1 : 2, 4);
+            for (int i = 0; i < extra; i++)
+            {
+                float a = rot + (i + 0.3f + (float)rng.NextDouble() * 0.4f) * Mathf.PI * 2f / extra;
+                float dd = d * (0.85f + (float)rng.NextDouble() * 0.2f);
+                float dy = halfH * (-0.25f + (float)rng.NextDouble() * 0.45f);
+                var c = centre + new Vector3(Mathf.Cos(a) * dd, dy, Mathf.Sin(a) * dd);
+                float r = subR * (0.85f + (float)rng.NextDouble() * 0.25f);
+                var tint = Color32.Lerp(leaves, LeavesLight, 0.1f + (float)rng.NextDouble() * 0.3f);
+                Lobe(crowns, c, r, Mathf.Min(r * 0.85f, halfH * 0.8f), a, WorldStyle.Tint(tint, rng, 0.05f));
+            }
+        }
+
+        /// <summary>Simple lobe: pentagonal ring with a low cap and a flat-ish bottom, apex nudged off-centre – 20 triangles.</summary>
+        static void Lobe(MeshSink.Batch b, Vector3 c, float r, float halfH, float rot, Color32 color)
+        {
+            const int n = 5;
+            var top = c + new Vector3(Mathf.Cos(rot) * r * 0.12f, halfH, Mathf.Sin(rot) * r * 0.12f);
+            var bottom = c + Vector3.down * halfH * 0.55f;
+            var light = Color32.Lerp(color, LeavesLight, 0.15f);
+            var dark = Shade(color, 0.8f);
+            var cap = new Vector3[n];
+            var ring = new Vector3[n];
+            for (int i = 0; i < n; i++)
+            {
+                float a = rot + i * Mathf.PI * 2f / n;
+                cap[i] = c + new Vector3(Mathf.Cos(a + 0.6f) * r * 0.6f, halfH * 0.6f, Mathf.Sin(a + 0.6f) * r * 0.6f);
+                ring[i] = c + new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r);
+            }
+            for (int i = 0; i < n; i++)
+            {
+                int j = (i + 1) % n;
+                MeshSink.Tri(b, cap[i], top, cap[j], light);
+                MeshSink.Tri(b, ring[j], cap[i], cap[j], color);   // band, two triangles per side
+                MeshSink.Tri(b, ring[j], bottom, ring[i], dark);
+                MeshSink.Tri(b, ring[i], cap[i], ring[j], color);
+            }
+        }
+
+        /// <summary>
+        /// Faceted crown lobe: pentagonal top cap, a twisted lower ring and a flat-ish bottom – 20 triangles.
+        /// <paramref name="halfH"/> is the half height.
+        /// </summary>
+        internal static void Blob(MeshSink.Batch b, Vector3 c, float r, float halfH, float rot, Color32 color, System.Random rng)
+        {
+            const int n = 5;
+            var top = c + Vector3.up * halfH;
+            var bottom = c + Vector3.down * halfH * 0.75f;
+            var up = new Vector3[n];
+            var lo = new Vector3[n];
+            for (int i = 0; i < n; i++)
+            {
+                float a = rot + i * Mathf.PI * 2f / n;
+                float ra = r * (0.72f + (float)rng.NextDouble() * 0.1f);
+                float rb = r * (0.92f + (float)rng.NextDouble() * 0.12f);
+                up[i] = c + new Vector3(Mathf.Cos(a) * ra, halfH * 0.5f, Mathf.Sin(a) * ra);
+                float b2 = a + Mathf.PI / n;
+                lo[i] = c + new Vector3(Mathf.Cos(b2) * rb, -halfH * 0.2f, Mathf.Sin(b2) * rb);
+            }
+            var light = Color32.Lerp(color, LeavesLight, 0.18f);
+            var dark = Shade(color, 0.82f);
+            for (int i = 0; i < n; i++)
+            {
+                int j = (i + 1) % n;
+                MeshSink.Tri(b, up[i], top, up[j], light);
+                MeshSink.Tri(b, up[i], up[j], lo[i], color);
+                MeshSink.Tri(b, lo[i], up[j], lo[j], WorldStyle.Tint(color, rng, 0.04f));
+                MeshSink.Tri(b, lo[j], bottom, lo[i], dark);
+            }
+        }
+
+        /// <summary>Cone with a slightly hollow underside (conifer tier).</summary>
+        static void Cone(MeshSink.Batch b, Vector3 baseC, float r, float h, int sides, float rot, Color32 side, Color32 under)
+        {
+            var tip = baseC + Vector3.up * h;
+            var hollow = baseC + Vector3.up * h * 0.18f;
             for (int i = 0; i < sides; i++)
             {
                 float a0 = rot + i * Mathf.PI * 2f / sides, a1 = rot + (i + 1) * Mathf.PI * 2f / sides;
-                var r0 = basePos + new Vector3(Mathf.Cos(a0) * r, midY, Mathf.Sin(a0) * r);
-                var r1 = basePos + new Vector3(Mathf.Cos(a1) * r, midY, Mathf.Sin(a1) * r);
-                MeshSink.Tri(crowns, r0, top, r1, leaves);
-                MeshSink.Tri(crowns, r1, bottom, r0, WorldStyle.Tint(leaves, rng, 0.05f));
+                var r0 = baseC + new Vector3(Mathf.Cos(a0) * r, 0f, Mathf.Sin(a0) * r);
+                var r1 = baseC + new Vector3(Mathf.Cos(a1) * r, 0f, Mathf.Sin(a1) * r);
+                MeshSink.Tri(b, r0, tip, r1, side);
+                MeshSink.Tri(b, r1, hollow, r0, Shade(under, 0.75f));
             }
         }
+
+        static void Frustum(MeshSink.Batch b, Vector3 bottom, Vector3 top, float r0, float r1, int sides, float rot, Color32 c)
+        {
+            for (int i = 0; i < sides; i++)
+            {
+                float a0 = rot + i * Mathf.PI * 2f / sides, a1 = rot + (i + 1) * Mathf.PI * 2f / sides;
+                Vector3 d0 = new Vector3(Mathf.Cos(a0), 0, Mathf.Sin(a0)), d1 = new Vector3(Mathf.Cos(a1), 0, Mathf.Sin(a1));
+                MeshSink.Quad(b, bottom + d0 * r0, top + d0 * r1, top + d1 * r1, bottom + d1 * r0, c);
+            }
+        }
+
+        static Color32 Shade(Color32 c, float f) =>
+            new Color32((byte)(c.r * f), (byte)(c.g * f), (byte)(c.b * f), c.a);
 
         static void Bush(MeshSink sink, Vector2 p, System.Random rng)
         {
@@ -355,18 +483,17 @@ namespace LeGamez.Editor.OsmImport
             float h = r * (0.9f + (float)rng.NextDouble() * 0.4f);
             float rot = (float)rng.NextDouble() * Mathf.PI * 2f;
             var color = WorldStyle.Tint(WorldStyle.Bush, rng, 0.12f);
+            var local = Fork(rng, 6);
             var basePos = new Vector3(p.x, 0f, p.y);
-            var top = basePos + Vector3.up * h;
-            int sides = 6;
-            for (int i = 0; i < sides; i++)
+            // Two or three overlapping lobes sitting on the ground.
+            Blob(b, basePos + Vector3.up * h * 0.45f, r, h * 0.55f, rot, color, local);
+            int extra = 1 + local.Next(2);
+            for (int i = 0; i < extra; i++)
             {
-                float a0 = rot + i * Mathf.PI * 2f / sides, a1 = rot + (i + 1) * Mathf.PI * 2f / sides;
-                var r0 = basePos + new Vector3(Mathf.Cos(a0) * r, h * 0.35f, Mathf.Sin(a0) * r);
-                var r1 = basePos + new Vector3(Mathf.Cos(a1) * r, h * 0.35f, Mathf.Sin(a1) * r);
-                var g0 = basePos + new Vector3(Mathf.Cos(a0) * r * 0.7f, 0f, Mathf.Sin(a0) * r * 0.7f);
-                var g1 = basePos + new Vector3(Mathf.Cos(a1) * r * 0.7f, 0f, Mathf.Sin(a1) * r * 0.7f);
-                MeshSink.Tri(b, r0, top, r1, color);
-                MeshSink.Quad(b, g0, r0, r1, g1, WorldStyle.Tint(color, rng, 0.06f));
+                float a = rot + 1.3f + i * 2.4f;
+                float rr = r * (0.55f + (float)local.NextDouble() * 0.2f);
+                var c = basePos + new Vector3(Mathf.Cos(a) * r * 0.6f, rr * 0.5f, Mathf.Sin(a) * r * 0.6f);
+                Lobe(b, c, rr, rr * 0.6f, a, WorldStyle.Tint(Color32.Lerp(color, LeavesLight, 0.2f), local, 0.05f));
             }
         }
 

@@ -42,6 +42,16 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
    → `Data/jever.trees.json` (`[x, z, Höhe, Kronenradius]`). nDOM = Oberfläche − Gelände, Gebäude (+1,5 m) ausmaskiert,
    Kronenspitzen ≥ 3,5 m als lokale Maxima, Mindestabstand 3 m. Mit Datei ersetzt sie OSM-Bäume und Zufallsbäume in
    Parks/Wäldern; Treffer > 32 m (Kirchtürme, Masten) verwirft der Importer. Ohne Datei: OSM-Bäume wie bisher.
+3d. **Luftbild holen** (nur Niedersachsen, LGLN DOP20 RGB + Infrarot, CC BY 4.0; `pip3 install --user rasterio`):
+   ```bash
+   python3 Tools/dop/fetch_dop.py jever
+   ```
+   → `Data/jever.dop.png` (1 m/Pixel im lokalen Rahmen, Alpha = Infrarot, oben = Norden) + `jever.dop.json` (Lage, Datum).
+   Liest nur eine Übersichtsstufe der COG-Kacheln (schnell). Der Importer (`AerialImage`) nutzt es für
+   **Dachfarben** (Median der sonnigen Dachpixel, Bäume per NDVI raus, auf Palette gezogen: Ziegelrot, Anthrazit,
+   Braun, Moos, Solar, Flachdach Bitumen/Kies/grün; `buildings.json`-Overrides und OSM `roof:colour` gehen vor) und
+   **Bodenbedeckung** je Geländedreieck (Rasen/Pflaster/Sand/Erde; unter LiDAR-Kronen entscheidet die Umgebung).
+   Mit Luftbild entfallen die flächigen OSM-Flächen residential/commercial/retail/industrial, damit Gärten/Höfe sichtbar werden.
 4. **In Unity importieren** (baut alle Gebiete, Menü-Vorschaubilder, Minimap-Karten, Hauptmenü-Szene):
    ```bash
    /Applications/Unity/Hub/Editor/6000.3.26f1/Unity.app/Contents/MacOS/Unity -batchmode -quit -projectPath . -buildTarget iOS \
@@ -58,16 +68,30 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
 - `OsmData` + `MiniJson`: Overpass-JSON lesen, `GeoProjection` (äquirektangulär um den Mittelpunkt, 1 Unit = 1 m, +X Ost, +Z Nord).
 - `Lod2Builder`: echte Wand-/Dachflächen aus LoD2; regionaler Stil je ALKIS-Gebäudefunktion + Insel/Festland
   (Klinker rot/dunkel/gelb, weißer Putz, Pfannendach rot/anthrazit, Schornsteine). Materialcode steckt im Vertex-Alpha.
-- `BuildingBuilder`: Fallback aus OSM-Grundrissen. Auch mit LoD2 aktiv für OSM-Häuser, die LoD2 (noch) nicht kennt
+- `BuildingBuilder`: Fallback aus OSM-Grundrissen. Geschätzte Wandhöhen werden auf ganze Geschosse gerundet (3 m + 0,3 m Sockel),
+  damit jedes Obergeschoss eine volle Fensterreihe bekommt. Auch mit LoD2 aktiv für OSM-Häuser, die LoD2 (noch) nicht kennt
   (Neubaugebiete; Test `Lod2Builder.Covers`), mit eigenem Zufallsgenerator, damit die Objekt-IDs stabil bleiben.
-- `BuildingOverrides`: Einzelhäuser anpassen über `Data/<id>.buildings.json` (Adresse oder `osmId`; Wandfarbe, Klinker,
-  Giebelfenster pro Geschoss). Wirkt nur auf OSM-gebaute Häuser; nicht passende Einträge → Warnung im Import-Log.
+- `BuildingOverrides`: Einzelhäuser anpassen über `Data/<id>.buildings.json` (`address` oder `id` = LoD2-gml-id bzw.
+  `osm:<way>`; `wall`, `brick`, `roof`, `gableWindows`, `gableWindowFloor`, `windows`, `hidden`, `door` = street/none/N/E/S/W,
+  `doorColor`, `roofShape` (nur OSM), `chimney`, `floors` = Geschosse bis Traufe; LoD2-Wände werden gestreckt). Gilt für LoD2- und OSM-Häuser; eine Adresse
+  trifft alle Gebäudeteile. Adressen: LoD2 = amtliche ALKIS-Adressen (fetch_lod2.py liest `bldg:address`), OSM = addr:*.
+  Der Importer schreibt alle Häuser (id, Adressen, Grundriss) nach `Assets/Generated/<id>/<id>_buildings.json`;
+  der Map-Editor hat dafür den Modus „Häuser“ (Adresssuche, Anklicken, Farbe/Dach/Giebelfenster).
+  Nicht passende Einträge → Warnung im Import-Log.
+  Fenster halten ≥ 0,6 m Abstand zum Dach (`BuildingBuilder.RoofGap`, Shader-Regel `head + 0.6` in VertexColorLit, Fensterbänke gleich).
 - `GroundBuilder`: Grund-Kacheln, Flächen (landuse/natural/leisure), Straßen-Bänder mit Mittellinie, Wasser, Hecken/Mauern/Zäune.
 - `PropPlacer`: LiDAR-Bäume (`<id>.trees.json`, Höhe/Krone echt) bzw. ohne Datei OSM-Bäume, Baumgruppen in Parks/Wäldern (mit Abstand zu Wegen), Büsche auf Dünen/Heide, Straßenlaternen.
+  Kronen = facettierter Hauptklumpen + Ring kleinerer Klumpen bis zum gemessenen Radius (~40–100 Dreiecke), Nadelbäume 3 Kegel.
+  Pflanzen-Builder ziehen aus dem gemeinsamen `rng` genau so viele Zahlen wie früher (`Fork`), sonst verschieben sich IDs/Edits.
+- `Lod2Builder`: zusätzlich Fensterbänke unter jedem Shader-Fenster (gleiches Raster wie `FacadeMask`) im Bucket `Details`
+  (Layer 8, keine Schatten/Kollider, 25-m-Chunks; die Spielkamera blendet Layer 8 ab 120 m aus).
 - `PoiExtractor`: benannte Sehenswürdigkeiten → Stempelheft.
 - `MeshSink`: Geometrie pro Material und 100-m-Chunk; Kollider für Gebäude, Stämme, Props
   (Stämme/Props liegen auf Layer 2, damit die Kamera sie ignoriert).
-- Shader `Assets/Shaders/VertexColorLit.shader`: Vertex-Farben, Fenster/Sprossen, Klinker, Putz, Dachpfannen, Wasser.
+- Shader `Assets/Shaders/VertexColorLit.shader`: Vertex-Farben, Fenster/Sprossen (Laibungsschatten, Gardinen), Klinker, Putz,
+  Sockel, Traufband, Dachpfannen, Wasser, großflächige Farbvariation auf Boden/Flachdächern. Bordsteinbänder: `GroundBuilder.Kerbs`.
+- Himmel `Assets/Shaders/Sky.shader` (Verlauf, Sonne, ziehende Wolken); Licht/Nebel in `OsmAreaImporter.AddLighting`,
+  HDR + Bloom/Farbkorrektur in `ProjectSetup` (`ConfigureUrp`, `CreatePostProfile`).
 
 ### Map-Editor (macOS-App, `Tools/MapEditor`)
 Draufsicht je Gebiet (Minimap + LoD2-Dachumrisse). Neue Objekte setzen, außerdem alle vom Importer erzeugten
@@ -85,12 +109,14 @@ Draufsicht je Gebiet (Minimap + LoD2-Dachumrisse). Neue Objekte setzen, außerde
   ```
 
 ### Schnell eine Stadt ergänzen (Kurzfassung)
+Skill: **`/create-map`** (`.claude/skills/create-map/SKILL.md`) führt durch den ganzen Ablauf inkl. Prüf-Checkliste.
 ```bash
 # 1. Eintrag in Tools/osm/areas.json
 python3 Tools/osm/fetch_area.py <id>
 python3 Tools/lod2/fetch_lod2.py <id>      # nur Niedersachsen
 python3 Tools/dgm/fetch_dgm.py <id>        # Gelände, nur Niedersachsen
 python3 Tools/dgm/fetch_trees.py <id>      # Bäume aus DOM1, nach lod2
+python3 Tools/dop/fetch_dop.py <id>        # Luftbild: Dachfarben + Bodenbedeckung
 # 2. Unity ImportAllBatch (siehe oben), Snapshots prüfen, bauen
 ```
 Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen später Scrollen.
@@ -113,6 +139,21 @@ Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen sp�
   xcrun devicectl device install app --device 466CD8EB-A8DD-5BF2-BD23-5CF7F213964F /tmp/Unity-iPhone-dd/Build/Products/Release-iphoneos/Nordisch.app
   xcrun devicectl device process launch --device 466CD8EB-A8DD-5BF2-BD23-5CF7F213964F de.letzgo.legamez
   ```
+
+### Android
+- Unity-Module `android`, `android-sdk-ndk-tools`, `android-open-jdk` (über Unity Hub installiert). ARM64, IL2CPP, Vulkan + GLES3, minSdk 26,
+  gleiche Bundle-ID. Einstellungen: `ProjectSetup.ConfigureAndroid` (läuft auch vor jedem Android-Build).
+- APK: `-buildTarget Android -executeMethod LeGamez.Editor.BuildScript.BuildAndroid` → `Builds/Android/Nordisch.apk` (~200 MB, alle Gebiete).
+- Emulator (AVD `nordisch`, Pixel 7, Android 36.1 Play-Image, GPU host):
+  ```bash
+  ~/Library/Android/sdk/emulator/emulator -avd nordisch -no-snapshot-save -no-boot-anim &
+  ~/Library/Android/sdk/platform-tools/adb install -r Builds/Android/Nordisch.apk
+  ~/Library/Android/sdk/platform-tools/adb shell am start -n de.letzgo.legamez/com.unity3d.player.UnityPlayerGameActivity
+  ```
+  Querformat testen: `adb emu sensor set acceleration 9.81:0:0` (zurück: `0:9.81:0`). Logs: `adb logcat -s Unity`.
+- Eigenheiten: Unitys Auto-Rotation bleibt auf Android im Start-Format hängen → `Core/AppOrientation` dreht selbst nach
+  `Input.deviceOrientation` (respektiert Rotationssperre). Back-Taste = Escape (Predictive Back aus): schließt große Karte,
+  sonst zurück ins Menü, im Menü App in den Hintergrund. `Assets/link.xml` hält Collider-Klassen fürs Engine-Stripping (`CreatePrimitive`).
 
 ## Stolperfallen
 - Unity schreibt Template-Pakete (purchasing, analytics, collab-proxy, multiplayer.center) zurück in `Packages/manifest.json` → wieder entfernen.

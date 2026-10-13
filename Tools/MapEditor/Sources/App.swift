@@ -105,7 +105,24 @@ struct Sidebar: View {
                     ForEach(model.areas) { Text($0.name).tag(Optional($0)) }
                 }
                 .labelsHidden()
+                Picker("Bearbeiten", selection: $model.mode) {
+                    Text("Objekte").tag(EditorModel.Mode.objects)
+                    Text("Häuser").tag(EditorModel.Mode.houses)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
             }
+            if model.mode == .houses {
+                HouseSidebar(model: model)
+            } else {
+                objectSections
+            }
+        }
+        .listStyle(.sidebar)
+    }
+
+    @ViewBuilder
+    private var objectSections: some View {
             Section("Objekt setzen") {
                 ForEach(ObjectType.all) { t in
                     Button {
@@ -149,8 +166,203 @@ struct Sidebar: View {
                     .listRowBackground(model.selection.contains(o.id) ? Color.accentColor.opacity(0.25) : nil)
                 }
             }
+    }
+}
+
+struct HouseSidebar: View {
+    @ObservedObject var model: EditorModel
+
+    var body: some View {
+        Section("Adresse suchen") {
+            TextField("z. B. Alte Weide 4", text: $model.houseQuery)
+                .textFieldStyle(.roundedBorder)
+            ForEach(model.houseMatches(model.houseQuery)) { h in row(h) }
+            if model.houseQuery.count >= 2 && model.houseMatches(model.houseQuery).isEmpty {
+                Text("Keine Adresse gefunden").font(.caption).foregroundStyle(.secondary)
+            }
+            if model.houses.isEmpty {
+                Text("Keine Gebäudeliste – einmal „In Unity übernehmen“.").font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("Oder ein Haus in der Karte anklicken.").font(.caption).foregroundStyle(.secondary)
+            }
         }
-        .listStyle(.sidebar)
+        Section("Angepasste Häuser (\(model.houseStyles.count))") {
+            ForEach(Array(model.houseStyles.enumerated()), id: \.offset) { _, st in
+                let h = model.houses.first { h in
+                    h.id == st.id || st.address.map { a in h.addr.contains { HouseCatalog.normalize($0) == HouseCatalog.normalize(a) } } == true
+                }
+                Button { if let h { model.focusHouse(h) } } label: {
+                    HStack {
+                        Circle().fill(Color(nsColor: st.wall.flatMap(NSColor.init(hexString:)) ?? .tertiaryLabelColor)).frame(width: 12, height: 12)
+                        Text(st.address ?? st.id ?? "?")
+                        Spacer()
+                        if h == nil { Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange).help("Kein Haus mit dieser Adresse/ID im Gebiet") }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func row(_ h: House) -> some View {
+        Button { model.focusHouse(h) } label: {
+            HStack {
+                Image(systemName: "house").frame(width: 22)
+                Text(h.title)
+                Spacer()
+                if model.styleByHouse[h.id] != nil { Image(systemName: "paintbrush").foregroundStyle(.secondary) }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .listRowBackground(model.selectedHouse == h.id ? Color.accentColor.opacity(0.25) : nil)
+    }
+}
+
+struct HouseInspector: View {
+    @ObservedObject var model: EditorModel
+    let house: House
+
+    var body: some View {
+        let st = model.style(house) ?? HouseStyle()
+        Section(house.title) {
+            if house.addr.count > 1 { LabeledContent("Adressen", value: house.addr.joined(separator: ", ")) }
+            LabeledContent("Quelle", value: house.sourceName)
+            LabeledContent("Grundfläche", value: String(format: "%.0f m²", house.area))
+            if house.addr.isEmpty {
+                Text("Ohne Adresse – Änderung gilt nur für dieses Gebäudeteil.").font(.caption).foregroundStyle(.secondary)
+            } else if model.houses.filter({ $0.addr.contains(house.addr[0]) }).count > 1 {
+                Text("Gilt für alle Teile mit dieser Adresse.").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        Section("Gebäude") {
+            Toggle("Haus entfernen", isOn: Binding(get: { st.hidden == true }, set: { on in
+                model.updateStyle(house) { $0.hidden = on ? true : nil }
+            }))
+            if st.hidden == true {
+                Text("Wird beim Import nicht gebaut (z. B. abgerissen oder doppelt). Andere Einstellungen bleiben gespeichert.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        if st.hidden != true { details(st) }
+        if model.style(house) != nil {
+            Section {
+                Button("Haus zurücksetzen", role: .destructive) { model.resetStyle(house) }
+                Text("Änderungen erscheinen nach „In Unity übernehmen“ im Spiel.").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func details(_ st: HouseStyle) -> some View {
+        Section("Geschosse") {
+            let auto = max(house.floors, 1)
+            Stepper(value: Binding(
+                get: { st.floors ?? auto },
+                set: { v in model.updateStyle(house) { $0.floors = v == auto && $0.floors == nil ? nil : v } }), in: 1...10) {
+                HStack {
+                    Text("Geschosse bis Traufe")
+                    Spacer()
+                    Text(st.floors.map { "\($0)" } ?? "\(auto) (automatisch)").foregroundStyle(st.floors == nil ? .secondary : .primary)
+                }
+            }
+            if st.floors != nil {
+                Button("Wie gemessen (\(auto))") { model.updateStyle(house) { $0.floors = nil } }
+            }
+            Text(house.src == "lod2" ? "Wände werden gestreckt, das Dach wandert mit." : "Je Geschoss 3 m, Dach obendrauf.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        Section("Wand") {
+            Toggle("Fassadenfenster", isOn: Binding(get: { st.windows != false }, set: { on in
+                model.updateStyle(house) { $0.windows = on ? nil : false }
+            }))
+            Toggle("Eigene Wandfarbe", isOn: Binding(get: { st.wall != nil }, set: { on in
+                model.updateStyle(house) { $0.wall = on ? Palette.walls[0].1 : nil; $0.brick = on ? true : nil }
+            }))
+            if let wall = st.wall {
+                ColorPicker("Farbe", selection: Binding(
+                    get: { Color(nsColor: NSColor(hexString: wall) ?? .gray) },
+                    set: { c in model.updateStyle(house) { $0.wall = NSColor(c).hexString } }), supportsOpacity: false)
+                swatches(Palette.walls, selected: wall) { hex, name in
+                    model.updateStyle(house) { $0.wall = hex; $0.brick = name.hasPrefix("Klinker") }
+                }
+                Toggle("Klinker (Mauerwerk)", isOn: Binding(get: { st.brick ?? false }, set: { b in model.updateStyle(house) { $0.brick = b } }))
+            }
+        }
+        Section("Haustür") {
+            Picker("Tür", selection: Binding(get: { st.door ?? "auto" }, set: { v in
+                model.updateStyle(house) { $0.door = v == "auto" ? nil : v }
+            })) {
+                Text("Automatisch (Straßenseite)").tag("auto")
+                Text("Keine Tür").tag("none")
+                Text("Nordseite").tag("N"); Text("Ostseite").tag("E"); Text("Südseite").tag("S"); Text("Westseite").tag("W")
+            }
+            if st.door != "none" {
+                Toggle("Eigene Türfarbe", isOn: Binding(get: { st.doorColor != nil }, set: { on in
+                    model.updateStyle(house) { $0.doorColor = on ? Palette.doors[0].1 : nil }
+                }))
+                if let dc = st.doorColor {
+                    ColorPicker("Farbe", selection: Binding(
+                        get: { Color(nsColor: NSColor(hexString: dc) ?? .gray) },
+                        set: { c in model.updateStyle(house) { $0.doorColor = NSColor(c).hexString } }), supportsOpacity: false)
+                    swatches(Palette.doors, selected: dc) { hex, _ in model.updateStyle(house) { $0.doorColor = hex } }
+                }
+            }
+        }
+        Section("Dach") {
+            if house.src == "osm" {
+                Picker("Dachform", selection: Binding(get: { st.roofShape ?? "auto" }, set: { v in
+                    model.updateStyle(house) { $0.roofShape = v == "auto" ? nil : v }
+                })) {
+                    Text("Automatisch").tag("auto"); Text("Satteldach").tag("gabled"); Text("Walmdach").tag("hipped"); Text("Flachdach").tag("flat")
+                }
+            } else {
+                Text("Dachform aus der amtlichen 3D-Vermessung (LGLN).").font(.caption).foregroundStyle(.secondary)
+            }
+            Picker("Schornstein", selection: Binding(get: { st.chimney.map { $0 ? "yes" : "no" } ?? "auto" }, set: { v in
+                model.updateStyle(house) { $0.chimney = v == "auto" ? nil : v == "yes" }
+            })) {
+                Text(house.src == "osm" ? "Automatisch (keiner)" : "Automatisch").tag("auto"); Text("Ja").tag("yes"); Text("Nein").tag("no")
+            }
+            Toggle("Eigene Dachfarbe", isOn: Binding(get: { st.roof != nil }, set: { on in
+                model.updateStyle(house) { $0.roof = on ? Palette.roofs[0].1 : nil }
+            }))
+            if let roof = st.roof {
+                ColorPicker("Farbe", selection: Binding(
+                    get: { Color(nsColor: NSColor(hexString: roof) ?? .gray) },
+                    set: { c in model.updateStyle(house) { $0.roof = NSColor(c).hexString } }), supportsOpacity: false)
+                swatches(Palette.roofs, selected: roof) { hex, _ in model.updateStyle(house) { $0.roof = hex } }
+            }
+        }
+        Section("Giebelfenster") {
+            Stepper("Anzahl je Giebel: \(st.gableWindows ?? 0)", value: Binding(
+                get: { st.gableWindows ?? 0 },
+                set: { v in model.updateStyle(house) { $0.gableWindows = v > 0 ? v : nil; if v > 0 && $0.gableWindowFloor == nil { $0.gableWindowFloor = 1 } } }), in: 0...4)
+            if (st.gableWindows ?? 0) > 0 {
+                Picker("Geschoss", selection: Binding(
+                    get: { st.gableWindowFloor ?? 1 },
+                    set: { v in model.updateStyle(house) { $0.gableWindowFloor = v } })) {
+                    Text("EG").tag(0); Text("1. OG").tag(1); Text("2. OG").tag(2); Text("3. OG").tag(3)
+                }
+            }
+            Text("Mittig auf beiden Stirnseiten; Fenster, die nicht in die Wand passen, entfallen.").font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private func swatches(_ items: [(String, String)], selected: String, pick: @escaping (String, String) -> Void) -> some View {
+        HStack(spacing: 6) {
+            ForEach(items, id: \.1) { name, hex in
+                Button { pick(hex, name) } label: {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color(nsColor: NSColor(hexString: hex) ?? .gray))
+                        .frame(width: 22, height: 22)
+                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(selected.uppercased() == hex ? Color.accentColor : Color.secondary.opacity(0.4), lineWidth: selected.uppercased() == hex ? 2.5 : 1))
+                }
+                .buttonStyle(.plain)
+                .help(name)
+            }
+        }
     }
 }
 
@@ -179,7 +391,15 @@ struct Inspector: View {
     var body: some View {
         Form {
             let sel = model.selectedObjects
-            if sel.count == 1, let o = sel.first {
+            if model.mode == .houses {
+                if let h = model.currentHouse {
+                    HouseInspector(model: model, house: h)
+                } else {
+                    Section("Kein Haus ausgewählt") {
+                        Text("Haus in der Karte anklicken oder links nach Adresse suchen.").foregroundStyle(.secondary)
+                    }
+                }
+            } else if sel.count == 1, let o = sel.first {
                 single(o)
             } else if sel.count > 1 {
                 Section("\(sel.count) Objekte") {

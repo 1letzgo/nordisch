@@ -11,8 +11,8 @@ namespace LeGamez.Vehicles
     /// </summary>
     public class Bicycle : Vehicle
     {
-        public override float CruiseSpeed => 7.5f;
-        public override float SprintSpeed => 11f;
+        public override float CruiseSpeed => 11f;
+        public override float SprintSpeed => 16f;
         public override float TurnSmoothTime => 0.2f;
         public override float CameraBonus => 1.5f;
         public override int AvatarMode => 2;
@@ -22,9 +22,18 @@ namespace LeGamez.Vehicles
 
         const float WheelRadius = 0.34f;
         const float WheelBase = 1.05f;
+        public override float AxleBase => WheelBase;
+        public override float RearAxle => WheelBase * 0.5f;
+        public override float MaxSteer => 38f;
+        public override float LateralAccel => 5f;
+        public override float TopSpeed => 13f;                    // ~47 km/h, game-fast
+        public override float AccelTime => 2.5f;
+        public override float BrakeDecel => 8f;
+        public override float CoastDecel => 0.8f;
+        public override float ReverseSpeed => 1.6f;               // pushing back with the feet, walking pace
 
         Transform frontWheel, rearWheel, body;
-        float lean, leanVel;
+        float lean, leanVel, wheelSpin;
         float lastYaw;
 
         static Mesh frameMesh, wheelMesh;
@@ -77,9 +86,9 @@ namespace LeGamez.Vehicles
         /// <summary>Called by the rider each frame with the current ground speed.</summary>
         public override void Animate(float speed)
         {
-            float spin = speed / WheelRadius * Mathf.Rad2Deg * Time.deltaTime;
-            frontWheel.Rotate(spin, 0, 0, Space.Self);
-            rearWheel.Rotate(spin, 0, 0, Space.Self);
+            wheelSpin = (wheelSpin + speed / WheelRadius * Mathf.Rad2Deg * Time.deltaTime) % 360f;
+            frontWheel.localRotation = Quaternion.Euler(0f, SteerAngle, 0f) * Quaternion.Euler(wheelSpin, 0f, 0f);
+            rearWheel.localRotation = Quaternion.Euler(wheelSpin, 0f, 0f);
 
             // Lean into turns proportional to yaw rate × speed.
             float yaw = transform.eulerAngles.y;
@@ -131,6 +140,35 @@ namespace LeGamez.Vehicles
                 }
             }
 
+            /// <summary>Axis-aligned box (half extents h), all faces double-sided like Tube.</summary>
+            public void Box(Vector3 c, Vector3 h, Color32 col)
+            {
+                Vector3 x = Vector3.right * h.x, y = Vector3.up * h.y, z = Vector3.forward * h.z;
+                void Side(Vector3 o, Vector3 u, Vector3 v)
+                {
+                    Quad(o - u - v, o - u + v, o + u + v, o + u - v, col);
+                    Quad(o - u - v, o + u - v, o + u + v, o - u + v, col);
+                }
+                Side(c + x, z, y); Side(c - x, z, y);
+                Side(c + y, x, z); Side(c - y, x, z);
+                Side(c + z, x, y); Side(c - z, x, y);
+            }
+
+            /// <summary>Mudguard: flat strip bent round a wheel hub from angle a0 to a1 (radians, 0 = forward, π/2 = up).</summary>
+            public void Arc(Vector3 hub, float radius, float a0, float a1, float width, Color32 col)
+            {
+                const int seg = 7;
+                Vector3 hw = Vector3.right * (width * 0.5f);
+                for (int i = 0; i < seg; i++)
+                {
+                    float t0 = Mathf.Lerp(a0, a1, (float)i / seg), t1 = Mathf.Lerp(a0, a1, (float)(i + 1) / seg);
+                    Vector3 p0 = hub + new Vector3(0, Mathf.Sin(t0), Mathf.Cos(t0)) * radius;
+                    Vector3 p1 = hub + new Vector3(0, Mathf.Sin(t1), Mathf.Cos(t1)) * radius;
+                    Quad(p0 - hw, p0 + hw, p1 + hw, p1 - hw, col);
+                    Quad(p0 - hw, p1 - hw, p1 + hw, p0 + hw, col);
+                }
+            }
+
             public Mesh ToMesh(string name)
             {
                 var m = new Mesh { name = name };
@@ -160,13 +198,31 @@ namespace LeGamez.Vehicles
             b.Tube(headTop, headTop + new Vector3(0, 0.08f, -0.12f), w * 0.7f, Chrome);
             b.Tube(headTop + new Vector3(-0.28f, 0.1f, -0.16f), headTop + new Vector3(0.28f, 0.1f, -0.16f), w * 0.7f, Navy); // handlebar
             b.Tube(seatTop, seatTop + Vector3.up * 0.08f, w * 0.7f, Chrome);
-            b.Tube(seatTop + new Vector3(0, 0.1f, -0.1f), seatTop + new Vector3(0, 0.1f, 0.12f), 0.14f, Saddle); // saddle
-            // Rear rack + front basket (very Nordwest).
-            b.Tube(new Vector3(0, 0.62f, -0.2f), new Vector3(0, 0.62f, -0.62f), 0.2f, Navy);
-            b.Tube(headTop + new Vector3(0, -0.05f, 0.14f), headTop + new Vector3(0, -0.05f, 0.4f), 0.3f, Navy);
-            // Mudguards.
-            b.Tube(new Vector3(0, r + 0.36f, -hb + 0.25f), new Vector3(0, r + 0.2f, -hb - 0.3f), 0.08f, Navy);
-            b.Tube(new Vector3(0, r + 0.36f, hb - 0.25f), new Vector3(0, r + 0.2f, hb + 0.3f), 0.08f, Navy);
+            // Saddle: wide, flat rear and a narrow nose.
+            b.Box(seatTop + new Vector3(0, 0.1f, -0.05f), new Vector3(0.085f, 0.03f, 0.07f), Saddle);
+            b.Box(seatTop + new Vector3(0, 0.095f, 0.08f), new Vector3(0.035f, 0.025f, 0.07f), Saddle);
+            // Rear rack: two rails and cross bars on struts down to the hub.
+            foreach (float x in new[] { -0.07f, 0.07f })
+            {
+                b.Tube(new Vector3(x, 0.66f, -0.22f), new Vector3(x, 0.66f, -0.66f), 0.025f, Navy);
+                b.Tube(new Vector3(x, 0.66f, -0.6f), rearHub + new Vector3(x, 0f, 0f), 0.02f, Navy);
+            }
+            for (int k = 0; k < 3; k++)
+                b.Tube(new Vector3(-0.09f, 0.66f, -0.3f - k * 0.15f), new Vector3(0.09f, 0.66f, -0.3f - k * 0.15f), 0.02f, Navy);
+            // Mudguards hugging the tyres.
+            b.Arc(rearHub, r + 0.05f, 0.15f, Mathf.PI * 1.05f, 0.07f, Navy);
+            b.Arc(frontHub, r + 0.05f, -0.1f, Mathf.PI * 0.85f, 0.07f, Navy);
+            // Chain guard (Dutch city bike) and crank with pedals.
+            b.Tube(bottom + new Vector3(0.06f, 0.02f, 0.06f), rearHub + new Vector3(0.06f, 0.02f, 0.04f), 0.09f, Navy);
+            var crankEnd = bottom + new Vector3(0.1f, -0.12f, 0.08f);
+            b.Tube(bottom + new Vector3(0.08f, 0f, 0f), crankEnd, 0.025f, Chrome);
+            b.Tube(crankEnd, crankEnd + new Vector3(0.1f, 0f, 0f), 0.05f, Black);
+            var crankEnd2 = bottom + new Vector3(-0.1f, 0.12f, -0.08f);
+            b.Tube(bottom + new Vector3(-0.08f, 0f, 0f), crankEnd2, 0.025f, Chrome);
+            b.Tube(crankEnd2, crankEnd2 + new Vector3(-0.1f, 0f, 0f), 0.05f, Black);
+            // Grips.
+            b.Tube(headTop + new Vector3(-0.3f, 0.1f, -0.16f), headTop + new Vector3(-0.2f, 0.1f, -0.16f), 0.04f, Black);
+            b.Tube(headTop + new Vector3(0.2f, 0.1f, -0.16f), headTop + new Vector3(0.3f, 0.1f, -0.16f), 0.04f, Black);
             return frameMesh = b.ToMesh("BicycleFrame");
         }
 

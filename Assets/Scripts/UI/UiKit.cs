@@ -24,7 +24,7 @@ namespace LeGamez.UI
 
         // ---------------------------------------------------------------- icons
 
-        public enum IconKind { Jump, Run, Bike, Walk, BikeFast, Car, CarFast }
+        public enum IconKind { Jump, Run, Bike, Walk, BikeFast, Car, CarFast, SteerLeft, SteerRight }
 
         static readonly System.Collections.Generic.Dictionary<IconKind, Sprite> icons = new System.Collections.Generic.Dictionary<IconKind, Sprite>();
 
@@ -107,6 +107,14 @@ namespace LeGamez.UI
                     }
                     break;
                 }
+                case IconKind.SteerLeft:
+                    S(40, 54, 20, 32, 9f);
+                    S(20, 32, 40, 10, 9f);
+                    break;
+                case IconKind.SteerRight:
+                    S(24, 54, 44, 32, 9f);
+                    S(44, 32, 24, 10, 9f);
+                    break;
                 case IconKind.Walk:
                     // Walking figure (calm, upright) – "get off the bike".
                     dots.Add((new Vector2(34, 54), 5.5f));

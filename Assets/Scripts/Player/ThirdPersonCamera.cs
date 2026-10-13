@@ -96,7 +96,15 @@ namespace LeGamez.Player
 
             // Auto follow (Zelda/Genshin style): sideways input swings the camera round so the player
             // runs a curve instead of strafing across the screen; forward input recentres behind them.
-            if (player != null && idleLookTime > manualLookHold)
+            if (player != null && player.Steering != null && idleLookTime > manualLookHold)
+            {
+                // Driving: settle behind the vehicle, faster the quicker it goes (also while reversing).
+                float moving = Mathf.Clamp01(Mathf.Abs(player.SignedSpeed) / 3f);
+                targetYaw = Mathf.MoveTowardsAngle(targetYaw, target.eulerAngles.y, 120f * moving * Time.deltaTime);
+                if (idleLookTime > 2f)
+                    targetPitch = Mathf.MoveTowards(targetPitch, defaultPitch, 20f * Time.deltaTime);
+            }
+            else if (player != null && idleLookTime > manualLookHold)
             {
                 Vector2 input = player.SmoothedInput;
                 float moving = Mathf.Clamp01(player.CurrentSpeed / 2f);

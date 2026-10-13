@@ -54,6 +54,14 @@ namespace LeGamez.UI
 
         void Update()
         {
+            // Android back button (arrives as Escape) on the root screen: send the app to the background.
+            var kb = UnityEngine.InputSystem.Keyboard.current;
+            if (Application.platform == RuntimePlatform.Android && kb != null && kb.escapeKey.wasPressedThisFrame)
+            {
+                using var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+                using var activity = player.GetStatic<AndroidJavaObject>("currentActivity");
+                activity.Call<bool>("moveTaskToBack", true);
+            }
             bool portrait = Screen.height > Screen.width;
             if (builtPortrait != portrait)
             {
@@ -94,6 +102,29 @@ namespace LeGamez.UI
             float longSide = 1080f * Mathf.Max(Screen.width, Screen.height) / Mathf.Max(1, Mathf.Min(Screen.width, Screen.height));
             if (portrait) BuildPortrait(safe, longSide);
             else BuildLandscape(safe, longSide);
+            if (BuildExpiry.IsExpired) ExpiredOverlay(canvasGo.transform);
+        }
+
+        /// <summary>Release build past its date: covers the whole menu, only the download link works.</summary>
+        static void ExpiredOverlay(Transform canvas)
+        {
+            var root = UiKit.Rect("Expired", canvas);
+            UiKit.Stretch(root);
+            UiKit.Panel(root.gameObject, new Color(UiKit.Navy.r, UiKit.Navy.g, UiKit.Navy.b, 0.96f)); // blocks all taps below
+            var card = UiKit.Rect("Card", root, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(860, 520));
+            UiKit.Panel(card.gameObject, UiKit.Card, UiKit.Rounded);
+            UiKit.Label(card, "Diese Version ist abgelaufen", 52, UiKit.Navy, TextAnchor.UpperCenter, FontStyle.Bold)
+                .Place(new Vector2(0.5f, 1f), new Vector2(0, -60), new Vector2(780, 70));
+            string date = BuildExpiry.Expires.HasValue ? BuildExpiry.Expires.Value.ToLocalTime().ToString("dd.MM.yyyy") : "";
+            UiKit.Label(card, $"Testversionen laufen 15 Tage (bis {date}).\nDie aktuelle Version gibt es auf GitHub.", 34, UiKit.InkSoft,
+                    TextAnchor.UpperCenter)
+                .Place(new Vector2(0.5f, 1f), new Vector2(0, -160), new Vector2(780, 120));
+            var btn = UiKit.Rect("Download", card, new Vector2(0.5f, 0f), new Vector2(0, 110), new Vector2(560, 110));
+            var img = UiKit.Panel(btn.gameObject, UiKit.Mustard, UiKit.Rounded);
+            var button = btn.gameObject.AddComponent<Button>();
+            button.targetGraphic = img;
+            button.onClick.AddListener(() => Application.OpenURL(BuildExpiry.ReleasesUrl));
+            UiKit.Stretch(UiKit.Label(btn, "Neue Version laden", 40, UiKit.Navy, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform);
         }
 
         // ---------------------------------------------------------------- layouts

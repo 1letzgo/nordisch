@@ -84,6 +84,7 @@ final class MapCanvas: NSView {
         ctx.concatenate(transform)
         let visible = toWorld(.zero), visible2 = toWorld(CGPoint(x: bounds.maxX, y: bounds.maxY))
         let view = CGRect(x: visible.x, y: visible2.y, width: visible2.x - visible.x, height: visible.y - visible2.y).insetBy(dx: -10, dy: -10)
+        drawHouses(ctx, model, view)
         for o in model.objects where view.contains(CGPoint(x: o.x, y: o.z)) && model.isVisible(o) {
             let selected = model.selection.contains(o.id)
             if o.deleted {
@@ -190,6 +191,52 @@ final class MapCanvas: NSView {
         switch t.shape {
         case .circle(let r): return CGPath(ellipseIn: CGRect(x: -r, y: -r, width: 2 * r, height: 2 * r), transform: nil)
         case .rect(let w, let d): return CGPath(rect: CGRect(x: -w / 2, y: -d / 2, width: w, height: d), transform: nil)
+        }
+    }
+
+    /// Styled houses filled with their wall colour; the selected house outlined. Context in world space.
+    private func drawHouses(_ ctx: CGContext, _ model: EditorModel, _ view: CGRect) {
+        for h in model.houses where model.styleByHouse[h.id] != nil && view.intersects(h.bounds) {
+            let st = model.styleByHouse[h.id]!
+            if st.hidden == true {
+                // Removed: dark fill, red outline and cross.
+                ctx.addPath(h.path)
+                ctx.setFillColor(NSColor.black.withAlphaComponent(0.35).cgColor)
+                ctx.fillPath()
+                ctx.addPath(h.path)
+                ctx.move(to: CGPoint(x: h.bounds.minX, y: h.bounds.minY)); ctx.addLine(to: CGPoint(x: h.bounds.maxX, y: h.bounds.maxY))
+                ctx.move(to: CGPoint(x: h.bounds.minX, y: h.bounds.maxY)); ctx.addLine(to: CGPoint(x: h.bounds.maxX, y: h.bounds.minY))
+                ctx.setStrokeColor(NSColor.systemRed.cgColor)
+                ctx.setLineWidth(2 / zoom)
+                ctx.strokePath()
+                continue
+            }
+            let fill = st.wall.flatMap(NSColor.init(hexString:)) ?? NSColor.controlAccentColor.withAlphaComponent(0.35)
+            ctx.addPath(h.path)
+            ctx.setFillColor(fill.withAlphaComponent(0.9).cgColor)
+            ctx.fillPath()
+            ctx.addPath(h.path)
+            ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.9).cgColor)
+            ctx.setLineWidth(1.5 / zoom)
+            ctx.strokePath()
+        }
+        if let h = model.currentHouse {
+            // Every part of the same building (shared address) gets a light outline, the clicked part a strong one.
+            if let a = h.addr.first {
+                for o in model.houses where o.id != h.id && o.addr.contains(a) && view.intersects(o.bounds) {
+                    ctx.addPath(o.path)
+                    ctx.setStrokeColor(NSColor.controlAccentColor.withAlphaComponent(0.6).cgColor)
+                    ctx.setLineWidth(2 / zoom)
+                    ctx.strokePath()
+                }
+            }
+            ctx.addPath(h.path)
+            ctx.setFillColor(NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor)
+            ctx.fillPath()
+            ctx.addPath(h.path)
+            ctx.setStrokeColor(NSColor.controlAccentColor.cgColor)
+            ctx.setLineWidth(3 / zoom)
+            ctx.strokePath()
         }
     }
 
@@ -329,6 +376,17 @@ final class MapCanvas: NSView {
         let w = toWorld(v)
         let shift = event.modifierFlags.contains(.shift)
 
+        if model.mode == .houses {
+            if let h = model.house(at: w) {
+                model.selectedHouse = h.id
+                if event.clickCount == 2 { focus(on: CGPoint(x: h.bounds.midX, y: h.bounds.midY)) }
+            } else {
+                model.selectedHouse = nil
+                drag = .pan(lastView: v)
+            }
+            needsDisplay = true
+            return
+        }
         if let type = model.placing {
             model.place(type, at: w)
             if let o = model.selectedObjects.first {
@@ -467,7 +525,7 @@ final class MapCanvas: NSView {
         switch event.keyCode {
         case 51, 117: model.deleteSelected()                      // ⌫ / ⌦
         case 53:                                                  // Esc
-            if model.placing != nil { model.placing = nil } else { model.selection = [] }
+            if model.placing != nil { model.placing = nil } else { model.selection = []; model.selectedHouse = nil }
         case 123: model.nudgeSelected(dx: -step, dz: 0)
         case 124: model.nudgeSelected(dx: step, dz: 0)
         case 125: model.nudgeSelected(dx: 0, dz: -step)

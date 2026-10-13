@@ -16,6 +16,13 @@ namespace LeGamez.UI
         Image runBackground;
         Image interactIcon;
 
+        // Vehicle controls (shown instead of joystick/run/jump while riding).
+        RectTransform driveRoot;
+        HoldButton steerLeft, steerRight, gasPedal, brakePedal;
+        Text gearLabel;
+        RectTransform gearBadge;
+        Vector2 interactRestPos;
+
         RectTransform safeRoot;
         Rect appliedSafeArea;
         float toastUntil;
@@ -86,6 +93,8 @@ namespace LeGamez.UI
             hud.interactButton.GetComponent<Image>().color = new Color(UiKit.Mustard.r, UiKit.Mustard.g, UiKit.Mustard.b, 0.9f);
             hud.interactButton.onPress = GameInput.QueueInteract;
             hud.interactButton.gameObject.SetActive(false);
+            hud.interactRestPos = ((RectTransform)hud.interactButton.transform).anchoredPosition;
+            hud.BuildDriveControls();
 
             var menuButton = CreateButton(hud.safeRoot, "Menu", "×", Vector2.zero, 90);
             var menuRt = (RectTransform)menuButton.transform;
@@ -115,11 +124,90 @@ namespace LeGamez.UI
         void Update()
         {
             if (Screen.safeArea != appliedSafeArea) ApplySafeArea();
+            // Android back button arrives as Escape: close the big map first, otherwise back to the menu.
+            var kb = UnityEngine.InputSystem.Keyboard.current;
+            if (kb != null && kb.escapeKey.wasPressedThisFrame && !FullMap.CloseIfOpen())
+                UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(0);
             if (portrait != IsPortrait) ApplyOrientation();
             if (toastLabel != null && toastLabel.text.Length > 0 && Time.time > toastUntil) toastLabel.text = "";
+            if (driveRoot != null && driveRoot.gameObject.activeSelf)
+            {
+                GameInput.TouchSteer = (steerRight.Held ? 1f : 0f) - (steerLeft.Held ? 1f : 0f);
+                GameInput.TouchGas = gasPedal.Held;
+                GameInput.TouchBrake = brakePedal.Held;
+            }
             if (runBackground != null)
                 runBackground.color = GameInput.RunToggled ? new Color(UiKit.Mustard.r, UiKit.Mustard.g, UiKit.Mustard.b, 0.95f) : ButtonIdle;
         }
+
+        // ---------------------------------------------------------------- vehicle controls
+
+        const float SteerSize = 190f, PedalW = 170f, GasH = 270f, BrakeH = 180f;
+
+        void BuildDriveControls()
+        {
+            driveRoot = NewRect("DriveControls", safeRoot);
+            Stretch(driveRoot);
+            // Left thumb: ◀ ▶.
+            steerLeft = HoldPad(driveRoot, "SteerLeft", new Vector2(0, 0), new Vector2(60 + SteerSize / 2, 50 + SteerSize / 2), new Vector2(SteerSize, SteerSize), UiKit.IconKind.SteerLeft, null);
+            steerRight = HoldPad(driveRoot, "SteerRight", new Vector2(0, 0), new Vector2(60 + SteerSize * 1.5f + 28, 50 + SteerSize / 2), new Vector2(SteerSize, SteerSize), UiKit.IconKind.SteerRight, null);
+            // Right thumb: tall gas pedal at the edge, brake next to it.
+            gasPedal = HoldPad(driveRoot, "Gas", new Vector2(1, 0), new Vector2(-40 - PedalW / 2, 40 + GasH / 2), new Vector2(PedalW, GasH), null, "GAS");
+            brakePedal = HoldPad(driveRoot, "Brake", new Vector2(1, 0), new Vector2(-40 - PedalW * 1.5f - 30, 40 + BrakeH / 2), new Vector2(PedalW, BrakeH), null, "BREMSE");
+            // Gear badge (cars): D / R above the brake.
+            gearBadge = NewRect("Gear", driveRoot);
+            gearBadge.anchorMin = gearBadge.anchorMax = new Vector2(1, 0);
+            gearBadge.sizeDelta = new Vector2(96, 72);
+            gearBadge.anchoredPosition = new Vector2(-40 - PedalW * 1.5f - 30, 40 + BrakeH + 30 + 36);
+            UiKit.Panel(gearBadge.gameObject, new Color(0.1f, 0.23f, 0.31f, 0.75f));
+            gearLabel = UiKit.Label(gearBadge, "D", 44, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
+            UiKit.Stretch(gearLabel.rectTransform);
+            driveRoot.gameObject.SetActive(false);
+        }
+
+        static HoldButton HoldPad(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size, UiKit.IconKind? icon, string text)
+        {
+            var rt = NewRect(name, parent);
+            rt.anchorMin = rt.anchorMax = anchor;
+            rt.sizeDelta = size;
+            rt.anchoredPosition = pos;
+            var bg = UiKit.Panel(rt.gameObject, ButtonIdle);
+            bg.raycastTarget = true;
+            if (icon.HasValue)
+            {
+                var glyph = NewRect("Icon", rt);
+                glyph.sizeDelta = Vector2.one * Mathf.Min(size.x, size.y) * 0.5f;
+                var img = glyph.gameObject.AddComponent<Image>();
+                img.sprite = UiKit.Icon(icon.Value);
+                img.raycastTarget = false;
+            }
+            if (text != null)
+            {
+                var t = UiKit.Label(rt, text, 34, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
+                UiKit.Stretch(t.rectTransform);
+                t.raycastTarget = false;
+            }
+            var hb = rt.gameObject.AddComponent<HoldButton>();
+            hb.tint = bg;
+            hb.idleColor = ButtonIdle;
+            hb.heldColor = new Color(UiKit.Mustard.r, UiKit.Mustard.g, UiKit.Mustard.b, 0.9f);
+            return hb;
+        }
+
+        /// <summary>Riding: ◀ ▶ + gas/brake instead of joystick, sprint and jump. <paramref name="gears"/> shows D/R.</summary>
+        public void SetDriveMode(bool on, bool gears)
+        {
+            driveRoot.gameObject.SetActive(on);
+            gearBadge.gameObject.SetActive(on && gears);
+            joystickZone.gameObject.SetActive(!on);
+            runButton.gameObject.SetActive(!on);
+            jumpButton.gameObject.SetActive(!on);
+            // Get off / out: above the gas pedal while riding.
+            ((RectTransform)interactButton.transform).anchoredPosition = on ? new Vector2(-40 - PedalW / 2, 40 + GasH + 30 + 68) : interactRestPos;
+            if (!on) { GameInput.TouchSteer = 0f; GameInput.TouchGas = GameInput.TouchBrake = false; }
+        }
+
+        public void SetGear(bool reverse) => gearLabel.text = reverse ? "R" : "D";
 
         public void ShowToast(string message, float seconds = 3f)
         {

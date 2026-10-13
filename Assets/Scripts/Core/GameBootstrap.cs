@@ -135,6 +135,11 @@ namespace LeGamez.Core
             cam.nearClipPlane = 0.2f;
             cam.farClipPlane = 750f; // fog ends at 650 m – nothing beyond needs drawing
             cam.fieldOfView = 55f;
+            // Small detail geometry (window sills – layer 8 from the importer) only up close.
+            var cull = new float[32];
+            cull[8] = 120f;
+            cam.layerCullDistances = cull;
+            cam.layerCullSpherical = true;
             cam.clearFlags = RenderSettings.skybox != null ? CameraClearFlags.Skybox : CameraClearFlags.SolidColor;
             cam.backgroundColor = RenderSettings.fog ? RenderSettings.fogColor : new Color(0.7f, 0.82f, 0.95f);
             var urpCam = cam.GetUniversalAdditionalCameraData();

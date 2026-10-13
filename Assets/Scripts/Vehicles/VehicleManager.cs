@@ -72,7 +72,9 @@ namespace LeGamez.Vehicles
             if (player == null || hud == null) return;
             if (riding != null)
             {
-                riding.Animate(player.CurrentSpeed);
+                riding.SteerAngle = player.SteerAngle;
+                riding.Animate(player.SignedSpeed);
+                hud.SetGear(player.Reversing);
                 hud.SetInteract(UiKit.IconKind.Walk);
                 if (GameInput.ConsumeInteract()) Dismount();
                 return;
@@ -103,6 +105,7 @@ namespace LeGamez.Vehicles
             player.runSpeed = v.SprintSpeed;
             player.turnSmoothTime = v.TurnSmoothTime;
             player.CanJump = false;
+            player.Steering = v.Steering();
 
             if (controller != null)
             {
@@ -119,8 +122,7 @@ namespace LeGamez.Vehicles
             avatar?.SetMode(v.AvatarMode);
             if (cam != null) cam.distanceBonus = v.CameraBonus;
             GameInput.RunToggled = false;          // start in the relaxed gear
-            hud.SetRunIcon(v.SprintIcon);          // sprint button now shifts the vehicle's gear
-            hud.jumpButton.gameObject.SetActive(false);
+            hud.SetDriveMode(true, v.ReverseSpeed > 0f);
             if (!silent) hud.ShowToast("Gute Fahrt!", 1.5f);
         }
 
@@ -155,6 +157,7 @@ namespace LeGamez.Vehicles
             player.runSpeed = runSpeed;
             player.turnSmoothTime = turnSmooth;
             player.CanJump = true;
+            player.Steering = null;
             if (controller != null)
             {
                 controller.radius = ccRadius;
@@ -169,8 +172,8 @@ namespace LeGamez.Vehicles
             avatar?.SetMode(0);
             if (cam != null) cam.distanceBonus = 0f;
             GameInput.RunToggled = false;
+            hud.SetDriveMode(false, false);
             hud.SetRunIcon(UiKit.IconKind.Run);
-            hud.jumpButton.gameObject.SetActive(true);
         }
     }
 }

@@ -167,7 +167,7 @@ namespace LeGamez.Editor
 
         static void Render(Camera cam, string file) => RenderTo(cam, file, Width, Height);
 
-        static void RenderTo(Camera cam, string file, int width, int height)
+        internal static void RenderTo(Camera cam, string file, int width, int height)
         {
             var rt = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
             cam.targetTexture = rt;

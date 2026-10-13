@@ -100,6 +100,20 @@ def text_of(el, path):
     return x.text.strip() if x is not None and x.text else None
 
 
+def addresses_of(b):
+    """Official ALKIS addresses of a building element ("Street 12"), own bldg:address children only."""
+    out = []
+    for adr in b.findall("bldg:address", NS):
+        for tf in adr.iter("{urn:oasis:names:tc:ciq:xsdschema:xAL:2.0}Thoroughfare"):
+            name = tf.find("{urn:oasis:names:tc:ciq:xsdschema:xAL:2.0}ThoroughfareName")
+            num = tf.find("{urn:oasis:names:tc:ciq:xsdschema:xAL:2.0}ThoroughfareNumber")
+            if name is not None and name.text:
+                a = name.text.strip() + (" " + num.text.strip() if num is not None and num.text else "")
+                if a not in out:
+                    out.append(a)
+    return out
+
+
 def extract_building(b):
     """Returns (attrs, surfaces) for a bldg:Building or bldg:BuildingPart (own surfaces only)."""
     attrs = {
@@ -147,8 +161,10 @@ def process_area(area):
                 if el.tag != "{http://www.opengis.net/citygml/building/1.0}Building":
                     continue
                 parts = [el] + el.findall(".//bldg:BuildingPart", NS)
+                parent_addr = addresses_of(el)
                 for part in parts:
                     attrs, surfaces = extract_building(part)
+                    attrs["addr"] = addresses_of(part) or parent_addr
                     if not surfaces or attrs["id"] in seen:
                         continue
                     # Convert every vertex; keep the building if its footprint centre is inside the area.

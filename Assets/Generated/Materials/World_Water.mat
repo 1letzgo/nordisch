@@ -28,7 +28,7 @@ Material:
     m_Floats:
     - _Facade: 0
     - _FloorHeight: 3
-    - _ShadowStrength: 0.55
+    - _ShadowStrength: 0.68
     - _WaterAnim: 1
     m_Colors:
     - _Tint: {r: 1, g: 1, b: 1, a: 1}

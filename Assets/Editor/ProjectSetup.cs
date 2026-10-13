@@ -49,7 +49,26 @@ namespace LeGamez.Editor
             PlayerSettings.SetGraphicsAPIs(BuildTarget.iOS, new[] { GraphicsDeviceType.Metal });
             PlayerSettings.colorSpace = ColorSpace.Linear;
             PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.iOS, ManagedStrippingLevel.Low);
+            ConfigureAndroid();
             ConfigureBranding();
+        }
+
+        /// <summary>Android player settings (same bundle id; ARM64 only, Vulkan with GLES3 fallback).</summary>
+        public static void ConfigureAndroid()
+        {
+            PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, BundleId);
+            PlayerSettings.Android.bundleVersionCode = 1;
+            PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
+            PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevelAuto;
+            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+            PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+            PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.Android, false);
+            PlayerSettings.SetGraphicsAPIs(BuildTarget.Android, new[] { GraphicsDeviceType.Vulkan, GraphicsDeviceType.OpenGLES3 });
+            PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.Android, ManagedStrippingLevel.Low);
+            PlayerSettings.Android.renderOutsideSafeArea = true; // UI already respects Screen.safeArea (notches)
+            PlayerSettings.Android.startInFullscreen = true;
+            PlayerSettings.Android.autoRotationBehavior = AndroidAutoRotationBehavior.User; // see AppOrientation
+            PlayerSettings.Android.predictiveBackSupport = false; // back button must arrive as Escape (Hud)
         }
 
         const string LogoPath = "Assets/Resources/Branding/logo.png";
@@ -119,7 +138,7 @@ namespace LeGamez.Editor
                 urp.shadowCascadeCount = 2;
                 urp.msaaSampleCount = 4;
                 urp.renderScale = 1f;
-                urp.supportsHDR = false;
+                urp.supportsHDR = true; // subtle bloom on sun-lit glass/water
                 var so = new SerializedObject(urp);
                 SetInt(so, "m_MainLightShadowmapResolution", 2048);
                 SetBool(so, "m_MainLightShadowsSupported", true);
@@ -215,10 +234,15 @@ namespace LeGamez.Editor
             tone.mode.Override(TonemappingMode.Neutral);
             var color = Get<ColorAdjustments>();
             color.postExposure.Override(0.15f);
-            color.contrast.Override(10f);
+            color.contrast.Override(14f);
             color.saturation.Override(12f);
             var wb = Get<WhiteBalance>();
             wb.temperature.Override(6f);
+            var bloom = Get<Bloom>();
+            bloom.threshold.Override(1.05f);
+            bloom.intensity.Override(0.35f);
+            bloom.scatter.Override(0.6f);
+            bloom.highQualityFiltering.Override(false);
             var vignette = Get<Vignette>();
             vignette.intensity.Override(0.18f);
             vignette.smoothness.Override(0.45f);

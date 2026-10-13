@@ -19,6 +19,28 @@ namespace LeGamez.Vehicles
         public abstract Vector3 SeatOffset { get; }
         /// <summary>Hide the rider (inside a car).</summary>
         public virtual bool HideRider => false;
+        /// <summary>Steering geometry: wheelbase and distance from the pivot back to the rear axle (m).</summary>
+        public abstract float AxleBase { get; }
+        public abstract float RearAxle { get; }
+        public virtual float MaxSteer => 32f;
+        public virtual float LateralAccel => 6f;
+        // Pedals: top speed at full gas, seconds to reach it, brake/coast deceleration, reverse (0 = none).
+        public abstract float TopSpeed { get; }
+        public virtual float AccelTime => 3f;
+        public virtual float BrakeDecel => 9f;
+        public virtual float CoastDecel => 1.5f;
+        public virtual float ReverseSpeed => 0f;
+
+        /// <summary>Front wheel angle set by the rider each frame (degrees, + = right), for the wheel visuals.</summary>
+        [System.NonSerialized] public float SteerAngle;
+
+        public LeGamez.Player.PlayerController.VehicleSteering Steering() => new LeGamez.Player.PlayerController.VehicleSteering
+        {
+            axleBase = AxleBase, rearAxle = RearAxle, maxSteer = MaxSteer, lateralAccel = LateralAccel,
+            maxSpeed = TopSpeed, accelTime = AccelTime, brakeDecel = BrakeDecel, coastDecel = CoastDecel,
+            reverseSpeed = ReverseSpeed,
+        };
+
         /// <summary>CharacterController radius while riding (cars are wide).</summary>
         public virtual float ColliderRadius => 0.35f;
 

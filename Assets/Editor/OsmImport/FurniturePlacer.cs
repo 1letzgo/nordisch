@@ -407,15 +407,10 @@ namespace LeGamez.Editor.OsmImport
             var basePos = V(p, 0.6f);
             Cylinder(g, basePos, 0.06f, 1.4f, 5, WorldStyle.TreeTrunk, WorldStyle.TreeTrunk, false);
             var leaves = WorldStyle.Tint(PlanterGreen, rng, 0.1f);
-            float r = 0.65f, cy = 1.9f;
-            for (int i = 0; i < 6; i++)
-            {
-                float a0 = i * Mathf.PI / 3f, a1 = (i + 1) * Mathf.PI / 3f;
-                var r0 = basePos + new Vector3(Mathf.Cos(a0) * r, cy, Mathf.Sin(a0) * r);
-                var r1 = basePos + new Vector3(Mathf.Cos(a1) * r, cy, Mathf.Sin(a1) * r);
-                MeshSink.Tri(g, r0, basePos + Vector3.up * (cy + 0.7f), r1, leaves);
-                MeshSink.Tri(g, r1, basePos + Vector3.up * (cy - 0.6f), r0, WorldStyle.Tint(leaves, rng, 0.05f));
-            }
+            var local = PropPlacer.Fork(rng, 6); // same draw count as the former 6-sided crown
+            PropPlacer.Blob(g, basePos + Vector3.up * 1.95f, 0.68f, 0.6f, 0f, leaves, local);
+            PropPlacer.Blob(g, basePos + new Vector3(0.18f, 2.45f, -0.1f), 0.42f, 0.32f, 1f,
+                Color32.Lerp(leaves, PropPlacer.LeavesLight, 0.3f), local);
         }
 
         static void CafeSet(MeshSink.Batch b, Vector2 p, float yaw, Color32 umbrella)

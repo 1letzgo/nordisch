@@ -30,6 +30,14 @@ namespace LeGamez.UI
 
         static FullMap instance;
 
+        /// <summary>Closes the map if it is open (Android back button); false when there was nothing to close.</summary>
+        public static bool CloseIfOpen()
+        {
+            if (instance == null || !instance.gameObject.activeSelf) return false;
+            instance.Hide();
+            return true;
+        }
+
         public static void Open(Transform canvasRoot)
         {
             if (instance == null) instance = Build(canvasRoot);

@@ -11,6 +11,8 @@ namespace LeGamez.Editor.OsmImport
     public class MeshSink
     {
         public const float ChunkSize = 100f;
+        /// <summary>Small chunks for <see cref="WorldStyle.MatDetails"/>, so distance culling works per block.</summary>
+        public const float DetailChunkSize = 25f;
 
         public class Batch
         {
@@ -31,7 +33,9 @@ namespace LeGamez.Editor.OsmImport
 
         public Batch Get(string material, Vector2 anchor)
         {
-            var key = (material, ChunkOf(anchor));
+            var key = (material, material == WorldStyle.MatDetails
+                ? new Vector2Int(Mathf.FloorToInt(anchor.x / DetailChunkSize), Mathf.FloorToInt(anchor.y / DetailChunkSize))
+                : ChunkOf(anchor));
             if (!batches.TryGetValue(key, out var b)) batches[key] = b = new Batch();
             return b;
         }
@@ -97,14 +101,15 @@ namespace LeGamez.Editor.OsmImport
             }
         }
 
-        public static Mesh ToMesh(Batch b, string name)
+        /// <param name="withShaderData">False for materials without the facade keyword (trees, water): saves 16 bytes per vertex.</param>
+        public static Mesh ToMesh(Batch b, string name, bool withShaderData = true)
         {
             var mesh = new Mesh { name = name };
             if (b.vertices.Count > 65000) mesh.indexFormat = IndexFormat.UInt32;
             mesh.SetVertices(b.vertices);
             mesh.SetNormals(b.normals);
             mesh.SetColors(b.colors);
-            mesh.SetUVs(0, b.uvs);
+            if (withShaderData) mesh.SetUVs(0, b.uvs);
             mesh.SetTriangles(b.triangles, 0);
             mesh.RecalculateBounds();
             return mesh;

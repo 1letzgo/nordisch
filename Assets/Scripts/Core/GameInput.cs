@@ -37,6 +37,60 @@ namespace LeGamez.Core
         }
         public static void QueueInteract() => touchInteractQueued = true;
 
+        // ---- Vehicles: on-screen pedals and steering buttons (written by the HUD while riding).
+        public static float TouchSteer;
+        public static bool TouchGas, TouchBrake;
+
+        /// <summary>Steering −1 (left) … +1 (right): ◀ ▶ buttons, A/D or ←/→, gamepad left stick.</summary>
+        public static float Steer
+        {
+            get
+            {
+                float s = TouchSteer;
+#if ENABLE_INPUT_SYSTEM
+                var kb = Keyboard.current;
+                if (kb != null)
+                {
+                    if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) s -= 1f;
+                    if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) s += 1f;
+                }
+                var pad = Gamepad.current;
+                if (pad != null && Mathf.Abs(pad.leftStick.ReadValue().x) > 0.15f) s += pad.leftStick.ReadValue().x;
+#endif
+                return Mathf.Clamp(s, -1f, 1f);
+            }
+        }
+
+        /// <summary>Gas pedal 0…1: on-screen pedal, W/↑, gamepad right trigger.</summary>
+        public static float Throttle
+        {
+            get
+            {
+                float t = TouchGas ? 1f : 0f;
+#if ENABLE_INPUT_SYSTEM
+                var kb = Keyboard.current;
+                if (kb != null && (kb.wKey.isPressed || kb.upArrowKey.isPressed)) t = 1f;
+                if (Gamepad.current != null) t = Mathf.Max(t, Gamepad.current.rightTrigger.ReadValue());
+#endif
+                return t;
+            }
+        }
+
+        /// <summary>Brake pedal 0…1 (held at standstill = reverse): on-screen pedal, S/↓, gamepad left trigger.</summary>
+        public static float Brake
+        {
+            get
+            {
+                float b = TouchBrake ? 1f : 0f;
+#if ENABLE_INPUT_SYSTEM
+                var kb = Keyboard.current;
+                if (kb != null && (kb.sKey.isPressed || kb.downArrowKey.isPressed)) b = 1f;
+                if (Gamepad.current != null) b = Mathf.Max(b, Gamepad.current.leftTrigger.ReadValue());
+#endif
+                return b;
+            }
+        }
+
         public static Vector2 Move
         {
             get

@@ -1,5 +1,60 @@
 {
-  "buildings": [
-    { "address": "Alte Weide 4", "wall": "#9E4834", "brick": true, "gableWindows": 2, "gableWindowFloor": 1 }
+  "buildings" : [
+    {
+      "address" : "Alte Weide 4",
+      "brick" : true,
+      "doorColor" : "#E8E6DE",
+      "gableWindowFloor" : 1,
+      "gableWindows" : 2,
+      "wall" : "#9E4834"
+    },
+    {
+      "brick" : true,
+      "id" : "DENILD1200001BHh",
+      "wall" : "#9E4834"
+    },
+    {
+      "id" : "DENILD1200001BHd",
+      "windows" : false
+    },
+    {
+      "address" : "Bussardweg 3",
+      "brick" : false,
+      "roofShape" : "flat",
+      "wall" : "#EEEAE2"
+    },
+    {
+      "address" : "Alte Weide 6",
+      "brick" : false,
+      "roofShape" : "hipped",
+      "wall" : "#DEC48C"
+    },
+    {
+      "address" : "Bussardweg 12",
+      "brick" : false,
+      "roofShape" : "hipped",
+      "wall" : "#DEC48C"
+    },
+    {
+      "id" : "DENILD120000dJbn",
+      "windows" : false
+    },
+    {
+      "address" : "Bussardweg 6",
+      "roofShape" : "hipped"
+    },
+    {
+      "address" : "Bussardweg 10",
+      "roofShape" : "hipped"
+    },
+    {
+      "brick" : true,
+      "id" : "UUID_df01d552-1124-470a-bc96-d9944a4ad27f",
+      "wall" : "#9E4834"
+    },
+    {
+      "hidden" : true,
+      "id" : "DENILD120000hgaZ"
+    }
   ]
 }

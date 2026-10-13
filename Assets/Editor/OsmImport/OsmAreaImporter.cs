@@ -121,6 +121,9 @@ namespace LeGamez.Editor.OsmImport
             var rng = new System.Random(meta.id.GetHashCode());
 
             var terrain = TerrainField.Load(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".dgm.bin"));
+            var lidarTrees = PropPlacer.LoadLidarTrees(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".trees.json"));
+            var aerial = AerialImage.Load(Path.GetDirectoryName(jsonPath), meta.id);
+            aerial?.SetCanopy(lidarTrees);
             var sink = new MeshSink();
             GroundBuilder.BuildBase(sink, area, WorldStyle.GroundColor(meta.ground), terrain);
             GroundBuilder.BuildAreas(data, sink, area);
@@ -136,7 +139,6 @@ namespace LeGamez.Editor.OsmImport
             int osmExtra = hasLod2 ? BuildingBuilder.Build(data, sink, area, new System.Random(meta.id.GetHashCode() ^ 0x0B5D), Lod2Builder.Covers) : 0;
             BuildingOverrides.ReportUnused();
             EditsPlacer.Begin(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".edits.json"));
-            var lidarTrees = PropPlacer.LoadLidarTrees(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".trees.json"));
             int trees = PropPlacer.PlaceTrees(data, sink, area, rng, lidarTrees);
             int lamps = PropPlacer.PlaceStreetLamps(data, sink, area);
             int barriers = GroundBuilder.BuildBarriers(data, sink, area);
@@ -156,6 +158,7 @@ namespace LeGamez.Editor.OsmImport
             string areaDir = $"{GeneratedRoot}/{meta.id}";
             EnsureFolder(areaDir);
             EditsPlacer.SaveRecords($"{areaDir}/{meta.id}_objects.json"); // object list for the map editor
+            BuildingOverrides.SaveCatalog($"{areaDir}/{meta.id}_buildings.json"); // houses (id, address, footprint) for the map editor
             EnsureFolder(AreaScenesDir);
             var materials = EnsureMaterials();
 
@@ -181,7 +184,8 @@ namespace LeGamez.Editor.OsmImport
                     groups[mat] = parent;
                 }
 
-                var mesh = MeshSink.ToMesh(kv.Value, $"{meta.id}_{mat}_{chunk.x}_{chunk.y}");
+                bool facadeData = WorldStyle.MaterialOf(mat) == WorldStyle.MatBuildings || WorldStyle.MaterialOf(mat) == WorldStyle.MatGround;
+                var mesh = MeshSink.ToMesh(kv.Value, $"{meta.id}_{mat}_{chunk.x}_{chunk.y}", facadeData);
                 MeshUtility.Optimize(mesh);
                 AssetDatabase.AddObjectToAsset(mesh, container);
 
@@ -190,12 +194,13 @@ namespace LeGamez.Editor.OsmImport
                 go.AddComponent<MeshFilter>().sharedMesh = mesh;
                 var mr = go.AddComponent<MeshRenderer>();
                 mr.sharedMaterial = materials[WorldStyle.MaterialOf(mat)];
-                bool casts = mat != WorldStyle.MatGround && mat != WorldStyle.MatWater;
+                bool casts = mat != WorldStyle.MatGround && mat != WorldStyle.MatWater && mat != WorldStyle.MatDetails;
                 mr.shadowCastingMode = casts ? ShadowCastingMode.On : ShadowCastingMode.Off;
                 if (WorldStyle.HasCollider(mat))
                     go.AddComponent<MeshCollider>().sharedMesh = mesh;
                 // Thin props (lamps, trunks, fences) block the player but not the camera probe.
                 if (mat == WorldStyle.MatProps || mat == WorldStyle.MatTreeTrunks) go.layer = 2;
+                if (mat == WorldStyle.MatDetails) go.layer = WorldStyle.DetailsLayer;
                 // Water: collider on the built-in "Water" layer so placement can detect it; the player walks through.
                 if (mat == WorldStyle.MatWater)
                 {
@@ -241,7 +246,7 @@ namespace LeGamez.Editor.OsmImport
             info.spawnBikeSpot = bikeSpot.HasValue
                 ? new Vector3(bikeSpot.Value.x, terrain.Height(bikeSpot.Value.x, bikeSpot.Value.y), bikeSpot.Value.y)
                 : Vector3.zero;
-            info.attribution = hasLod2 ? "© OpenStreetMap-Mitwirkende (ODbL) · 3D-Gebäude © LGLN (CC BY 4.0)" : "© OpenStreetMap-Mitwirkende (ODbL)";
+            info.attribution = hasLod2 ? "© OpenStreetMap-Mitwirkende (ODbL) · 3D-Gebäude, Gelände, Luftbilder © LGLN (CC BY 4.0)" : "© OpenStreetMap-Mitwirkende (ODbL)";
             spawn.SetParent(areaGo.transform, true);
 
             new GameObject("GameBootstrap").AddComponent<GameBootstrap>();
@@ -252,7 +257,7 @@ namespace LeGamez.Editor.OsmImport
             UpdateCatalog(meta, pois.Count);
             AssetDatabase.SaveAssets();
 
-            Debug.Log($"[OSM] {meta.name}: {buildings} buildings (+{osmExtra} OSM-only), {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, terrain {(terrain.IsFlat ? "flat" : "DGM1")}, trees {(lidarTrees != null ? "LiDAR" : "OSM")}, " +
+            Debug.Log($"[OSM] {meta.name}: {buildings} buildings (+{osmExtra} OSM-only), {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, terrain {(terrain.IsFlat ? "flat" : "DGM1")}, aerial {(aerial != null ? "DOP20" : "-")}, trees {(lidarTrees != null ? "LiDAR" : "OSM")}, " +
                       $"furniture {furniture.mapped} mapped/{furniture.benches} benches/{furniture.planters} planters/{furniture.seating} café tables/{furniture.fountains} fountains, {edits} hand-placed/{EditsPlacer.ChangedCount} edited, {pois.Count} POIs, " +
                       $"{sink.Batches.Count()} meshes in {sw.ElapsedMilliseconds} ms -> {scenePath}");
             return scenePath;
@@ -474,17 +479,18 @@ namespace LeGamez.Editor.OsmImport
         {
             string path = $"{MaterialsDir}/Sky.mat";
             var sky = AssetDatabase.LoadAssetAtPath<Material>(path);
+            var shader = Shader.Find("LeGamez/Sky");
             if (sky == null)
             {
-                sky = new Material(Shader.Find("Skybox/Procedural")) { name = "Sky" };
+                sky = new Material(shader) { name = "Sky" };
                 AssetDatabase.CreateAsset(sky, path);
             }
-            sky.SetFloat("_SunSize", 0.035f);
-            sky.SetFloat("_SunSizeConvergence", 6f);
-            sky.SetFloat("_AtmosphereThickness", 0.75f);
-            sky.SetColor("_SkyTint", new Color(0.52f, 0.66f, 0.86f));
-            sky.SetColor("_GroundColor", new Color(0.74f, 0.82f, 0.90f)); // = fog colour, hides the horizon seam
-            sky.SetFloat("_Exposure", 1.15f);
+            sky.shader = shader;
+            sky.SetColor("_ZenithColor", new Color(0.30f, 0.50f, 0.80f));
+            sky.SetColor("_HorizonColor", new Color(0.74f, 0.82f, 0.90f)); // = fog colour, hides the horizon seam
+            sky.SetColor("_GroundColor", new Color(0.74f, 0.82f, 0.90f));
+            sky.SetColor("_SunColor", new Color(1f, 0.94f, 0.8f));
+            sky.SetFloat("_CloudCover", 0.42f);
             EditorUtility.SetDirty(sky);
             return sky;
         }
@@ -494,10 +500,11 @@ namespace LeGamez.Editor.OsmImport
             RenderSettings.skybox = sky;
             var sun = new GameObject("Sun").AddComponent<Light>();
             sun.type = LightType.Directional;
-            sun.color = new Color(1f, 0.96f, 0.88f);
-            sun.intensity = 1.25f;
+            sun.color = new Color(1f, 0.94f, 0.84f);
+            sun.intensity = 1.3f;
             sun.shadows = LightShadows.Soft;
-            sun.transform.rotation = Quaternion.Euler(48f, -35f, 0f);
+            // Lower afternoon sun: longer shadows model the low-poly shapes better.
+            sun.transform.rotation = Quaternion.Euler(38f, -35f, 0f);
 
             RenderSettings.sun = sun;
             RenderSettings.ambientMode = AmbientMode.Trilight;
@@ -527,6 +534,7 @@ namespace LeGamez.Editor.OsmImport
                     AssetDatabase.CreateAsset(mat, path);
                 }
                 mat.shader = shader;
+                mat.SetFloat("_ShadowStrength", 0.68f);
                 if (name == WorldStyle.MatWater)
                 {
                     mat.SetFloat("_WaterAnim", 1f);

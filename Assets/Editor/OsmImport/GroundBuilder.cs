@@ -67,6 +67,10 @@ namespace LeGamez.Editor.OsmImport
                 case "grass": case "meadow": case "recreation_ground": case "village_green": case "cemetery":
                 case "allotments": case "farmland": case "orchard":
                     s.color = WorldStyle.Grass; return true;
+                // Generic built-up landuse would hide the measured ground cover of gardens and yards.
+                case "residential" when AerialImage.Current != null: s = default; return false;
+                case "commercial" when AerialImage.Current != null: case "retail" when AerialImage.Current != null:
+                case "industrial" when AerialImage.Current != null: s = default; return false;
                 case "residential": s.color = WorldStyle.Residential; s.y = WorldStyle.YBase + 0.01f; return true;
                 case "commercial": case "retail": case "industrial": case "railway": case "construction":
                     s.color = WorldStyle.Commercial; s.y = WorldStyle.YBase + 0.01f; return true;
@@ -96,7 +100,60 @@ namespace LeGamez.Editor.OsmImport
                 if (style.marking) DashedLine(sink, way.points, area, style.y + 0.012f);
                 count++;
             }
+            Kerbs(data, sink, area);
             return count;
+        }
+
+        static readonly Color32 Kerbstone = WorldStyle.Hex("#B8B4AA");
+
+        /// <summary>
+        /// Light kerbstone band along both edges of every carriageway. Pieces that fall onto another carriageway
+        /// (junctions, crossings, joining service roads) are left out, so the band never runs across a road.
+        /// </summary>
+        static void Kerbs(OsmData data, MeshSink sink, AreaRect area)
+        {
+            var roads = new List<(OsmWay way, LineStyle style)>();
+            var carriageways = new PropPlacer.Clearance();
+            foreach (var way in data.ways)
+            {
+                if (way.tags.Is("area", "yes") || way.tags.Has("tunnel") && !way.tags.Is("tunnel", "no")) continue;
+                if (!TryLineStyle(way.tags, out var style) || !style.color.Equals(WorldStyle.Asphalt)) continue;
+                if (!area.Overlaps(way.points, 20f)) continue;
+                roads.Add((way, style));
+                carriageways.AddLine(way.points, style.width * 0.5f);
+            }
+            const float piece = 1.2f, band = 0.2f;
+            foreach (var (way, style) in roads)
+            {
+                float hw = style.width * 0.5f, y = style.y + 0.006f;
+                var pts = way.points;
+                for (int i = 0; i < pts.Count - 1; i++)
+                {
+                    Vector2 a = pts[i], b = pts[i + 1];
+                    if (!area.ClipSegment(ref a, ref b)) continue;
+                    float len = Vector2.Distance(a, b);
+                    if (len < 0.3f) continue;
+                    Vector2 dir = (b - a) / len, nrm = new Vector2(-dir.y, dir.x);
+                    int pieces = Mathf.Max(1, Mathf.RoundToInt(len / piece));
+                    float step = len / pieces;
+                    var batch = sink.Get(WorldStyle.MatGround, (a + b) * 0.5f);
+                    foreach (float side in new[] { 1f, -1f })
+                    {
+                        var n = nrm * side;
+                        for (int k = 0; k < pieces; k++)
+                        {
+                            var s0 = a + dir * (k * step);
+                            var s1 = a + dir * ((k + 1) * step);
+                            // Just outside this road's edge: inside another carriageway -> junction, no kerb.
+                            if (carriageways.IsBlocked((s0 + s1) * 0.5f + n * (hw + 0.15f), 0f)) continue;
+                            Vector2 o0 = s0 + n * hw, o1 = s1 + n * hw, i0 = s0 + n * (hw - band), i1 = s1 + n * (hw - band);
+                            // Clockwise from above for the left side; mirror for the right.
+                            if (side > 0) MeshSink.Quad(batch, V(o0, y), V(o1, y), V(i1, y), V(i0, y), Kerbstone);
+                            else MeshSink.Quad(batch, V(i0, y), V(i1, y), V(o1, y), V(o0, y), Kerbstone);
+                        }
+                    }
+                }
+            }
         }
 
         /// <summary>Drawn width of a road/path/rail/waterway ribbon (0 = not drawn), for keeping props off it.</summary>
@@ -262,6 +319,10 @@ namespace LeGamez.Editor.OsmImport
         /// split along the x0z0–x1z1 diagonal – the same split TerrainField.Height uses), with soft colour
         /// variation and a little extra shading on slopes.
         /// </summary>
+        static Color32 Shade(Color32 color, float f, float noise) =>
+            new Color32((byte)Mathf.Clamp(color.r * f, 0, 255), (byte)Mathf.Clamp(color.g * (f + noise * 0.04f), 0, 255),
+                (byte)Mathf.Clamp(color.b * f, 0, 255), 255);
+
         public static void BuildBase(MeshSink sink, AreaRect area, Color32 color, TerrainField t)
         {
             float cs = TerrainField.CellSize;
@@ -279,9 +340,17 @@ namespace LeGamez.Editor.OsmImport
                 Vector3 p00 = new Vector3(x0, t.Raw(x0, z0), z0), p10 = new Vector3(x1, t.Raw(x1, z0), z0);
                 Vector3 p01 = new Vector3(x0, t.Raw(x0, z1), z1), p11 = new Vector3(x1, t.Raw(x1, z1), z1);
                 var batch = sink.Get(WorldStyle.MatTerrain, new Vector2(x0, z0));
+                // With an aerial image each triangle takes the measured ground cover (garden, yard, sand, field).
+                Color32 cUpper = c, cLower = c;
+                var aerial = AerialImage.Current;
+                if (aerial != null)
+                {
+                    cUpper = Shade(AerialImage.CoverColor(aerial.CoverIn(x0, z0, cs, true), color), f, noise);
+                    cLower = Shade(AerialImage.CoverColor(aerial.CoverIn(x0, z0, cs, false), color), f, noise);
+                }
                 // Clockwise from above → facing up.
-                MeshSink.Tri(batch, p00, p01, p11, c);
-                MeshSink.Tri(batch, p00, p11, p10, c);
+                MeshSink.Tri(batch, p00, p01, p11, cUpper);
+                MeshSink.Tri(batch, p00, p11, p10, cLower);
             }
         }
     }

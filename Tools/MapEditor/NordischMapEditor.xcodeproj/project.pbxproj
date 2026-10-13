@@ -10,6 +10,7 @@
 		08845C8D7819924A1AFF4C78 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 747DB44B24CF994FE2CEB4FE /* App.swift */; };
 		42C4BED335025C031F872AB9 /* EditorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FCF59E9A397C773BBE06A92 /* EditorModel.swift */; };
 		589F5D80B54C700B59061082 /* MapCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF1C84FBAECA864BBBC83B63 /* MapCanvas.swift */; };
+		72E9CB2CF9D5E502C5C26512 /* Buildings.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE704A7CE7CB3FA6462065A /* Buildings.swift */; };
 		7F042158FF9D6324184D4200 /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC7177BA7F42BFC2A9D0DA3A /* Model.swift */; };
 		A6FAD8D5342FC31780AE1CF9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A6BC3B2499085895DCC5F49A /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -19,6 +20,7 @@
 		747DB44B24CF994FE2CEB4FE /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		A6BC3B2499085895DCC5F49A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BE19189E85B992752341A27D /* NordischMapEditor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NordischMapEditor.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CEE704A7CE7CB3FA6462065A /* Buildings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Buildings.swift; sourceTree = "<group>"; };
 		FC7177BA7F42BFC2A9D0DA3A /* Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
 		FF1C84FBAECA864BBBC83B63 /* MapCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapCanvas.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -37,6 +39,7 @@
 			children = (
 				747DB44B24CF994FE2CEB4FE /* App.swift */,
 				A6BC3B2499085895DCC5F49A /* Assets.xcassets */,
+				CEE704A7CE7CB3FA6462065A /* Buildings.swift */,
 				2FCF59E9A397C773BBE06A92 /* EditorModel.swift */,
 				FF1C84FBAECA864BBBC83B63 /* MapCanvas.swift */,
 				FC7177BA7F42BFC2A9D0DA3A /* Model.swift */,
@@ -123,6 +126,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				08845C8D7819924A1AFF4C78 /* App.swift in Sources */,
+				72E9CB2CF9D5E502C5C26512 /* Buildings.swift in Sources */,
 				42C4BED335025C031F872AB9 /* EditorModel.swift in Sources */,
 				589F5D80B54C700B59061082 /* MapCanvas.swift in Sources */,
 				7F042158FF9D6324184D4200 /* Model.swift in Sources */,

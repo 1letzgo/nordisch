@@ -34,8 +34,92 @@ final class EditorModel: ObservableObject {
         focusToken += 1
     }
 
-    private var undoStack: [[PlacedObject]] = []
-    private var redoStack: [[PlacedObject]] = []
+    private struct UndoState { var objects: [PlacedObject]; var styles: [HouseStyle] }
+    private var undoStack: [UndoState] = []
+    private var redoStack: [UndoState] = []
+    private var undoState: UndoState { UndoState(objects: objects, styles: houseStyles) }
+
+    // MARK: - Houses
+
+    enum Mode: String { case objects, houses }
+    @Published var mode: Mode = .objects { didSet { if mode != oldValue { placing = nil; selection = []; selectedHouse = nil } } }
+    @Published var houses: [House] = [] { didSet { rebuildStyleCache() } }
+    /// Entries of Data/<area>.buildings.json (also hand-written ones, kept as they are).
+    @Published var houseStyles: [HouseStyle] = [] { didSet { rebuildStyleCache() } }
+    /// House id -> its style, for drawing (styles are few, houses many).
+    private(set) var styleByHouse: [String: HouseStyle] = [:]
+
+    private func rebuildStyleCache() {
+        var m: [String: HouseStyle] = [:]
+        if !houseStyles.isEmpty {
+            for h in houses { if let st = style(h) { m[h.id] = st } }
+        }
+        styleByHouse = m
+    }
+    @Published var selectedHouse: String?
+    @Published var houseQuery = ""
+
+    var currentHouse: House? { selectedHouse.flatMap { id in houses.first { $0.id == id } } }
+
+    /// Index of the style entry for a house: id match first, then any of its addresses.
+    func styleIndex(_ h: House) -> Int? {
+        if let i = houseStyles.firstIndex(where: { $0.id == h.id }) { return i }
+        let addrs = Set(h.addr.map(HouseCatalog.normalize))
+        return houseStyles.firstIndex { $0.address.map { addrs.contains(HouseCatalog.normalize($0)) } ?? false }
+    }
+
+    func style(_ h: House) -> HouseStyle? { styleIndex(h).map { houseStyles[$0] } }
+
+    /// Changes the style of a house – keyed by its address (covers all parts of the building) or, without one, its id.
+    func updateStyle(_ h: House, _ change: (inout HouseStyle) -> Void) {
+        snapshot()
+        if let i = styleIndex(h) {
+            change(&houseStyles[i])
+            if houseStyles[i].isEmpty { houseStyles.remove(at: i) }
+        } else {
+            var st = h.addr.first.map { HouseStyle(address: $0) } ?? HouseStyle(id: h.id)
+            change(&st)
+            if !st.isEmpty { houseStyles.append(st) }
+        }
+    }
+
+    func resetStyle(_ h: House) {
+        guard let i = styleIndex(h) else { return }
+        snapshot()
+        houseStyles.remove(at: i)
+    }
+
+    /// Houses whose address contains the query (case-insensitive), at most 40.
+    func houseMatches(_ q: String) -> [House] {
+        let n = HouseCatalog.normalize(q)
+        guard n.count >= 2 else { return [] }
+        var seen = Set<String>()
+        var out: [House] = []
+        for h in houses where h.addr.contains(where: { HouseCatalog.normalize($0).contains(n) }) {
+            // One row per address (LoD2 buildings come in several parts).
+            if seen.insert(h.title).inserted { out.append(h) }
+        }
+        return out.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }.prefix(40).map { $0 }
+    }
+
+    func focusHouse(_ h: House) {
+        mode = .houses
+        selectedHouse = h.id
+        focusPoint = CGPoint(x: h.bounds.midX, y: h.bounds.midY)
+        focusToken += 1
+    }
+
+    /// Smallest house containing the point.
+    func house(at p: CGPoint) -> House? {
+        houses.filter { $0.contains(p) }.min { $0.area < $1.area }
+    }
+
+    func reloadHouses() {
+        guard let a = area else { return }
+        houses = repo.map { HouseCatalog.load($0.appendingPathComponent("Assets/Generated/\(a.id)/\(a.id)_buildings.json")) } ?? []
+    }
+
+    private func stylesURL(_ a: Area) -> URL? { repo?.appendingPathComponent("Data/\(a.id).buildings.json") }
 
     var areaRect: CGRect { area?.rect ?? CGRect(x: -500, y: -500, width: 1000, height: 1000) }
     /// Region of the minimap PNG: area rectangle + 60 m margin (SceneSnapshot / AreaInfo.MapMargin).
@@ -102,6 +186,12 @@ final class EditorModel: ObservableObject {
         placing = nil
         undoStack = []
         redoStack = []
+        selectedHouse = nil
+        reloadHouses()
+        houseStyles = []
+        if let url = stylesURL(a), let data = try? Data(contentsOf: url) {
+            houseStyles = (try? JSONDecoder().decode(HouseStylesFile.self, from: data).buildings) ?? []
+        }
         var list: [PlacedObject] = []
         originals = [:]
         var genCount = 0
@@ -175,6 +265,12 @@ final class EditorModel: ObservableObject {
             background = nil
         }
         buildings = nil
+        if !houses.isEmpty {
+            let path = CGMutablePath()
+            for h in houses { path.addPath(h.path) }
+            buildings = path
+            return
+        }
         let lod2 = repo.appendingPathComponent("Data/\(a.id).lod2.json")
         let id = a.id
         Task.detached(priority: .userInitiated) {
@@ -209,7 +305,7 @@ final class EditorModel: ObservableObject {
     /// Call before every user change (also marks the document dirty).
     func snapshot() {
         dirty = true
-        undoStack.append(objects)
+        undoStack.append(undoState)
         if undoStack.count > 200 { undoStack.removeFirst() }
         redoStack = []
     }
@@ -219,16 +315,18 @@ final class EditorModel: ObservableObject {
 
     func undo() {
         guard let last = undoStack.popLast() else { return }
-        redoStack.append(objects)
-        objects = last
+        redoStack.append(undoState)
+        objects = last.objects
+        houseStyles = last.styles
         dirty = true
         selection = selection.filter { id in objects.contains { $0.id == id } }
     }
 
     func redo() {
         guard let next = redoStack.popLast() else { return }
-        undoStack.append(objects)
-        objects = next
+        undoStack.append(undoState)
+        objects = next.objects
+        houseStyles = next.styles
         dirty = true
     }
 
@@ -356,8 +454,12 @@ final class EditorModel: ObservableObject {
             } else {
                 try enc.encode(EditsFile(area: a.id, objects: rounded, changes: changes)).write(to: url, options: .atomic)
             }
+            if let surl = stylesURL(a) {
+                if houseStyles.isEmpty { try? FileManager.default.removeItem(at: surl) }
+                else { try enc.encode(HouseStylesFile(buildings: houseStyles)).write(to: surl, options: .atomic) }
+            }
             dirty = false
-            status = "Gespeichert: \(rounded.count) neue, \(changes.count) geänderte Objekte → Data/\(a.id).edits.json"
+            status = "Gespeichert: \(rounded.count) neue, \(changes.count) geänderte Objekte, \(houseStyles.count) angepasste Häuser"
             return true
         } catch {
             status = "Speichern fehlgeschlagen: \(error.localizedDescription)"
@@ -416,7 +518,7 @@ final class EditorModel: ObservableObject {
                 self.unityLog = lines
                 if code == 0 {
                     self.status = "Import fertig – Szene \(a.name).unity aktualisiert"
-                    if self.area?.id == a.id { self.loadBackground() }
+                    if self.area?.id == a.id { self.reloadHouses(); self.loadBackground() }
                 } else {
                     self.status = code == 139 ? "Unity abgestürzt (139) – einfach nochmal starten" : "Unity-Import fehlgeschlagen (Exit \(code)), Log: \(log.path)"
                 }

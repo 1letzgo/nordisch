@@ -6,7 +6,7 @@ namespace LeGamez.Editor.OsmImport
     /// <summary>Extrudes OSM building footprints into low-poly walls + roofs.</summary>
     public static class BuildingBuilder
     {
-        const float LevelHeight = 3f;
+        public const float LevelHeight = 3f;
         const float MaxPitchedArea = 260f;
 
         /// <param name="skip">Optional filter, e.g. <see cref="Lod2Builder.Covers"/> to only add buildings LoD2 lacks.</param>
@@ -18,6 +18,7 @@ namespace LeGamez.Editor.OsmImport
                 if (poly.tags.Has("building:part") && !poly.tags.Is("building:part", "no"))
                     partCentroids.Add(GeoUtil.Centroid(poly.outer));
 
+            osm = data;
             int count = 0;
             foreach (var poly in data.polygons)
             {
@@ -42,6 +43,8 @@ namespace LeGamez.Editor.OsmImport
             return count;
         }
 
+        static OsmData osm; // streets for the door side
+
         static bool BuildOne(OsmPolygon poly, MeshSink sink, System.Random rng)
         {
             var outer = PolygonTriangulator.Clean(poly.outer);
@@ -56,7 +59,12 @@ namespace LeGamez.Editor.OsmImport
             float height = EstimateHeight(tags, area, rng);
             if (height <= minHeight + 0.5f) height = minHeight + 3f;
 
-            string roofShape = tags.Get("roof:shape");
+            // Hand tweaks (Data/<area>.buildings.json); random picks below still happen so the sequence stays the same.
+            string houseId = "osm:" + poly.id;
+            var addresses = BuildingOverrides.OsmAddresses(tags);
+            var custom = BuildingOverrides.Find(houseId, addresses);
+
+            string roofShape = custom?.roofShape ?? tags.Get("roof:shape");
             float roofHeight = GeoUtil.ParseMeters(tags.Get("roof:height")) ?? 0f;
             bool wantsPitched = roofShape == "gabled" || roofShape == "hipped" || roofShape == "pyramidal" ||
                                 (roofShape == null && IsHouseLike(tags) && area < MaxPitchedArea && !tags.Has("building:part"));
@@ -64,21 +72,40 @@ namespace LeGamez.Editor.OsmImport
             if (pitched && roofHeight <= 0f) roofHeight = Mathf.Clamp(Mathf.Sqrt(area) * 0.35f, 2f, 5f);
             if (!pitched) roofHeight = 0f;
             float wallTop = Mathf.Max(minHeight + 2f, height - roofHeight);
+            if (custom != null && custom.floors > 0) wallTop = minHeight + custom.floors * LevelHeight + 0.3f; // + plinth
+            else if (minHeight < 0.5f && wallTop > 2.5f)
+            {
+                // Estimated walls snap to whole storeys (3 m + 0.3 m plinth): an upper floor either gets its full
+                // window row (shader needs lintel + 0.6 m under the eaves) or doesn't exist – no half storeys.
+                int storeys = Mathf.Max(1, Mathf.RoundToInt((wallTop - 0.3f) / LevelHeight));
+                wallTop = storeys * LevelHeight + 0.3f;
+            }
 
             var wallColor = WallStyleColor(tags, rng);
             var roofColor = WorldStyle.RoofColor(tags, rng, pitched);
-            // Hand tweaks (Data/<area>.buildings.json) – applied after the random picks so the sequence stays the same.
-            var custom = BuildingOverrides.Find(poly);
+            // Measured colour from the aerial image unless OSM states one (roof:colour).
+            if (AerialImage.Current != null && !tags.Has("roof:colour") &&
+                AerialImage.Current.RoofColor(new List<List<Vector2>> { outer }, !pitched) is Color32 measured)
+                roofColor = new Color32(measured.r, measured.g, measured.b, roofColor.a);
             if (custom?.wall != null)
             {
                 var w = custom.wall.Value;
                 wallColor = new Color32(w.r, w.g, w.b, custom.brick ? Lod2Builder.CodeBrick : (byte)255);
             }
+            if (custom?.roof != null) roofColor = custom.roof.Value;
+            BuildingOverrides.Register(houseId, "osm", addresses, outer, Mathf.Max(1, Mathf.RoundToInt((wallTop - minHeight) / LevelHeight)));
+            if (custom != null && custom.hidden) return false; // removed in the map editor
             var batch = sink.Get(WorldStyle.MatBuildings, GeoUtil.Centroid(outer));
             int firstVertex = batch.vertices.Count;
             bool windowed = HasWindows(tags, wallTop - minHeight);
+            bool baseWindowed = windowed;
+            if (custom?.windows != null) windowed = custom.windows.Value;
 
             Walls(batch, outer, minHeight, wallTop, wallColor, windowed);
+            string doorSide = custom?.door;
+            bool wantDoor = doorSide != "none" && (baseWindowed || doorSide != null);
+            if (wantDoor && minHeight < 0.5f && wallTop >= 2.8f)
+                FrontDoor(batch, outer, wallTop, doorSide == "street" ? null : doorSide, custom?.doorColor);
             var holes = new List<List<Vector2>>();
             foreach (var h in poly.holes)
             {
@@ -105,6 +132,7 @@ namespace LeGamez.Editor.OsmImport
             if (roofRect != null)
             {
                 GabledRoof(batch, roofRect, wallTop, roofHeight, roofColor, wallColor, roofShape == "hipped");
+                if (custom?.chimney == true) RidgeChimney(batch, roofRect, wallTop + roofHeight, poly.id);
                 if (custom != null && custom.gableWindows > 0)
                     GableWindows(batch, roofRect, minHeight, wallTop, roofShape == "hipped" ? 0f : roofHeight, custom.gableWindows, custom.gableWindowFloor);
             }
@@ -172,6 +200,26 @@ namespace LeGamez.Editor.OsmImport
                     return false;
             }
             return true;
+        }
+
+        /// <summary>Door on the street-facing segment, over one of its window bays (same layout as Walls).</summary>
+        static void FrontDoor(MeshSink.Batch b, List<Vector2> ring, float wallTop, string side, Color32? colour)
+        {
+            var walls = new List<Doors.Wall>();
+            for (int i = 0; i < ring.Count; i++)
+            {
+                Vector2 p = ring[i], q = ring[(i + 1) % ring.Count];
+                float len = Vector2.Distance(p, q);
+                int windows = Mathf.FloorToInt((len - 0.6f) / WindowSpacing);
+                if (windows <= 0) continue;
+                var dir = (q - p) / len;
+                walls.Add(new Doors.Wall
+                {
+                    start = p, dir = dir, normal = new Vector2(dir.y, -dir.x), // CCW ring: outside is on the right
+                    bayOffset = (len - windows * WindowSpacing) * 0.5f, bays = windows, heightScale = 1f, top = wallTop,
+                });
+            }
+            if (Doors.Pick(osm, walls, out var front, out float bay, side)) Doors.Emit(b, front, bay, colour);
         }
 
         static void Walls(MeshSink.Batch b, List<Vector2> ring, float y0, float y1, Color32 color, bool windowed)
@@ -246,6 +294,14 @@ namespace LeGamez.Editor.OsmImport
             }
         }
 
+        /// <summary>Chimney a third along the ridge (map editor option for OSM houses).</summary>
+        static void RidgeChimney(MeshSink.Batch b, List<Vector2> r, float ridgeY, long id)
+        {
+            if ((r[2] - r[1]).sqrMagnitude > (r[1] - r[0]).sqrMagnitude) r = new List<Vector2> { r[1], r[2], r[3], r[0] };
+            Vector2 m12 = (r[1] + r[2]) * 0.5f, m30 = (r[3] + r[0]) * 0.5f;
+            Lod2Builder.Chimney(b, V(Vector2.Lerp(m30, m12, 0.32f), ridgeY), new System.Random((int)id));
+        }
+
         /// <summary>Gabled (or hipped) roof over a 4-corner footprint, ridge along the longer axis.</summary>
         static void GabledRoof(MeshSink.Batch b, List<Vector2> r, float y, float h, Color32 roof, Color32 wall, bool hipped)
         {
@@ -276,7 +332,9 @@ namespace LeGamez.Editor.OsmImport
 
         static readonly Color32 WindowFrame = new Color32(238, 234, 226, 255);
         static readonly Color32 WindowGlass = new Color32(68, 82, 94, 255);
-        const float WinWidth = 1.0f, WinHeight = 1.3f, WinSill = 0.9f, WinGap = 0.8f;
+        public const float WinWidth = 1.0f, WinHeight = 1.3f, WinSill = 0.9f, WinGap = 0.8f;
+        /// <summary>Minimum clearance between a window and the roof (eaves or gable slope).</summary>
+        public const float RoofGap = 0.6f;
 
         /// <summary>
         /// <paramref name="count"/> windows centred side by side on both short (gable) walls of a ridge-roofed
@@ -287,8 +345,8 @@ namespace LeGamez.Editor.OsmImport
             if ((r[2] - r[1]).sqrMagnitude > (r[1] - r[0]).sqrMagnitude) r = new List<Vector2> { r[1], r[2], r[3], r[0] };
             var centre = (r[0] + r[1] + r[2] + r[3]) * 0.25f;
             float sill = y0 + floor * LevelHeight + WinSill;
-            // Never above what the wall + gable can hold.
-            float maxTop = wallTop + roofHeight * 0.55f;
+            // Never above what the wall + gable can hold; without a gable (hipped) stay clear of the eaves.
+            float maxTop = roofHeight > 0f ? wallTop + roofHeight * 0.55f : wallTop - RoofGap;
             if (sill + WinHeight > maxTop) sill = Mathf.Max(y0 + 0.5f, maxTop - WinHeight);
             foreach (var (p, q) in new[] { (r[1], r[2]), (r[3], r[0]) })
             {
@@ -297,25 +355,33 @@ namespace LeGamez.Editor.OsmImport
                 if (Vector2.Dot(n2, mid - centre) < 0f) n2 = -n2;
                 float halfLen = Vector2.Distance(p, q) * 0.5f;
                 Vector3 n = new Vector3(n2.x, 0f, n2.y), u = new Vector3(along.x, 0f, along.y);
-                for (int i = 0; i < count; i++)
+                // Reaching up into the gable: keep RoofGap to the roof slopes (checked a bit above the lintel).
+                bool Fits(float offset, float sl)
                 {
-                    float offset = (i - (count - 1) * 0.5f) * (WinWidth + WinGap);
-                    float half = WinWidth * 0.5f;
-                    // Inside the gable triangle: available half-width shrinks with height above the eaves.
-                    float top = sill + WinHeight;
-                    if (top > wallTop && roofHeight > 0f)
-                    {
-                        float avail = halfLen * (1f - (top - wallTop) / roofHeight) - 0.15f;
-                        if (Mathf.Abs(offset) + half > avail) continue;
-                    }
-                    var c = V(mid, 0f) + u * offset + n * 0.03f;
-                    Window(b, c, u, n, sill);
+                    float top = sl + WinHeight;
+                    if (top <= wallTop - RoofGap) return true;
+                    if (roofHeight <= 0f) return false;
+                    float avail = halfLen * (1f - (top + 0.35f - wallTop) / roofHeight) - RoofGap;
+                    return Mathf.Abs(offset) + WinWidth * 0.5f <= avail;
                 }
+                float Offset(int i) => (i - (count - 1) * 0.5f) * (WinWidth + WinGap);
+                // Too close to the slopes: the whole row moves down (up to 0.6 m, not below its storey).
+                float rowSill = sill;
+                for (float drop = 0f; drop <= 0.6f + 1e-3f; drop += 0.1f)
+                {
+                    rowSill = Mathf.Max(y0 + floor * LevelHeight + 0.3f, sill - drop);
+                    bool all = true;
+                    for (int i = 0; i < count && all; i++) all = Fits(Offset(i), rowSill);
+                    if (all) break;
+                }
+                for (int i = 0; i < count; i++)
+                    if (Fits(Offset(i), rowSill))
+                        Window(b, V(mid, 0f) + u * Offset(i) + n * 0.03f, u, n, rowSill);
             }
         }
 
         /// <summary>Frame, glass and a mullion cross, slightly proud of the wall (normal <paramref name="n"/>).</summary>
-        static void Window(MeshSink.Batch b, Vector3 c, Vector3 u, Vector3 n, float sill)
+        public static void Window(MeshSink.Batch b, Vector3 c, Vector3 u, Vector3 n, float sill)
         {
             void Rect(float x0, float x1, float yA, float yB, float out_, Color32 col)
             {
