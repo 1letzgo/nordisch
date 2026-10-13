@@ -28,8 +28,9 @@ namespace LeGamez.Core
     {
         /// <summary>Bump when map scenes need something only a newer app has (new script in map scenes, changed serialized
         /// fields of AreaInfo/TrafficLights/FacadeDetails/PoiDatabase/StreetIndex/WorldStreamer/WorldTile …). Then re-publish all maps.
-        /// 1 = one scene bundle with all geometry; 2 = scene bundle + tiles bundle streamed by World/WorldStreamer.</summary>
-        public const int Format = 2;
+        /// 1 = one scene bundle with all geometry; 2 = scene bundle + tiles bundle streamed by World/WorldStreamer;
+        /// 3 = AreaData bundle (no scene, materials in the app) + tiles bundle, built in the one world scene.</summary>
+        public const int Format = 3;
 
         public const string CatalogUrl = "https://github.com/1letzgo/nordisch/releases/download/maps/maps.json";
         const bool AutoUpdateOnWifi = true;
@@ -107,7 +108,7 @@ namespace LeGamez.Core
             public string error;
             public Texture2D thumb;
             internal string thumbUrl;
-            public string scenePath; // editor only
+            public string scenePath; // editor only: path of the AreaData asset
 
             public string Id => entry.id;
             /// <summary>Installed and fitting this app – also while a newer version downloads.</summary>
@@ -193,7 +194,8 @@ namespace LeGamez.Core
         {
             if (m == null || !m.Playable || starting) return;
 #if UNITY_EDITOR
-            UnityEditor.SceneManagement.EditorSceneManager.LoadSceneAsyncInPlayMode(m.scenePath, new LoadSceneParameters(LoadSceneMode.Single));
+            World.AreaLoader.Pending = UnityEditor.AssetDatabase.LoadAssetAtPath<World.AreaData>(m.scenePath);
+            SceneManager.LoadSceneAsync(World.AreaLoader.WorldSceneIndex);
 #else
             Run(PlayRoutine(m));
 #endif
@@ -479,15 +481,22 @@ namespace LeGamez.Core
             var req = AssetBundle.LoadFromFileAsync(BundlePath(m.Id));
             yield return req;
             loaded = req.assetBundle;
-            var scenes = loaded != null ? loaded.GetAllScenePaths() : new string[0];
-            if (scenes.Length == 0)
+            World.AreaData data = null;
+            if (loaded != null)
+            {
+                var areq = loaded.LoadAllAssetsAsync<World.AreaData>();
+                yield return areq;
+                data = areq.asset as World.AreaData;
+            }
+            if (data == null)
             {
                 starting = false;
                 UnloadLoaded();
-                Fail(m, "Karte beschädigt – bitte löschen und neu laden", "bundle without scene");
+                Fail(m, "Karte beschädigt – bitte löschen und neu laden", "bundle without AreaData");
                 yield break;
             }
-            yield return SceneManager.LoadSceneAsync(scenes[0]);
+            World.AreaLoader.Pending = data;
+            yield return SceneManager.LoadSceneAsync(World.AreaLoader.WorldSceneIndex);
             starting = false;
         }
 
@@ -542,7 +551,7 @@ namespace LeGamez.Core
                     entry = new Entry { id = a.id, name = a.displayName, lat = a.lat, lon = a.lon, vehicles = a.vehicles.ToArray(), pois = a.poiCount },
                     installed = editorBuild,
                     status = Status.Installed,
-                    scenePath = $"Assets/Scenes/Areas/{a.sceneName}.unity",
+                    scenePath = $"Assets/Generated/{a.id}/{a.id}_area.asset", // AreaData (OsmAreaImporter.AreaDataPath)
                     thumb = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>(World.AreaCatalog.ThumbPath(a.id)),
                 };
                 Maps.Add(m);

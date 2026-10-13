@@ -1,3 +1,4 @@
+using System.Linq;
 using System.IO;
 using LeGamez.World;
 using UnityEditor;
@@ -21,15 +22,12 @@ namespace LeGamez.Editor
         {
             string outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Builds", "Snapshots"));
             Directory.CreateDirectory(outDir);
-            foreach (var guid in AssetDatabase.FindAssets("t:Scene", new[] { "Assets/Scenes/Areas" }))
+            foreach (var data in AreaPreview.All().ToList())
             {
-                var path = AssetDatabase.GUIDToAssetPath(guid);
-                EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
-                var area = Object.FindAnyObjectByType<AreaInfo>();
+                var area = AreaPreview.Open(data); // all tiles loaded
                 if (area == null) continue;
                 string id = area.areaId;
                 var world = Object.FindAnyObjectByType<WorldStreamer>();
-                if (world != null) world.LoadAllInEditor(); // the scene itself holds no geometry
 
                 var camGo = new GameObject("SnapshotCam");
                 var cam = camGo.AddComponent<Camera>();
@@ -94,19 +92,19 @@ namespace LeGamez.Editor
 
         /// <summary>
         /// Oblique bird's-eye thumbnails per area for the main menu cards, plus the top-down map texture, which is
-        /// assigned to AreaInfo.mapTexture (the scene is saved) so it ends up in the map's download bundle.
+        /// assigned to AreaData.mapTexture so it ends up in the map's download bundle. <paramref name="onlyId"/>: one area.
         /// </summary>
         [MenuItem("LeGamez/Render Menu Thumbnails")]
-        public static void RenderThumbnails()
+        public static void RenderThumbnails() => RenderThumbnails(null);
+
+        public static void RenderThumbnails(string onlyId)
         {
-            var activeScene = EditorSceneManager.GetActiveScene().path;
-            foreach (var guid in AssetDatabase.FindAssets("t:Scene", new[] { "Assets/Scenes/Areas" }))
+            var paths = AreaPreview.All().Where(d => onlyId == null || d.areaId == onlyId).Select(AssetDatabase.GetAssetPath).ToList();
+            foreach (var dataPath in paths)
             {
-                var scene = EditorSceneManager.OpenScene(AssetDatabase.GUIDToAssetPath(guid), OpenSceneMode.Single);
-                var area = Object.FindAnyObjectByType<AreaInfo>();
+                var area = AreaPreview.Open(AssetDatabase.LoadAssetAtPath<AreaData>(dataPath));
                 if (area == null) continue;
                 var world = Object.FindAnyObjectByType<WorldStreamer>();
-                if (world != null) world.LoadAllInEditor();
 
                 var camGo = new GameObject("ThumbCam");
                 var cam = camGo.AddComponent<Camera>();
@@ -165,13 +163,12 @@ namespace LeGamez.Editor
                     ti.SaveAndReimport();
                 }
 
-                if (world != null) world.UnloadAllInEditor(); // never save tile objects into the scene
-                area.mapTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(mapFile);
-                EditorUtility.SetDirty(area);
-                EditorSceneManager.MarkSceneDirty(scene);
-                EditorSceneManager.SaveScene(scene);
+                // Texture imports above reload assets – fetch the AreaData again before writing to it.
+                var data = AssetDatabase.LoadAssetAtPath<AreaData>(dataPath);
+                data.mapTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(mapFile);
+                EditorUtility.SetDirty(data);
+                AssetDatabase.SaveAssets();
             }
-            if (!string.IsNullOrEmpty(activeScene)) EditorSceneManager.OpenScene(activeScene, OpenSceneMode.Single);
         }
 
         static void Render(Camera cam, string file) => RenderTo(cam, file, Width, Height);

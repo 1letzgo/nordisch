@@ -11,9 +11,15 @@ namespace LeGamez.World
         public Font font;
         public Material material;
 
-        void Awake()
+        bool hooked;
+
+        void Awake() => Init();
+
+        /// <summary>Also called by SignTexts after it filled in font/material (AddComponent runs Awake before that).</summary>
+        public void Init()
         {
-            if (font == null || material == null) return;
+            if (font == null || material == null || hooked) return;
+            hooked = true;
             Font.textureRebuilt += OnRebuilt;
             // Request every glyph the signs use up front, so the atlas is stable before the first frame.
             var all = new System.Text.StringBuilder();

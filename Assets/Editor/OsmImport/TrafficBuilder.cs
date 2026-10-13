@@ -940,7 +940,7 @@ namespace LeGamez.Editor.OsmImport
 
         const string TextMaterialPath = "Assets/Generated/Materials/SignText.mat";
 
-        static Material TextMaterial(Font font)
+        internal static Material TextMaterial(Font font)
         {
             var mat = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>(TextMaterialPath);
             var shader = Shader.Find("LeGamez/SignText");
@@ -956,56 +956,24 @@ namespace LeGamez.Editor.OsmImport
             return mat;
         }
 
-        /// <summary>Creates the lamp controller and the sign texts (after the meshes, so terrain heights can be applied).</summary>
-        public static void Spawn(Transform parent, TerrainField terrain, Material lampMaterial)
+        /// <summary>Lamp positions/phases and sign texts for AreaData (terrain heights applied); built at runtime
+        /// by TrafficLights and SignTexts.</summary>
+        public static void Export(TerrainField terrain, List<TrafficLights.Head> outHeads, List<TrafficLights.Signal> outSignals,
+            List<SignTexts.Item> outTexts)
         {
-            if (heads.Count == 0 && texts.Count == 0) return;
-            var root = new GameObject("Traffic");
-            root.transform.SetParent(parent, false);
-            if (heads.Count > 0)
+            outHeads.Clear(); outSignals.Clear(); outTexts.Clear();
+            outSignals.AddRange(signals);
+            foreach (var h in heads)
             {
-                var lights = root.AddComponent<TrafficLights>();
-                lights.material = lampMaterial;
-                lights.signals = new List<TrafficLights.Signal>(signals);
-                foreach (var h in heads)
-                {
-                    var c = h;
-                    c.position.y += terrain.Height(c.position.x, c.position.z);
-                    lights.heads.Add(c);
-                }
+                var c = h;
+                c.position.y += terrain.Height(c.position.x, c.position.z);
+                outHeads.Add(c);
             }
-            if (texts.Count == 0) return;
-            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            var textRoot = new GameObject("SignTexts").transform;
-            textRoot.SetParent(root.transform, false);
-            var textMaterial = TextMaterial(font);
-            var keeper = textRoot.gameObject.AddComponent<SignTextFont>();
-            keeper.font = font;
-            keeper.material = textMaterial;
-            const int fontSize = 48;
             foreach (var t in texts)
             {
-                var go = new GameObject(t.text);
-                go.layer = WorldStyle.DetailsLayer;
-                go.transform.SetParent(textRoot, false);
                 var pos = t.pos;
                 pos.y += terrain.Height(pos.x, pos.z);
-                go.transform.position = pos;
-                // TextMesh reads correctly when looked at along its +Z: point it away from the viewer.
-                go.transform.rotation = Quaternion.LookRotation(-V(t.facing), Vector3.up);
-                var tm = go.AddComponent<TextMesh>();
-                tm.font = font;
-                tm.fontSize = fontSize;
-                tm.fontStyle = FontStyle.Bold;
-                tm.characterSize = t.height / (fontSize * 0.1f);
-                tm.anchor = TextAnchor.MiddleCenter;
-                tm.alignment = TextAlignment.Center;
-                tm.color = t.color;
-                tm.text = t.text;
-                var mr = go.GetComponent<MeshRenderer>();
-                mr.sharedMaterial = textMaterial;
-                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                mr.receiveShadows = false;
+                outTexts.Add(new SignTexts.Item { text = t.text, position = pos, facing = t.facing, height = t.height, color = t.color });
             }
         }
     }

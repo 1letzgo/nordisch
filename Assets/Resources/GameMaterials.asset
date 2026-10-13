@@ -37,3 +37,9 @@ MonoBehaviour:
   characterFootOffset: 0.11029713
   pedestalMaterial: {fileID: 2100000, guid: 80ae7b7f04bb0457c8711c02f887b43b, type: 2}
   vehicleMaterial: {fileID: 2100000, guid: 7ad31f8ae6d7c4cd980ac8a027768a44, type: 2}
+  worldMaterials:
+  - {fileID: 2100000, guid: 78b397a7da00e442eb73e5434763792c, type: 2}
+  - {fileID: 2100000, guid: e50d31831abc34eaf82fafa85611f91f, type: 2}
+  - {fileID: 2100000, guid: 3c23ab19eef8d4023819764e41531cfa, type: 2}
+  - {fileID: 2100000, guid: bee414cf8f12b4292846bf5bc9dbbdb1, type: 2}
+  signTextMaterial: {fileID: 2100000, guid: b071c445a8fdc4653a69489854220d31, type: 2}

@@ -23,7 +23,6 @@ namespace LeGamez.Editor.OsmImport
     {
         const string GeneratedRoot = "Assets/Generated";
         const string MaterialsDir = GeneratedRoot + "/Materials";
-        const string AreaScenesDir = "Assets/Scenes/Areas";
         const string ShaderName = "LeGamez/VertexColorLit";
 
         static string DataDir => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Data"));
@@ -63,11 +62,12 @@ namespace LeGamez.Editor.OsmImport
             int i = System.Array.IndexOf(args, "-area");
             if (i < 0 || i + 1 >= args.Length) throw new System.ArgumentException("missing -area <id>");
             ImportArea(Path.Combine(DataDir, args[i + 1] + ".osm.json"));
-            SceneSnapshot.RenderThumbnails();
+            SceneSnapshot.RenderThumbnails(args[i + 1]); // only this area
             AssetDatabase.SaveAssets();
         }
 
         const string MenuScenePath = "Assets/Scenes/MainMenu.unity";
+        public const string WorldScenePath = "Assets/Scenes/World.unity";
 
         [MenuItem("LeGamez/Create Main Menu Scene")]
         public static void CreateMenuScene()
@@ -81,8 +81,15 @@ namespace LeGamez.Editor.OsmImport
             new GameObject("MainMenu").AddComponent<LeGamez.UI.MainMenu>();
             EditorSceneManager.SaveScene(scene, MenuScenePath);
 
-            // The app contains only the menu; area scenes are downloaded as bundles (Core/MapStore, Editor/MapBundles).
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(MenuScenePath, true) };
+
+            // The one world scene: lighting/sky + AreaLoader, which builds the downloaded (or, in the editor, local) area.
+            var world = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            AddLighting(EnsureSkyMaterial());
+            new GameObject("AreaLoader").AddComponent<AreaLoader>();
+            EditorSceneManager.SaveScene(world, WorldScenePath);
+
+            // The app contains only menu + world scene (build index = AreaLoader.WorldSceneIndex); areas are downloads.
+            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(MenuScenePath, true), new EditorBuildSettingsScene(WorldScenePath, true) };
         }
 
         static void UpdateCatalog(OsmAreaMeta meta, int poiCount)
@@ -167,25 +174,7 @@ namespace LeGamez.Editor.OsmImport
             string facadePath = $"{areaDir}/{meta.id}_facade.bytes";            // close-up building detail, built at runtime
             FacadeRecords.Save(facadePath);
             AssetDatabase.ImportAsset(facadePath);
-            EnsureFolder(AreaScenesDir);
             var materials = EnsureMaterials();
-
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            var worldRoot = new GameObject($"World_{meta.name}");
-            worldRoot.isStatic = true;
-
-            // World geometry: one asset per WorldStreamer tile (meshes as sub-assets), loaded around the camera at runtime.
-            var streamer = new GameObject("WorldStreamer").AddComponent<WorldStreamer>();
-            streamer.transform.SetParent(worldRoot.transform, false);
-            streamer.areaId = meta.id;
-            streamer.tileKeys = WriteTiles(sink, meta.id, areaDir, materials, streamer.materials);
-            AddGroundAndBounds(worldRoot.transform, area);
-            TrafficBuilder.Spawn(worldRoot.transform, terrain, materials[WorldStyle.MatTrees]);
-            var facade = new GameObject("FacadeDetails").AddComponent<FacadeDetails>();
-            facade.transform.SetParent(worldRoot.transform, false);
-            facade.data = AssetDatabase.LoadAssetAtPath<TextAsset>(facadePath);
-            facade.material = materials[WorldStyle.MatTrees];
-            AddLighting(EnsureSkyMaterial());
 
             // POI database asset.
             string poiPath = $"{areaDir}/{meta.id}_pois.asset";
@@ -198,52 +187,60 @@ namespace LeGamez.Editor.OsmImport
             poiDb.entries = pois;
             EditorUtility.SetDirty(poiDb);
 
-            var spawn = new GameObject("SpawnPoint").transform;
+            // Everything besides the tiles goes into one AreaData asset; the world scene builds it at runtime (AreaLoader).
+            string areaPath = AreaDataPath(meta.id);
+            var areaData = AssetDatabase.LoadAssetAtPath<AreaData>(areaPath);
+            if (areaData == null)
+            {
+                areaData = ScriptableObject.CreateInstance<AreaData>();
+                AssetDatabase.CreateAsset(areaData, areaPath);
+            }
+            var d = areaData;
+            d.areaId = meta.id;
+            d.displayName = meta.name;
+            d.projection = data.projection;
+            d.sizeMeters = Mathf.Max(area.Width, area.Height);
+            d.boundsMin = new Vector2(area.xMin, area.zMin);
+            d.boundsMax = new Vector2(area.xMax, area.zMax);
+            d.allowedVehicles = new List<string>(meta.vehicles);
+            d.attribution = hasLod2 ? "© OpenStreetMap-Mitwirkende (ODbL) · 3D-Gebäude, Gelände, Luftbilder © LGLN (CC BY 4.0)" : "© OpenStreetMap-Mitwirkende (ODbL)";
             var spawnXZ = FindSpawn(data, area);
-            spawn.position = new Vector3(spawnXZ.x, terrain.Height(spawnXZ.x, spawnXZ.z) + 0.2f, spawnXZ.z);
-
-            var areaGo = new GameObject("Area");
-            var info = areaGo.AddComponent<AreaInfo>();
-            info.areaId = meta.id;
-            info.displayName = meta.name;
-            info.projection = data.projection;
-            info.sizeMeters = Mathf.Max(area.Width, area.Height);
-            info.boundsMin = new Vector2(area.xMin, area.zMin);
-            info.boundsMax = new Vector2(area.xMax, area.zMax);
-            info.allowedVehicles = new List<string>(meta.vehicles);
-            info.pois = poiDb;
-            info.streets = BuildStreets(data, $"{areaDir}/{meta.id}_streets.asset");
-            info.spawnPoint = spawn;
-            info.bikeSpots = BikeSpots(data, area, terrain);
-            info.carSpots = CarSpots(data, area, terrain);
-            var spawn2 = new Vector2(spawn.position.x, spawn.position.z);
+            d.spawn = new Vector3(spawnXZ.x, terrain.Height(spawnXZ.x, spawnXZ.z) + 0.2f, spawnXZ.z);
+            var spawn2 = new Vector2(spawnXZ.x, spawnXZ.z);
             var bikeSpot = FreeBikeSpot(data, spawn2, NearbyBuildings(data, spawn2, 15f));
-            info.spawnBikeSpot = bikeSpot.HasValue
+            d.spawnBikeSpot = bikeSpot.HasValue
                 ? new Vector3(bikeSpot.Value.x, terrain.Height(bikeSpot.Value.x, bikeSpot.Value.y), bikeSpot.Value.y)
                 : Vector3.zero;
-            info.attribution = hasLod2 ? "© OpenStreetMap-Mitwirkende (ODbL) · 3D-Gebäude, Gelände, Luftbilder © LGLN (CC BY 4.0)" : "© OpenStreetMap-Mitwirkende (ODbL)";
-            spawn.SetParent(areaGo.transform, true);
-
-            new GameObject("GameBootstrap").AddComponent<GameBootstrap>();
-
-            string scenePath = $"{AreaScenesDir}/{meta.name}.unity";
-            EditorSceneManager.SaveScene(scene, scenePath);
+            d.bikeSpots = BikeSpots(data, area, terrain);
+            d.carSpots = CarSpots(data, area, terrain);
+            d.pois = poiDb;
+            d.streets = BuildStreets(data, $"{areaDir}/{meta.id}_streets.asset");
+            d.facade = AssetDatabase.LoadAssetAtPath<TextAsset>(facadePath);
+            TrafficBuilder.Export(terrain, d.trafficHeads, d.trafficSignals, d.signTexts);
+            // World geometry: one asset per WorldStreamer tile (meshes as sub-assets), loaded around the camera at runtime.
+            d.tileKeys = WriteTiles(sink, meta.id, areaDir);
+            EditorUtility.SetDirty(d);
             UpdateCatalog(meta, pois.Count);
             AssetDatabase.SaveAssets();
+
+            // Leave a preview of the area open (unsaved scene with all tiles) for snapshot tools.
+            AreaPreview.Open(d);
 
             Debug.Log($"[OSM] {meta.name}: {buildings} buildings (+{osmExtra} OSM-only), {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, gardens {gardens.plots} plots/{gardens.measured} measured hedges/{gardens.hedges} hedges/{gardens.fences} fences/{gardens.walls} walls/{gardens.drawn} drawn, terrain {(terrain.IsFlat ? "flat" : "DGM1")}, aerial {(aerial != null ? "DOP20" : "-")}, trees {(lidarTrees != null ? "LiDAR" : "OSM")}, " +
                       $"furniture {furniture.mapped} mapped/{furniture.benches} benches/{furniture.planters} planters/{furniture.seating} café tables/{furniture.fountains} fountains, {edits} hand-placed/{EditsPlacer.ChangedCount} edited, " +
                       $"facade {FacadeRecords.Windows} windows/{FacadeRecords.Doors} doors/{FacadeRecords.Gutters} gutters/{FacadeRecords.Verges} verges/{FacadeRecords.Ridges} ridges, traffic {traffic.junctionSignals} signal junctions/{traffic.crossingSignals} signal crossings/{traffic.heads} heads/{traffic.zebras} zebras/{traffic.lanes} lanes/{traffic.stops} stop/{traffic.giveWays} give way/{traffic.priority} priority/{traffic.speed} speed/{traffic.oneway} one-way/{traffic.names} names/{traffic.mapped} mapped, {pois.Count} POIs, " +
-                      $"{sink.Batches.Count()} meshes in {sw.ElapsedMilliseconds} ms -> {scenePath}");
-            return scenePath;
+                      $"{sink.Batches.Count()} meshes in {sw.ElapsedMilliseconds} ms -> {areaPath}");
+            return areaPath;
         }
+
+        public static string AreaDataPath(string id) => $"{GeneratedRoot}/{id}/{id}_area.asset";
 
         /// <summary>
         /// Sorts the sink's batches (100 m chunks, 25 m for details) into <see cref="WorldStreamer.TileSize"/> tiles and
         /// writes one <see cref="WorldTile"/> asset per tile to &lt;areaDir&gt;/tiles (old tiles are removed first).
         /// Meshes without collider are not CPU-readable – halves their memory on the device.
         /// </summary>
-        static List<Vector2Int> WriteTiles(MeshSink sink, string id, string areaDir, Dictionary<string, Material> materials, List<Material> materialList)
+        static List<Vector2Int> WriteTiles(MeshSink sink, string id, string areaDir)
         {
             string tileDir = $"{areaDir}/tiles";
             if (AssetDatabase.IsValidFolder(tileDir)) AssetDatabase.DeleteAsset(tileDir);
@@ -280,9 +277,7 @@ namespace LeGamez.Editor.OsmImport
                         so.ApplyModifiedPropertiesWithoutUndo();
                     }
 
-                    var material = materials[style];
-                    int mi = materialList.IndexOf(material);
-                    if (mi < 0) { mi = materialList.Count; materialList.Add(material); }
+                    int mi = System.Array.IndexOf(WorldTile.MaterialNames, style); // = GameMaterials.worldMaterials index
                     bool casts = mat != WorldStyle.MatGround && mat != WorldStyle.MatWater && mat != WorldStyle.MatDetails;
                     // Thin props (lamps, trunks, fences) block the player but not the camera probe; water sits on
                     // the built-in "Water" layer so placement can detect it, the player walks through.
@@ -529,34 +524,7 @@ namespace LeGamez.Editor.OsmImport
             return min;
         }
 
-        static void AddGroundAndBounds(Transform root, AreaRect area)
-        {
-            var c = area.Center;
-            var ground = new GameObject("GroundCollider");
-            ground.transform.SetParent(root, false);
-            var box = ground.AddComponent<BoxCollider>();
-            box.size = new Vector3(area.Width + 120f, 1f, area.Height + 120f);
-            box.center = new Vector3(c.x, -6f, c.y); // safety net below the terrain mesh collider
-
-            var bounds = new GameObject("AreaBounds");
-            bounds.transform.SetParent(root, false);
-            const float height = 60f, t = 2f;
-            float w = area.Width, h = area.Height;
-            AddWall(bounds.transform, new Vector3(c.x, height / 2, area.zMax + t / 2), new Vector3(w + t * 2, height, t));
-            AddWall(bounds.transform, new Vector3(c.x, height / 2, area.zMin - t / 2), new Vector3(w + t * 2, height, t));
-            AddWall(bounds.transform, new Vector3(area.xMax + t / 2, height / 2, c.y), new Vector3(t, height, h));
-            AddWall(bounds.transform, new Vector3(area.xMin - t / 2, height / 2, c.y), new Vector3(t, height, h));
-        }
-
-        static void AddWall(Transform parent, Vector3 center, Vector3 size)
-        {
-            var go = new GameObject("Wall");
-            go.transform.SetParent(parent, false);
-            go.transform.localPosition = center;
-            go.AddComponent<BoxCollider>().size = size;
-        }
-
-        static Material EnsureSkyMaterial()
+        internal static Material EnsureSkyMaterial()
         {
             string path = $"{MaterialsDir}/Sky.mat";
             var sky = AssetDatabase.LoadAssetAtPath<Material>(path);
@@ -576,7 +544,7 @@ namespace LeGamez.Editor.OsmImport
             return sky;
         }
 
-        static void AddLighting(Material sky)
+        internal static void AddLighting(Material sky)
         {
             RenderSettings.skybox = sky;
             var sun = new GameObject("Sun").AddComponent<Light>();
@@ -628,6 +596,14 @@ namespace LeGamez.Editor.OsmImport
                 }
                 EditorUtility.SetDirty(mat);
                 result[name] = mat;
+            }
+            // The app owns the world materials (maps reference them by index, WorldTile.MaterialNames).
+            var gm = AssetDatabase.LoadAssetAtPath<GameMaterials>($"Assets/Resources/{GameMaterials.ResourcePath}.asset");
+            if (gm != null)
+            {
+                gm.worldMaterials = WorldTile.MaterialNames.Select(n => result[n]).ToList();
+                gm.signTextMaterial = TrafficBuilder.TextMaterial(Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"));
+                EditorUtility.SetDirty(gm);
             }
             return result;
         }
