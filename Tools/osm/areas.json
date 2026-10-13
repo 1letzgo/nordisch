@@ -37,6 +37,7 @@
         "step": 10,
         "settlement_buffer": 50,
         "road_buffer": 35,
+        "include": [[-2350, 800, -900, 800]],
         "roads": ["motorway", "trunk", "primary", "secondary", "tertiary", "unclassified"]
       },
       "car_spots": [

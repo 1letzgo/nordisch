@@ -11,6 +11,7 @@ Data (c) OpenStreetMap contributors, ODbL.
 import json
 import math
 import sys
+import tempfile
 import time
 import urllib.parse
 import urllib.request
@@ -87,7 +88,10 @@ def fetch(query: str) -> dict:
             try:
                 req = urllib.request.Request(url, data=data, headers={"User-Agent": USER_AGENT})
                 with urllib.request.urlopen(req, timeout=360) as r:
-                    return json.loads(r.read())
+                    result = json.loads(r.read())
+                ENDPOINTS.remove(url)
+                ENDPOINTS.insert(0, url)  # the mirror that answered goes first next time
+                return result
             except Exception as err:  # noqa: BLE001
                 last_err = err
                 print(f"    {url}: {err}", flush=True)
@@ -165,9 +169,21 @@ def fetch_tiled(area, mask):
     zs = [z0 + i * TILE_M for i in range(int(math.ceil((z1 - z0) / TILE_M)) + 1)]
     tiles = [(xa, min(xa + TILE_M, x1), za, min(za + TILE_M, z1)) for xa in xs[:-1] for za in zs[:-1]]
     tiles = [t for t in tiles if mask.any_in_rect(*t, 50)]
+    if "--reverse" in sys.argv:  # a second process from the other end shares the tile cache
+        tiles.reverse()
+    for a in sys.argv:
+        if a.startswith("--start="):  # … or more, starting elsewhere
+            k = int(a.split("=")[1]) % len(tiles)
+            tiles = tiles[k:] + tiles[:k]
     for i, (xa, xb, za, zb) in enumerate(tiles):
         s, w, n, e = lat0 + za / m_lat, lon0 + xa / m_lon, lat0 + zb / m_lat, lon0 + xb / m_lon
-        res = fetch(build_query(s, w, n, e))
+        # Tiles are cached for a day (Overpass is slow and flaky; a restart continues where it stopped).
+        cache = Path(tempfile.gettempdir()) / f"nordisch_osm_{area['id']}_{int(xa)}_{int(za)}.json"
+        if cache.exists() and time.time() - cache.stat().st_mtime < 86400:
+            res = json.loads(cache.read_text())
+        else:
+            res = fetch(build_query(s, w, n, e))
+            cache.write_text(json.dumps(res))
         for el in res["elements"]:
             merged[(el["type"], el["id"])] = el
         print(f"    tile {i + 1}/{len(tiles)}: {len(res['elements'])} elements, {len(merged)} total", flush=True)
@@ -184,7 +200,7 @@ def fetch_tiled(area, mask):
 
 def main(argv):
     areas = json.loads(AREAS_FILE.read_text())["areas"]
-    wanted = set(argv[1:])
+    wanted = {x for x in argv[1:] if not x.startswith('--')}
     OUT_DIR.mkdir(exist_ok=True)
     for a in areas:
         if wanted and a["id"] not in wanted:

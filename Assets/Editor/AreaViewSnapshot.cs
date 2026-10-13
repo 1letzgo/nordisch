@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using LeGamez.Editor.OsmImport;
 using LeGamez.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -33,6 +34,7 @@ namespace LeGamez.Editor
             }
             if (scenePath == null) { Debug.LogError($"[View] no scene for {id}"); return; }
             var world = Object.FindAnyObjectByType<WorldStreamer>();
+            field = TerrainField.Load(Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Data", id + ".dgm.bin")));
             string outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Builds", "Snapshots"));
             Directory.CreateDirectory(outDir);
 
@@ -70,26 +72,9 @@ namespace LeGamez.Editor
             Object.DestroyImmediate(camGo);
         }
 
-        static float GroundHeight(Vector3 p)
-        {
-            float best = 0f;
-            bool found = false;
-            foreach (var mf in Object.FindObjectsByType<MeshFilter>(FindObjectsSortMode.None))
-            {
-                if (!mf.name.StartsWith("Terrain") || mf.sharedMesh == null) continue;
-                var b = mf.GetComponent<Renderer>().bounds;
-                if (p.x < b.min.x || p.x > b.max.x || p.z < b.min.z || p.z > b.max.z) continue;
-                var go = mf.gameObject;
-                var col = go.GetComponent<MeshCollider>();
-                if (col == null) col = go.AddComponent<MeshCollider>();
-                col.sharedMesh = mf.sharedMesh;
-                if (col.Raycast(new Ray(new Vector3(p.x, 500f, p.z), Vector3.down), out var hit, 1000f))
-                {
-                    best = found ? Mathf.Max(best, hit.point.y) : hit.point.y;
-                    found = true;
-                }
-            }
-            return best;
-        }
+        static TerrainField field;
+
+        /// <summary>DGM height (outside the mask the coarse mesh differs by a few dm – fine for a camera).</summary>
+        static float GroundHeight(Vector3 p) => field.Height(p.x, p.z);
     }
 }

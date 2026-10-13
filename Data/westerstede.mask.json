@@ -4,11 +4,11 @@
  "step": 10.0,
  "width": 1782,
  "height": 2077,
- "inside_km2": 32.97,
- "settlement_km2": 27.44,
- "corridor_km2": 5.53,
+ "inside_km2": 34.38,
+ "settlement_km2": 28.91,
+ "corridor_km2": 5.47,
  "road_km": 366.9,
- "osm_buildings_inside": 12728,
+ "osm_buildings_inside": 12813,
  "source": "OpenStreetMap (ODbL)",
  "config": {
   "admin_level": 8,
@@ -33,6 +33,14 @@
   "cluster_radius": 100,
   "cluster_buildings": 12,
   "fill_holes": 40000,
+  "include": [
+   [
+    -2350,
+    800,
+    -900,
+    800
+   ]
+  ],
   "boundary": "Westerstede"
  }
 }

@@ -59,6 +59,9 @@ namespace LeGamez.Editor.OsmImport
         public static bool Allows(Vector2 p) => Current == null || Current.Inside(p);
         public static bool Allows(float x, float z) => Current == null || Current.Inside(x, z);
 
+        /// <summary>Generated street lamps: in settlements only – the country roads between the villages are unlit.</summary>
+        public static bool LitStreet(Vector2 p) => Current == null || Current.Value(p.x, p.y) == 255;
+
         /// <summary>Any inside pixel touches the square [x0, x0+size]² grown by <paramref name="margin"/>.</summary>
         public bool AnyInside(float x0, float z0, float size, float margin)
         {
@@ -84,7 +87,7 @@ namespace LeGamez.Editor.OsmImport
 
         static bool IsWater(Dictionary<string, string> t) =>
             t.Is("natural", "water") || t.Has("water") || t.Is("waterway", "riverbank") || t.Is("landuse", "basin") ||
-            t.Is("landuse", "reservoir") || t.Is("waterway", "river") || t.Is("waterway", "canal") || t.Is("waterway", "stream");
+            t.Is("landuse", "reservoir") || t.Is("waterway", "river") || t.Is("waterway", "canal"); // streams/ditches: inside only
 
         static bool KeepEverywhere(Dictionary<string, string> t)
         {
@@ -96,7 +99,7 @@ namespace LeGamez.Editor.OsmImport
         /// <summary>
         /// Removes everything outside the mask right after loading (the builders stay unchanged): nodes by position,
         /// buildings by centroid, other areas when their centroid and most of the outline are inside, lines are cut to
-        /// the inside runs. Water and railways stay everywhere.
+        /// the inside runs. Lakes/ponds, rivers, canals and railways stay everywhere.
         /// </summary>
         public FilterStats Filter(OsmData data)
         {

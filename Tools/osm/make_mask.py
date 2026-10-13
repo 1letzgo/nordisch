@@ -58,6 +58,7 @@ DEFAULTS = {
     "cluster_radius": 100,           # … unless they belong to a cluster of ≥ cluster_buildings buildings
     "cluster_buildings": 12,         #     within cluster_radius (hamlets with several farmsteads)
     "fill_holes": 40000,             # m² – enclosed outside patches smaller than this become inside
+    "include": [],                   # [[xMin, xMax, zMin, zMax], …] local rectangles always inside
 }
 
 
@@ -255,7 +256,15 @@ def process_area(area, refresh):
     roads = np.array(roads_img, dtype=bool)
     corridor = grow(roads, cfg["road_buffer"], step)
 
-    inside = (settle | corridor) & bound
+    # Always-detailed rectangles ("include": [[west, east, south, north], …] in local metres, e.g. the former town map
+    # with its parks and woods, so it stays exactly as before).
+    incl = np.zeros_like(bound)
+    for x0, x1, z0, z1 in cfg.get("include", []):
+        c0, c1 = int((x0 - r.x0) / step), int(math.ceil((x1 - r.x0) / step))
+        r0, r1 = int((r.z1 - z1) / step), int(math.ceil((r.z1 - z0) / step))
+        incl[max(r0, 0):r1, max(c0, 0):c1] = True
+    settle |= incl
+    inside = ((settle | corridor) & bound) | incl
     # Small enclosed gaps (a field between two arms of a village) are filled.
     gaps, ng = ndimage.label(~inside)
     if ng:

@@ -244,8 +244,16 @@ namespace LeGamez.Editor.OsmImport
             return votes[best] >= total * Majority;
         }
 
-        static Color32 Colour(byte c, Color32 fallback) =>
-            c == Forest ? WorldStyle.Forest : AerialImage.CoverColor((AerialImage.Cover)c, fallback);
+        /// <summary>Bare field (ploughed / harvested): out in the country, "paving" and "sand" in the aerial image are soil.</summary>
+        static readonly Color32 Field = Color32.Lerp(WorldStyle.Grass, new Color32(150, 122, 90, 255), 0.65f);
+
+        static Color32 Colour(byte c, Color32 fallback)
+        {
+            if (c == Forest) return WorldStyle.Forest;
+            var cover = (AerialImage.Cover)c;
+            if (cover == AerialImage.Cover.Paving || cover == AerialImage.Cover.Sand || cover == AerialImage.Cover.Soil) return Field;
+            return AerialImage.CoverColor(cover, fallback);
+        }
 
         /// <summary>Same soft colour variation as the detailed ground (GroundBuilder.Shade with Perlin noise).</summary>
         static Color32 Shade(Color32 color, Vector3 p)

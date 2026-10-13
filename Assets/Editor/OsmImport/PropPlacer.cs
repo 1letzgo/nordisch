@@ -586,7 +586,7 @@ namespace LeGamez.Editor.OsmImport
                         side = -side;
                         if (spot == null) continue;
                         var p = spot.Value;
-                        if (!area.Contains(p, 2f) || buildings.IsBlocked(p, 1.2f) || mapped.IsBlocked(p, 0f)) continue;
+                        if (!area.Contains(p, 2f) || !AreaMask.LitStreet(p) || buildings.IsBlocked(p, 1.2f) || mapped.IsBlocked(p, 0f)) continue;
                         EditLamp(sink, p, dir);
                         count++;
                     }
