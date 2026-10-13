@@ -1,8 +1,10 @@
 import AppKit
 import SwiftUI
 
-/// Top-down map: minimap render + LoD2 roof outlines as background, placed objects on top.
+/// Top-down map: Unity's overview / region renders + house outlines as background, placed objects on top.
 /// World coordinates: x = east, y = north (metres). View is flipped (y down).
+/// Big areas (20 km, ~100 000 objects, ~35 000 houses) stay smooth because only what is visible gets drawn
+/// (grid indices in the model) and untouched generated objects become simple dots or disappear when zoomed out.
 final class MapCanvas: NSView {
     weak var model: EditorModel?
     var camera = CGPoint.zero
@@ -22,8 +24,11 @@ final class MapCanvas: NSView {
 
     private struct CacheKey: Equatable {
         var size: CGSize, camera: CGPoint, zoom: CGFloat, scale: CGFloat
-        var map: Bool, buildings: Bool, bg: ObjectIdentifier?, path: ObjectIdentifier?
+        var map: Bool, buildings: Bool, images: ObjectIdentifier?, imagesVersion: Int, path: ObjectIdentifier?, houses: Int
     }
+
+    /// Zoom levels (view points per metre) below which detail is left out.
+    private static let minHouseZoom: CGFloat = 0.6, minObjectZoom: CGFloat = 0.25, minGardenZoom: CGFloat = 0.35
     private var cacheKey: CacheKey?
     private var cache: CGImage?
 
@@ -67,7 +72,7 @@ final class MapCanvas: NSView {
     private func zoom(by factor: CGFloat, around v: CGPoint) {
         userNavigated = true
         let before = toWorld(v)
-        zoom = min(max(zoom * factor, 0.2), 80)
+        zoom = min(max(zoom * factor, 0.01), 80)
         let after = toWorld(v)
         camera.x += before.x - after.x
         camera.y += before.y - after.y
@@ -86,17 +91,21 @@ final class MapCanvas: NSView {
         let view = CGRect(x: visible.x, y: visible2.y, width: visible2.x - visible.x, height: visible.y - visible2.y).insetBy(dx: -10, dy: -10)
         drawHouses(ctx, model, view)
         if model.mode == .gardens { drawGardens(ctx, model, view) }
-        for o in model.objects where view.contains(CGPoint(x: o.x, y: o.z)) && model.isVisible(o) {
+        if model.showGenerated && zoom >= Self.minObjectZoom { drawUntouched(ctx, model, view) }
+        let objects = model.objects
+        for i in model.edited {
+            let o = objects[i]
+            guard view.contains(CGPoint(x: o.x, y: o.z)) else { continue }
             let selected = model.selection.contains(o.id)
             if o.deleted {
                 drawDeleted(ctx, o, selected: selected)
             } else {
-                drawObject(ctx, o, selected: selected, ghost: false, faint: o.isGenerated && !model.isChanged(o))
+                drawObject(ctx, o, selected: selected, ghost: false)
             }
         }
         if let type = model.placing, let c = model.cursor {
             var ghost = PlacedObject(type: type.id, x: c.x, z: c.y)
-            if let prev = model.objects.last(where: { $0.type == type.id && !$0.isGenerated }) { ghost.yaw = prev.yaw; ghost.scale = prev.scale }
+            if let prev = model.lastNew(of: type.id) { ghost.yaw = prev.yaw; ghost.scale = prev.scale }
             drawObject(ctx, ghost, selected: false, ghost: true)
         }
         ctx.restoreGState()
@@ -113,11 +122,39 @@ final class MapCanvas: NSView {
         }
     }
 
+    /// Generated objects nobody changed, from the grid (context in world space). Small ones are batched into one
+    /// path per type (faint dots), larger ones drawn as shapes. Selected ones get the full treatment.
+    private func drawUntouched(_ ctx: CGContext, _ model: EditorModel, _ view: CGRect) {
+        let objects = model.objects, flags = model.editedFlag
+        // Small square dots, filled per type in one call (ellipse paths cost ~10× more with tens of thousands).
+        var dots: [String: [CGRect]] = [:]
+        let r = (zoom < 1 ? 1.5 : 2.5) / zoom
+        model.genGrid.query(view) { i in
+            guard !flags[i] else { return }
+            let o = objects[i]
+            guard view.contains(CGPoint(x: o.x, y: o.z)) else { return }
+            let selected = !model.selection.isEmpty && model.selection.contains(o.id)
+            if selected || o.kind.radius * o.effScale * zoom >= 5 {
+                drawObject(ctx, o, selected: selected, ghost: false, faint: true)
+            } else {
+                dots[o.type, default: []].append(CGRect(x: o.x - r, y: o.z - r, width: 2 * r, height: 2 * r))
+            }
+        }
+        ctx.saveGState()
+        ctx.setShouldAntialias(false)
+        for (type, rects) in dots {
+            ctx.setFillColor(ObjectType.find(type).color.withAlphaComponent(0.75).cgColor)
+            ctx.fill(rects)
+        }
+        ctx.restoreGState()
+    }
+
     private func drawBackground(_ ctx: CGContext, _ model: EditorModel) {
         let scale = window?.backingScaleFactor ?? 2
         let key = CacheKey(size: bounds.size, camera: camera, zoom: zoom, scale: scale,
                            map: model.showMap, buildings: model.showBuildings,
-                           bg: model.background.map(ObjectIdentifier.init), path: model.buildings.map(ObjectIdentifier.init))
+                           images: model.mapImages.map(ObjectIdentifier.init), imagesVersion: model.mapImages?.version ?? 0,
+                           path: model.buildings.map(ObjectIdentifier.init), houses: model.houses.count)
         if key != cacheKey || cache == nil {
             cacheKey = key
             cache = renderBackground(model, scale: scale)
@@ -147,37 +184,47 @@ final class MapCanvas: NSView {
 
         let area = model.areaRect
         let mapRect = model.mapRect
-        ctx.interpolationQuality = zoom > 2 ? .none : .high
-        if model.showMap, let bg = model.background {
-            ctx.draw(bg, in: mapRect)
+        let view = visibleWorldRect
+        if model.showMap, let images = model.mapImages, let overview = images.overview {
+            drawMap(ctx, images, overview, view: view, scale: scale)
         } else {
             ctx.setFillColor(NSColor(hex: 0x8DBF6A).cgColor)
             ctx.fill(area)
         }
         // Outside the playable area: dim.
         ctx.setFillColor(NSColor.black.withAlphaComponent(0.45).cgColor)
-        ctx.addRect(mapRect.insetBy(dx: -4000, dy: -4000))
+        ctx.addRect(mapRect.union(view).insetBy(dx: -100, dy: -100))
         ctx.addRect(area)
         ctx.fillPath(using: .evenOdd)
 
-        // 100 m chunk grid when zoomed in.
+        // 100 m chunk grid when zoomed in (visible part only).
         if zoom > 1.5 {
-            ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.12).cgColor)
-            ctx.setLineWidth(1 / zoom)
-            var x = ceil(area.minX / 100) * 100
-            while x <= area.maxX {
-                ctx.move(to: CGPoint(x: x, y: area.minY)); ctx.addLine(to: CGPoint(x: x, y: area.maxY))
-                x += 100
+            let g = view.intersection(area)
+            if !g.isNull {
+                ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.12).cgColor)
+                ctx.setLineWidth(1 / zoom)
+                var x = ceil(g.minX / 100) * 100
+                while x <= g.maxX {
+                    ctx.move(to: CGPoint(x: x, y: g.minY)); ctx.addLine(to: CGPoint(x: x, y: g.maxY))
+                    x += 100
+                }
+                var y = ceil(g.minY / 100) * 100
+                while y <= g.maxY {
+                    ctx.move(to: CGPoint(x: g.minX, y: y)); ctx.addLine(to: CGPoint(x: g.maxX, y: y))
+                    y += 100
+                }
+                ctx.strokePath()
             }
-            var y = ceil(area.minY / 100) * 100
-            while y <= area.maxY {
-                ctx.move(to: CGPoint(x: area.minX, y: y)); ctx.addLine(to: CGPoint(x: area.maxX, y: y))
-                y += 100
-            }
-            ctx.strokePath()
         }
-        if model.showBuildings, let path = model.buildings, zoom > 0.8 {
-            ctx.addPath(path)
+        if model.showBuildings, zoom > Self.minHouseZoom {
+            if !model.houses.isEmpty {
+                let houses = model.houses
+                model.houseGrid.query(view) { i in
+                    if houses[i].bounds.intersects(view) { ctx.addPath(houses[i].path) }
+                }
+            } else if let path = model.buildings {
+                ctx.addPath(path)
+            }
             ctx.setStrokeColor(NSColor.black.withAlphaComponent(model.showMap ? 0.35 : 0.6).cgColor)
             ctx.setLineWidth(1 / zoom)
             ctx.strokePath()
@@ -186,6 +233,46 @@ final class MapCanvas: NSView {
         ctx.setLineWidth(2 / zoom)
         ctx.stroke(area)
         return ctx.makeImage()
+    }
+
+    /// World rectangle covered by the view.
+    var visibleWorldRect: CGRect {
+        let a = toWorld(.zero), b = toWorld(CGPoint(x: bounds.maxX, y: bounds.maxY))
+        return CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(b.x - a.x), height: abs(b.y - a.y))
+    }
+
+    /// Overview image, and on top the region images as soon as they are sharper than the overview at this zoom
+    /// (requested at the resolution the zoom needs; loading ones show the overview or another level meanwhile).
+    /// Context in world space (y north): an image drawn into a rect has its top row at maxY = north.
+    private func drawMap(_ ctx: CGContext, _ images: MapImages, _ overview: CGImage, view: CGRect, scale: CGFloat) {
+        var loaded: [(MapImages.Region, CGImage)] = []
+        let pixelsPerRegion = Double(zoom * scale) * MapImages.regionSize
+        var level = MapImages.levels[0]
+        if pixelsPerRegion > images.overviewPixelsPerRegion * 1.3 {
+            let regions = images.regions(in: view)
+            if !regions.isEmpty, regions.count <= 160 {
+                // A level up to 25 % below the screen resolution is fine and halves the pixels to resample.
+                level = MapImages.level(for: pixelsPerRegion / 1.25)
+                loaded = images.images(for: regions, level: level, center: CGPoint(x: view.midX, y: view.midY))
+            }
+        }
+        // Overview only where no region image lies on top (resampling is the expensive part of a frame).
+        ctx.saveGState()
+        if !loaded.isEmpty {
+            ctx.addRect(view.insetBy(dx: -10, dy: -10))
+            for (r, _) in loaded { ctx.addRect(MapImages.rect(r)) }
+            ctx.clip(using: .evenOdd)
+        }
+        ctx.interpolationQuality = loaded.isEmpty ? .high : .low
+        ctx.draw(overview, in: images.overviewRect)
+        ctx.restoreGState()
+        guard !loaded.isEmpty else { return }
+        ctx.interpolationQuality = pixelsPerRegion > Double(level) * 3 ? .none : .low
+        // Half a device pixel of overlap hides seams between neighbouring regions.
+        let seam = 0.5 / (zoom * scale)
+        for (r, img) in loaded {
+            ctx.draw(img, in: MapImages.rect(r).insetBy(dx: -seam, dy: -seam))
+        }
     }
 
     private func shapePath(_ t: ObjectType) -> CGPath {
@@ -199,7 +286,26 @@ final class MapCanvas: NSView {
     private func drawGardens(_ ctx: CGContext, _ model: EditorModel, _ view: CGRect) {
         ctx.setLineCap(.round)
         let minW = 2.5 / zoom
-        for g in model.gardenLines {
+        // Untouched lines: one path per kind (tens of thousands in a municipality); hidden when zoomed far out.
+        if zoom >= Self.minGardenZoom {
+            var paths: [GardenKind: CGMutablePath] = [:]
+            for g in model.gardenLines {
+                let r = CGRect(x: min(g.a.x, g.b.x), y: min(g.a.y, g.b.y), width: abs(g.a.x - g.b.x), height: abs(g.a.y - g.b.y))
+                guard view.intersects(r.insetBy(dx: -2, dy: -2)), model.gardenSelection != .generated(g.id),
+                      !model.gardenRemoved.contains(g.id) else { continue }
+                let path = paths[g.gardenKind] ?? CGMutablePath()
+                path.move(to: g.a); path.addLine(to: g.b)
+                paths[g.gardenKind] = path
+            }
+            for (kind, path) in paths {
+                ctx.addPath(path)
+                ctx.setStrokeColor(kind.color.cgColor)
+                ctx.setLineWidth(max(kind.width, minW))
+                ctx.strokePath()
+            }
+        }
+        // Removed and selected lines on top, one by one (few).
+        for g in model.gardenLines where model.gardenRemoved.contains(g.id) || model.gardenSelection == .generated(g.id) {
             let r = CGRect(x: min(g.a.x, g.b.x), y: min(g.a.y, g.b.y), width: abs(g.a.x - g.b.x), height: abs(g.a.y - g.b.y))
             guard view.intersects(r.insetBy(dx: -2, dy: -2)) else { continue }
             let removed = model.gardenRemoved.contains(g.id)
@@ -252,8 +358,9 @@ final class MapCanvas: NSView {
 
     /// Styled houses filled with their wall colour; the selected house outlined. Context in world space.
     private func drawHouses(_ ctx: CGContext, _ model: EditorModel, _ view: CGRect) {
-        for h in model.houses where model.styleByHouse[h.id] != nil && view.intersects(h.bounds) {
-            let st = model.styleByHouse[h.id]!
+        for i in model.styledHouses where view.intersects(model.houses[i].bounds) {
+            let h = model.houses[i]
+            guard let st = model.styleByHouse[h.id] else { continue }
             if st.hidden == true {
                 // Removed: dark fill, red outline and cross.
                 ctx.addPath(h.path)
@@ -278,8 +385,8 @@ final class MapCanvas: NSView {
         }
         if let h = model.currentHouse {
             // Every part of the same building (shared address) gets a light outline, the clicked part a strong one.
-            if let a = h.addr.first {
-                for o in model.houses where o.id != h.id && o.addr.contains(a) && view.intersects(o.bounds) {
+            if let a = h.norm.first {
+                for o in (model.housesByAddr[a] ?? []).map({ model.houses[$0] }) where o.id != h.id && view.intersects(o.bounds) {
                     ctx.addPath(o.path)
                     ctx.setStrokeColor(NSColor.controlAccentColor.withAlphaComponent(0.6).cgColor)
                     ctx.setLineWidth(2 / zoom)
@@ -439,9 +546,17 @@ final class MapCanvas: NSView {
         let slack = 6 / Double(zoom)
         // Prefer new/edited objects over untouched generated ones when they overlap.
         func hit(_ o: PlacedObject) -> Bool {
-            model.isVisible(o) && (o.contains(w, slack: slack) || dist(toView(CGPoint(x: o.x, y: o.z)), v) < 7)
+            o.contains(w, slack: slack) || dist(toView(CGPoint(x: o.x, y: o.z)), v) < 7
         }
-        return model.objects.last { hit($0) && (!$0.isGenerated || model.isChanged($0)) } ?? model.objects.last(where: hit)
+        let objects = model.objects
+        if let i = model.edited.last(where: { hit(objects[$0]) }) { return objects[i] }
+        guard model.showGenerated, zoom >= Self.minObjectZoom else { return nil }
+        let flags = model.editedFlag
+        var best = -1
+        model.genGrid.query(CGRect(x: w.x, y: w.y, width: 0, height: 0).insetBy(dx: -slack - 7 / zoom, dy: -slack - 7 / zoom)) { i in
+            if i > best, !flags[i], hit(objects[i]) { best = i }
+        }
+        return best >= 0 ? objects[best] : nil
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -546,7 +661,19 @@ final class MapCanvas: NSView {
         case .marquee(let start, _, let base):
             drag = .marquee(start: start, current: v, base: base)
             let r = CGRect(x: min(start.x, v.x), y: min(start.y, v.y), width: abs(start.x - v.x), height: abs(start.y - v.y))
-            model.selection = base.union(model.objects.filter { !$0.deleted && model.isVisible($0) && r.contains(toView(CGPoint(x: $0.x, y: $0.z))) }.map(\.id))
+            let objects = model.objects
+            var ids = base
+            for i in model.edited where !objects[i].deleted && r.contains(toView(CGPoint(x: objects[i].x, y: objects[i].z))) {
+                ids.insert(objects[i].id)
+            }
+            if model.showGenerated && zoom >= Self.minObjectZoom {
+                let flags = model.editedFlag
+                let a = toWorld(r.origin), b = toWorld(CGPoint(x: r.maxX, y: r.maxY))
+                model.genGrid.query(CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(b.x - a.x), height: abs(b.y - a.y))) { i in
+                    if !flags[i], r.contains(toView(CGPoint(x: objects[i].x, y: objects[i].z))) { ids.insert(objects[i].id) }
+                }
+            }
+            model.selection = ids
         }
         needsDisplay = true
     }
@@ -654,6 +781,7 @@ struct MapCanvasView: NSViewRepresentable {
 
     func updateNSView(_ v: MapCanvas, context: Context) {
         v.model = model
+        model.mapImages?.onLoad = { [weak v] in v?.needsDisplay = true }
         if v.lastRecenter != model.recenterToken, v.bounds.width > 10 {
             v.lastRecenter = model.recenterToken
             v.recenter()

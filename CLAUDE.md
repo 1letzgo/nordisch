@@ -233,8 +233,15 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
   HDR + Bloom/Farbkorrektur in `ProjectSetup` (`ConfigureUrp`, `CreatePostProfile`).
 
 ### Map-Editor (macOS-App, `Tools/MapEditor`)
-Draufsicht je Gebiet (Minimap + LoD2-Dachumrisse). Neue Objekte setzen, außerdem alle vom Importer erzeugten
+Draufsicht je Gebiet (Unity-Renders + Hausumrisse). Neue Objekte setzen, außerdem alle vom Importer erzeugten
 (Bäume, Büsche, Laternen, Bänke, Kübel, Brunnen, Café-Tische, Denkmäler …) verschieben/drehen/skalieren/löschen.
+- Hintergrund (`MapImages.swift`): Übersicht `Assets/Generated/<id>/<id>_map.jpg` (Gebiet + 60 m Rand), ab mittlerem Zoom
+  die 1-km-Regionsbilder `regions~/r<rx>_<rz>.jpg` (Region rx = x ∈ [rx·1000, (rx+1)·1000), Norden oben; gitignored,
+  entstehen bei `RenderThumbnails`/Import) – nur sichtbare, im Hintergrund dekodiert in 256/512/1024 px, LRU-Cache ~256 MB.
+- Große Gebiete (Westerstede ~93 000 Objekte, ~37 000 Häuser): Gitter-Indizes (`GridIndex`, 100 m) für Objekte/Häuser,
+  unveränderte erzeugte Objekte als Punkte (< 0,25 pt/m ausgeblendet), Hausumrisse ab 0,6 pt/m, Garten-Linien ab 0,35 pt/m;
+  Undo speichert nur Abweichungen vom Import. Prüfen ohne UI: App mit
+  `-snapshot <dir> -snapshotAreas spiekeroog,westerstede [-repoPath <repo>]` starten → PNGs je Zoomstufe + Zeiten in `snapshot.log`.
 - Speichert nach `Data/<id>.edits.json`: `objects` = neue Objekte, `changes` = Overrides erzeugter Objekte per ID
   (`<typ>@<x·10>,<z·10>`, Liste in `Assets/Generated/<id>/<id>_objects.json`, schreibt der Importer).
 - Importer: `EditsPlacer` – alle Placer laufen über `EditsPlacer.Emit` (baut auch gelöschte, damit die Zufallsfolge

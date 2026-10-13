@@ -6,22 +6,37 @@ final class EditorModel: ObservableObject {
     @Published var repo: URL?
     @Published var areas: [Area] = []
     @Published var area: Area?
-    @Published var objects: [PlacedObject] = []
-    /// Original placement of generated objects, by genId.
-    private(set) var originals: [String: PlacedObject] = [:]
+    /// Generated objects first (same order as `genBase`), then new ones. Not @Published: big areas have ~100 000
+    /// objects, and a plain didSet lets `objects[i].x = …` change the array in place instead of copying it.
+    var objects: [PlacedObject] = [] {
+        didSet {
+            objectWillChange.send()
+            derivedValid = false
+        }
+    }
+    /// Generated objects as imported (the first `genBase.count` entries of `objects` correspond 1:1).
+    private(set) var genBase: [PlacedObject] = []
+    /// Untouched generated objects by imported position, for drawing and hit tests (cell 100 m).
+    private(set) var genGrid = GridIndex(cell: 100)
     @Published var showGenerated = true
     @Published var selection: Set<UUID> = []
     /// Palette item armed for placing (click on the map drops one).
     @Published var placing: ObjectType?
     @Published var dirty = false
-    @Published var background: CGImage?
+    /// Overview + region images (top-down renders from Unity).
+    @Published var mapImages: MapImages?
     @Published var buildings: CGPath?
     @Published var showBuildings = true
     @Published var showMap = true
     @Published var status = ""
     @Published var unityBusy = false
     @Published var unityLog = ""
-    @Published var cursor: CGPoint?
+    /// Mouse position in world metres – separate object so moving the mouse doesn't re-render the whole UI.
+    let pointer = PointerState()
+    var cursor: CGPoint? {
+        get { pointer.cursor }
+        set { pointer.cursor = newValue }
+    }
     /// Bumped to make the map recentre on the area.
     @Published var recenterToken = 0
     /// Bumped (with `focusPoint`) to zoom the map onto a point.
@@ -34,10 +49,77 @@ final class EditorModel: ObservableObject {
         focusToken += 1
     }
 
-    private struct UndoState { var objects: [PlacedObject]; var styles: [HouseStyle]; var removed: Set<String>; var drawn: [DrawnLine] }
+    // MARK: - Derived object data (rebuilt lazily after changes)
+
+    private var derivedValid = false
+    private var _edited: [Int] = []
+    private var _editedFlag: [Bool] = []
+    private var _indexById: [UUID: Int] = [:]
+
+    private func validateDerived() {
+        guard !derivedValid else { return }
+        derivedValid = true
+        var list: [Int] = []
+        var flags = [Bool](repeating: false, count: genBase.count)
+        for i in objects.indices {
+            if i < genBase.count {
+                guard Self.differs(objects[i], genBase[i]) else { continue }
+                flags[i] = true
+            }
+            list.append(i)
+        }
+        _edited = list
+        _editedFlag = flags
+        if _indexById.count != objects.count || objects.last.map({ _indexById[$0.id] != objects.count - 1 }) == true {
+            rebuildIndex()
+        }
+    }
+
+    private func rebuildIndex() {
+        var m = [UUID: Int](minimumCapacity: objects.count)
+        for (i, o) in objects.enumerated() { m[o.id] = i }
+        _indexById = m
+    }
+
+    /// Indices (into `objects`) of new objects and of generated ones that differ from the import, in order.
+    var edited: [Int] { validateDerived(); return _edited }
+    /// Per generated index: changed (drawn from `edited`, not from `genGrid`).
+    var editedFlag: [Bool] { validateDerived(); return _editedFlag }
+
+    func index(of id: UUID) -> Int? {
+        validateDerived()
+        if let i = _indexById[id], i < objects.count, objects[i].id == id { return i }
+        rebuildIndex()
+        return _indexById[id]
+    }
+
+    private static func differs(_ o: PlacedObject, _ base: PlacedObject) -> Bool {
+        o.deleted != base.deleted || abs(o.x - base.x) > 0.005 || abs(o.z - base.z) > 0.005
+            || abs(o.yaw - base.yaw) > 0.05 || abs(o.scale - base.scale) > 0.005
+    }
+
+    /// Undo keeps only what differs from the import (a full copy of ~100 000 objects per step would cost gigabytes).
+    private struct UndoState {
+        var changed: [Int: PlacedObject]; var added: [PlacedObject]
+        var styles: [HouseStyle]; var removed: Set<String>; var drawn: [DrawnLine]
+    }
     private var undoStack: [UndoState] = []
     private var redoStack: [UndoState] = []
-    private var undoState: UndoState { UndoState(objects: objects, styles: houseStyles, removed: gardenRemoved, drawn: drawnLines) }
+    private var undoState: UndoState {
+        var changed: [Int: PlacedObject] = [:]
+        for i in edited where i < genBase.count { changed[i] = objects[i] }
+        return UndoState(changed: changed, added: Array(objects[min(genBase.count, objects.count)...]),
+                         styles: houseStyles, removed: gardenRemoved, drawn: drawnLines)
+    }
+
+    private func restore(_ st: UndoState) {
+        var list = genBase
+        for (i, o) in st.changed { list[i] = o }
+        objects = list + st.added
+        houseStyles = st.styles
+        gardenRemoved = st.removed
+        drawnLines = st.drawn
+    }
 
     // MARK: - Gardens (hedges, fences, walls)
 
@@ -108,7 +190,7 @@ final class EditorModel: ObservableObject {
     }
 
     /// Where the drawing cursor snaps to (shown as a ring); nil = free.
-    @Published var snapPoint: CGPoint?
+    var snapPoint: CGPoint? // not published: the map redraws itself on mouse moves
 
     /// One click = start, second click = end: every drawn line is a single element (extend it by snapping to its end).
     func addDrawingPoint(_ p: CGPoint) {
@@ -207,29 +289,64 @@ final class EditorModel: ObservableObject {
     @Published var mode: Mode = .objects {
         didSet { if mode != oldValue { placing = nil; selection = []; selectedHouse = nil; gardenSelection = nil; drawingKind = nil; drawingPoints = [] } }
     }
-    @Published var houses: [House] = [] { didSet { rebuildStyleCache() } }
+    @Published var houses: [House] = [] { didSet { rebuildHouseIndex(); rebuildStyleCache() } }
     /// Entries of Data/<area>.buildings.json (also hand-written ones, kept as they are).
     @Published var houseStyles: [HouseStyle] = [] { didSet { rebuildStyleCache() } }
     /// House id -> its style, for drawing (styles are few, houses many).
     private(set) var styleByHouse: [String: HouseStyle] = [:]
+    /// Indices of houses with a style.
+    private(set) var styledHouses: [Int] = []
+    /// First style entry per house id / normalised address (houseStyles order wins, like the importer).
+    private var styleIdx: [String: Int] = [:]
+    private var styleAddrIdx: [String: Int] = [:]
+    private(set) var houseById: [String: Int] = [:]
+    /// Normalised address -> house indices (a building can have several parts).
+    private(set) var housesByAddr: [String: [Int]] = [:]
+    /// Houses by footprint centre (cell 100 m).
+    private(set) var houseGrid = GridIndex(cell: 100)
+
+    private func rebuildHouseIndex() {
+        houseById = [:]
+        housesByAddr = [:]
+        houseGrid = GridIndex(cell: 100)
+        for (i, h) in houses.enumerated() {
+            houseById[h.id] = i
+            for a in Set(h.norm) { housesByAddr[a, default: []].append(i) }
+            houseGrid.insert(i, at: CGPoint(x: h.bounds.midX, y: h.bounds.midY), extent: max(h.bounds.width, h.bounds.height) / 2)
+        }
+        matchCache = [:]
+    }
 
     private func rebuildStyleCache() {
-        var m: [String: HouseStyle] = [:]
-        if !houseStyles.isEmpty {
-            for h in houses { if let st = style(h) { m[h.id] = st } }
+        styleIdx = [:]
+        styleAddrIdx = [:]
+        for (i, st) in houseStyles.enumerated() {
+            if let id = st.id, styleIdx[id] == nil { styleIdx[id] = i }
+            if let a = st.address.map(HouseCatalog.normalize), styleAddrIdx[a] == nil { styleAddrIdx[a] = i }
         }
+        var candidates = Set<Int>()
+        for id in styleIdx.keys { if let i = houseById[id] { candidates.insert(i) } }
+        for a in styleAddrIdx.keys { for i in housesByAddr[a] ?? [] { candidates.insert(i) } }
+        var m: [String: HouseStyle] = [:]
+        for i in candidates { if let st = style(houses[i]) { m[houses[i].id] = st } }
         styleByHouse = m
+        styledHouses = candidates.sorted()
+    }
+
+    /// Houses a style entry applies to (by id, else by address).
+    func houses(for st: HouseStyle) -> [House] {
+        if let id = st.id, let i = houseById[id] { return [houses[i]] }
+        return (st.address.map { housesByAddr[HouseCatalog.normalize($0)] ?? [] } ?? []).map { houses[$0] }
     }
     @Published var selectedHouse: String?
     @Published var houseQuery = ""
 
-    var currentHouse: House? { selectedHouse.flatMap { id in houses.first { $0.id == id } } }
+    var currentHouse: House? { selectedHouse.flatMap { houseById[$0] }.map { houses[$0] } }
 
     /// Index of the style entry for a house: id match first, then any of its addresses.
     func styleIndex(_ h: House) -> Int? {
-        if let i = houseStyles.firstIndex(where: { $0.id == h.id }) { return i }
-        let addrs = Set(h.addr.map(HouseCatalog.normalize))
-        return houseStyles.firstIndex { $0.address.map { addrs.contains(HouseCatalog.normalize($0)) } ?? false }
+        if let i = styleIdx[h.id] { return i }
+        return h.norm.compactMap { styleAddrIdx[$0] }.min()
     }
 
     func style(_ h: House) -> HouseStyle? { styleIndex(h).map { houseStyles[$0] } }
@@ -253,17 +370,23 @@ final class EditorModel: ObservableObject {
         houseStyles.remove(at: i)
     }
 
+    private var matchCache: [String: [House]] = [:]
+
     /// Houses whose address contains the query (case-insensitive), at most 40.
     func houseMatches(_ q: String) -> [House] {
         let n = HouseCatalog.normalize(q)
         guard n.count >= 2 else { return [] }
+        if let hit = matchCache[n] { return hit }
         var seen = Set<String>()
         var out: [House] = []
-        for h in houses where h.addr.contains(where: { HouseCatalog.normalize($0).contains(n) }) {
+        for h in houses where h.norm.contains(where: { $0.contains(n) }) {
             // One row per address (LoD2 buildings come in several parts).
             if seen.insert(h.title).inserted { out.append(h) }
         }
-        return out.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }.prefix(40).map { $0 }
+        let result = out.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }.prefix(40).map { $0 }
+        if matchCache.count > 64 { matchCache = [:] }
+        matchCache[n] = result
+        return result
     }
 
     func focusHouse(_ h: House) {
@@ -275,7 +398,12 @@ final class EditorModel: ObservableObject {
 
     /// Smallest house containing the point.
     func house(at p: CGPoint) -> House? {
-        houses.filter { $0.contains(p) }.min { $0.area < $1.area }
+        var best: House?
+        houseGrid.query(CGRect(origin: p, size: .zero)) { i in
+            let h = houses[i]
+            if h.contains(p), h.area < (best?.area ?? .infinity) { best = h }
+        }
+        return best
     }
 
     func reloadHouses() {
@@ -286,7 +414,7 @@ final class EditorModel: ObservableObject {
     private func stylesURL(_ a: Area) -> URL? { repo?.appendingPathComponent("Data/\(a.id).buildings.json") }
 
     var areaRect: CGRect { area?.rect ?? CGRect(x: -500, y: -500, width: 1000, height: 1000) }
-    /// Region of the minimap PNG: area rectangle + 60 m margin (SceneSnapshot / AreaInfo.MapMargin).
+    /// Region of the overview image <id>_map.jpg: area rectangle + 60 m margin (SceneSnapshot / AreaInfo.MapMargin).
     var mapRect: CGRect { areaRect.insetBy(dx: -60, dy: -60) }
 
     init() {
@@ -362,7 +490,7 @@ final class EditorModel: ObservableObject {
             houseStyles = (try? JSONDecoder().decode(HouseStylesFile.self, from: data).buildings) ?? []
         }
         var list: [PlacedObject] = []
-        originals = [:]
+        var grid = GridIndex(cell: 100)
         var genCount = 0
         if let repo, let data = try? Data(contentsOf: repo.appendingPathComponent("Assets/Generated/\(a.id)/\(a.id)_objects.json")),
            let gen = try? JSONDecoder().decode(GeneratedFile.self, from: data) {
@@ -372,11 +500,12 @@ final class EditorModel: ObservableObject {
                 o.seed = 0
                 o.genId = r.id
                 o.baseSize = r.size
-                originals[r.id] = o
+                grid.insert(list.count, at: CGPoint(x: r.x, y: r.z), extent: o.kind.radius * r.size)
                 list.append(o)
             }
             genCount = gen.objects.count
         }
+        let base = list
         var missing = 0
         var rematched = 0
         if let url = editsURL(a), let data = try? Data(contentsOf: url) {
@@ -399,14 +528,16 @@ final class EditorModel: ObservableObject {
                 list += edits.objects
             } catch { status = "\(a.id).edits.json unlesbar: \(error.localizedDescription)" }
         }
+        genBase = base
+        genGrid = grid
         objects = list
         dirty = rematched > 0 || gardenRematched // re-save under the new ids
-        loadBackground()
-        recenterToken += 1
-        status = "\(a.name): \(genCount) erzeugte, \(objects.count - genCount) neue Objekte"
+        status = "\(a.name): \(genCount) erzeugte, \(objects.count - genCount) neue Objekte, \(houses.count) Häuser"
             + (genCount == 0 ? " – noch nicht importiert? (In Unity übernehmen)" : "")
             + (rematched > 0 ? " · \(rematched) Änderungen neu zugeordnet (Objekt leicht verschoben)" : "")
             + (missing > 0 ? " · \(missing) Änderungen passen nicht mehr (OSM-Daten geändert?)" : "")
+        loadBackground()
+        recenterToken += 1
     }
 
     /// Index of the generated object of the same type nearest to the position encoded in `id` ("type@x10,z10"), within 1 m.
@@ -427,19 +558,18 @@ final class EditorModel: ObservableObject {
 
     func loadBackground() {
         guard let repo, let a = area else { return }
-        let png = repo.appendingPathComponent("Assets/Resources/AreaMaps/\(a.id).png")
-        if let src = CGImageSourceCreateWithURL(png as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary) {
-            background = CGImageSourceCreateImageAtIndex(src, 0, nil)
-        } else {
-            background = nil
+        let dir = repo.appendingPathComponent("Assets/Generated/\(a.id)")
+        let images = MapImages(overviewURL: dir.appendingPathComponent("\(a.id)_map.jpg"), overviewRect: mapRect,
+                               regionsDir: dir.appendingPathComponent("regions~"))
+        mapImages = images
+        if images.overview == nil {
+            status += " · Kein Kartenbild (\(a.id)_map.jpg) – einmal „In Unity übernehmen“"
+        } else if images.available.isEmpty {
+            status += " · Keine Regionsbilder (regions~) – nur Übersicht"
         }
+        // Catalog houses are drawn per visible cell; the LoD2 file is only the fallback without a catalog.
         buildings = nil
-        if !houses.isEmpty {
-            let path = CGMutablePath()
-            for h in houses { path.addPath(h.path) }
-            buildings = path
-            return
-        }
+        if !houses.isEmpty { return }
         let lod2 = repo.appendingPathComponent("Data/\(a.id).lod2.json")
         let id = a.id
         Task.detached(priority: .userInitiated) {
@@ -469,7 +599,14 @@ final class EditorModel: ObservableObject {
 
     // MARK: - Editing
 
-    var selectedObjects: [PlacedObject] { objects.filter { selection.contains($0.id) } }
+    /// Indices of the selected objects, in list order.
+    var selectedIndices: [Int] { selection.compactMap(index(of:)).sorted() }
+    var selectedObjects: [PlacedObject] { selectedIndices.map { objects[$0] } }
+
+    /// Last new (hand-placed) object of a type – new objects keep its rotation/size.
+    func lastNew(of type: String) -> PlacedObject? {
+        objects[min(genBase.count, objects.count)...].last { $0.type == type }
+    }
 
     /// Call before every user change (also marks the document dirty).
     func snapshot() {
@@ -485,22 +622,17 @@ final class EditorModel: ObservableObject {
     func undo() {
         guard let last = undoStack.popLast() else { return }
         redoStack.append(undoState)
-        objects = last.objects
-        houseStyles = last.styles
-        gardenRemoved = last.removed
-        drawnLines = last.drawn
+        restore(last)
         dirty = true
-        selection = selection.filter { id in objects.contains { $0.id == id } }
+        selection = selection.filter { index(of: $0) != nil }
     }
 
     func redo() {
         guard let next = redoStack.popLast() else { return }
         undoStack.append(undoState)
-        objects = next.objects
-        houseStyles = next.styles
-        gardenRemoved = next.removed
-        drawnLines = next.drawn
+        restore(next)
         dirty = true
+        selection = selection.filter { index(of: $0) != nil }
     }
 
     func place(_ type: ObjectType, at p: CGPoint) {
@@ -511,26 +643,26 @@ final class EditorModel: ObservableObject {
         snapshot()
         var o = PlacedObject(type: type.id, x: p.x, z: p.y)
         // Keep rotation/size of the last object of this type – handy for rows of benches.
-        if let prev = objects.last(where: { $0.type == type.id && !$0.isGenerated }) { o.yaw = prev.yaw; o.scale = prev.scale }
+        if let prev = lastNew(of: type.id) { o.yaw = prev.yaw; o.scale = prev.scale }
         objects.append(o)
         selection = [o.id]
     }
 
     func update(_ id: UUID, _ change: (inout PlacedObject) -> Void) {
-        guard let i = objects.firstIndex(where: { $0.id == id }) else { return }
+        guard let i = index(of: id) else { return }
         change(&objects[i])
     }
 
     func updateSelected(_ change: (inout PlacedObject) -> Void) {
-        for i in objects.indices where selection.contains(objects[i].id) { change(&objects[i]) }
+        for i in selectedIndices { change(&objects[i]) }
     }
 
     func deleteSelected() {
         guard !selection.isEmpty else { return }
         snapshot()
         // Generated objects are only marked (the importer skips them); new ones disappear.
-        for i in objects.indices where selection.contains(objects[i].id) { objects[i].deleted = true }
-        objects.removeAll { $0.deleted && !$0.isGenerated }
+        for i in selectedIndices { objects[i].deleted = true }
+        if objects[genBase.count...].contains(where: \.deleted) { objects.removeAll { $0.deleted && !$0.isGenerated } }
         selection = []
     }
 
@@ -574,17 +706,14 @@ final class EditorModel: ObservableObject {
 
     /// Generated object that differs from what the importer placed.
     func isChanged(_ o: PlacedObject) -> Bool {
-        guard let id = o.genId, let orig = originals[id] else { return false }
-        return o.deleted || abs(o.x - orig.x) > 0.005 || abs(o.z - orig.z) > 0.005
-            || abs(o.yaw - orig.yaw) > 0.05 || abs(o.scale - 1) > 0.005
+        guard o.isGenerated, let i = index(of: o.id), i < genBase.count else { return false }
+        return editedFlag[i]
     }
 
     func restoreSelected() {
         guard !selection.isEmpty else { return }
         snapshot()
-        for i in objects.indices where selection.contains(objects[i].id) {
-            if let id = objects[i].genId, let orig = originals[id] { objects[i] = orig.with(id: objects[i].id) }
-        }
+        for i in selectedIndices where i < genBase.count { objects[i] = genBase[i] }
     }
 
     func undeleteSelected() {
@@ -614,7 +743,8 @@ final class EditorModel: ObservableObject {
             return c
         }
         var changes: [String: EditsFile.Change] = [:]
-        for o in objects where isChanged(o) {
+        for i in edited where i < genBase.count {
+            let o = objects[i]
             changes[o.genId!] = o.deleted
                 ? EditsFile.Change(deleted: true)
                 : EditsFile.Change(x: r(o.x, 0.01), z: r(o.z, 0.01), yaw: r(o.yaw, 0.1), scale: r(o.scale, 0.01))

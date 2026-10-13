@@ -168,6 +168,11 @@ struct Area: Identifiable, Hashable, Decodable {
     }
 }
 
+/// Mouse position over the map (world metres); only the status bar observes it.
+final class PointerState: ObservableObject {
+    @Published var cursor: CGPoint?
+}
+
 extension NSColor {
     convenience init(hex: Int) {
         self.init(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
