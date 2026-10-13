@@ -89,6 +89,27 @@ namespace LeGamez.Editor.OsmImport
             return Current = new TerrainField(s, nx, nz, xMin, zMin, step, baseH);
         }
 
+        /// <summary>
+        /// Rewrites every height sample: f(x, z, height above <see cref="Base"/>, sample column, sample row) → new height
+        /// (used by <see cref="CoastBuilder"/> to sink water below and lift tidal flats above the sea level).
+        /// </summary>
+        public void Remap(System.Func<float, float, float, int, int, float> f)
+        {
+            if (IsFlat) return;
+            for (int iz = 0; iz < nz; iz++)
+            for (int ix = 0; ix < nx; ix++)
+                samples[iz * nx + ix] = f(xMin + ix * step, zMin + iz * step, samples[iz * nx + ix], ix, iz);
+        }
+
+        public int SamplesX => nx;
+        public int SamplesZ => nz;
+
+        /// <summary>Height sample (above <see cref="Base"/>) at grid index.</summary>
+        public float Sample(int ix, int iz) => samples[iz * nx + ix];
+
+        /// <summary>World position of grid sample [ix, iz].</summary>
+        public Vector2 SamplePos(int ix, int iz) => new Vector2(xMin + ix * step, zMin + iz * step);
+
         /// <summary>Smooth (bilinear) DGM height – used to build the faceted ground vertices.</summary>
         public float Raw(float x, float z)
         {

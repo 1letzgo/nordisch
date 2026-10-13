@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using LeGamez.Editor.OsmImport;
 using LeGamez.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -10,10 +11,10 @@ using UnityEngine.Rendering.Universal;
 namespace LeGamez.Editor
 {
     /// <summary>
-    /// Renders chosen views of one area (only the tiles around each view are loaded – fine for whole municipalities)
-    /// to Builds/Snapshots/&lt;id&gt;_view_&lt;name&gt;.png.
-    /// Batch: -executeMethod LeGamez.Editor.ViewSnapshot.Render -area &lt;id&gt; -views "name:x,z,yaw,height,pitch;…"
-    /// (x, z local metres; yaw 0 = north, 90 = east; height above ground; pitch down in degrees).
+    /// Renders hand-picked views of one area to Builds/Snapshots/&lt;id&gt;_&lt;name&gt;.png (for checking coasts, dunes, harbours …).
+    /// Batch: -executeMethod LeGamez.Editor.ViewSnapshot.Render -area &lt;id&gt; -views "beach:x,z,h,lx,lz;…"
+    /// Camera at local (x, z), h metres above the terrain, looking at (lx, lz) at ground level (+1.5 m).
+    /// "top" as name renders an orthographic, fog-free top view of the whole area instead (other values ignored).
     /// </summary>
     public static class ViewSnapshot
     {
@@ -21,7 +22,8 @@ namespace LeGamez.Editor
         {
             var args = System.Environment.GetCommandLineArgs();
             string Arg(string k) { int i = System.Array.IndexOf(args, k); return i >= 0 && i + 1 < args.Length ? args[i + 1] : null; }
-            string id = Arg("-area") ?? "westerstede", views = Arg("-views") ?? "centre:0,0,0,3,8";
+            string id = Arg("-area");
+            string views = Arg("-views") ?? "top";
 
             string scenePath = null;
             foreach (var guid in AssetDatabase.FindAssets("t:Scene", new[] { "Assets/Scenes/Areas" }))
@@ -31,65 +33,62 @@ namespace LeGamez.Editor
                 var a = Object.FindAnyObjectByType<AreaInfo>();
                 if (a != null && a.areaId == id) { scenePath = p; break; }
             }
-            if (scenePath == null) { Debug.LogError($"[View] no scene for {id}"); return; }
+            if (scenePath == null) throw new System.ArgumentException("area not found: " + id);
+            var area = Object.FindAnyObjectByType<AreaInfo>();
             var world = Object.FindAnyObjectByType<WorldStreamer>();
+            if (world != null) world.LoadAllInEditor();
+            Physics.SyncTransforms();
+            var terrain = TerrainField.Load(Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Data", id + ".dgm.bin")));
+            // Sea level etc. change the terrain; use the scene's colliders for heights instead of the raw field.
+            float H(float x, float z)
+            {
+                if (Physics.Raycast(new Vector3(x, 500f, z), Vector3.down, out var hit, 1000f, ~(1 << 4))) return hit.point.y;
+                return terrain.Height(x, z);
+            }
+
             string outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Builds", "Snapshots"));
             Directory.CreateDirectory(outDir);
-
-            var camGo = new GameObject("ViewCam");
+            var camGo = new GameObject("SnapshotCam");
             var cam = camGo.AddComponent<Camera>();
-            cam.fieldOfView = 55f;
             cam.nearClipPlane = 0.3f;
-            cam.farClipPlane = 2500f;
+            cam.farClipPlane = 3000f;
             cam.clearFlags = CameraClearFlags.Skybox;
             cam.GetUniversalAdditionalCameraData().renderPostProcessing = true;
-            var volume = new GameObject("ViewVolume").AddComponent<Volume>();
+            var volume = new GameObject("SnapshotVolume").AddComponent<Volume>();
             volume.isGlobal = true;
             var gm = LeGamez.Core.GameMaterials.Instance;
             if (gm != null) volume.sharedProfile = gm.postProfile;
 
-            foreach (var v in views.Split(';'))
+            foreach (var view in views.Split(';'))
             {
-                if (string.IsNullOrWhiteSpace(v)) continue;
-                var parts = v.Split(':');
-                var n = System.Array.ConvertAll(parts[1].Split(','), s => float.Parse(s, CultureInfo.InvariantCulture));
-                var pos = new Vector3(n[0], 0f, n[1]);
-                if (world != null) world.LoadAroundInEditor(pos, 900f);
-                // Ground height under the camera: ray down onto the loaded meshes (colliders are not built in edit mode).
-                float ground = GroundHeight(pos);
-                camGo.transform.position = new Vector3(pos.x, ground + n[3], pos.z);
-                camGo.transform.rotation = Quaternion.Euler(n[4], n[2], 0f);
-                bool fog = RenderSettings.fog;
-                if (n[3] > 150f) RenderSettings.fog = false; // overviews
-                SceneSnapshot.RenderTo(cam, Path.Combine(outDir, $"{id}_view_{parts[0]}.png"), 1600, 900);
-                RenderSettings.fog = fog;
-                Debug.Log($"[View] {parts[0]} at {pos} ground {ground:F1}");
+                var parts = view.Split(':');
+                string name = parts[0].Trim();
+                if (name.Length == 0) continue;
+                string file = Path.Combine(outDir, $"{id}_{name}.png");
+                if (name == "top")
+                {
+                    Vector2 size = area.MapSize, c = area.BoundsCenter;
+                    cam.orthographic = true;
+                    cam.orthographicSize = size.y * 0.5f;
+                    camGo.transform.SetPositionAndRotation(new Vector3(c.x, 800f, c.y), Quaternion.Euler(90f, 0f, 0f));
+                    bool fog = RenderSettings.fog;
+                    RenderSettings.fog = false;
+                    int w = 2400, h = Mathf.RoundToInt(w * size.y / size.x);
+                    SceneSnapshot.RenderTo(cam, file, w, h);
+                    RenderSettings.fog = fog;
+                    cam.orthographic = false;
+                    continue;
+                }
+                var v = System.Array.ConvertAll(parts[1].Split(','), s => float.Parse(s, CultureInfo.InvariantCulture));
+                cam.fieldOfView = 55f;
+                camGo.transform.position = new Vector3(v[0], H(v[0], v[1]) + v[2], v[1]);
+                camGo.transform.LookAt(new Vector3(v[3], H(v[3], v[4]) + 1.5f, v[4]));
+                SceneSnapshot.RenderTo(cam, file, 1600, 900);
             }
-            if (world != null) world.UnloadAllInEditor();
             Object.DestroyImmediate(volume.gameObject);
             Object.DestroyImmediate(camGo);
-        }
-
-        static float GroundHeight(Vector3 p)
-        {
-            float best = 0f;
-            bool found = false;
-            foreach (var mf in Object.FindObjectsByType<MeshFilter>(FindObjectsSortMode.None))
-            {
-                if (!mf.name.StartsWith("Terrain") || mf.sharedMesh == null) continue;
-                var b = mf.GetComponent<Renderer>().bounds;
-                if (p.x < b.min.x || p.x > b.max.x || p.z < b.min.z || p.z > b.max.z) continue;
-                var go = mf.gameObject;
-                var col = go.GetComponent<MeshCollider>();
-                if (col == null) col = go.AddComponent<MeshCollider>();
-                col.sharedMesh = mf.sharedMesh;
-                if (col.Raycast(new Ray(new Vector3(p.x, 500f, p.z), Vector3.down), out var hit, 1000f))
-                {
-                    best = found ? Mathf.Max(best, hit.point.y) : hit.point.y;
-                    found = true;
-                }
-            }
-            return best;
+            if (world != null) world.UnloadAllInEditor();
+            Debug.Log($"[Snapshot] views {id} -> {outDir}");
         }
     }
 }

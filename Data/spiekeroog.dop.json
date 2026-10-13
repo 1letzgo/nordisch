@@ -1,9 +1,9 @@
 {
- "xMin": -560.0,
- "zMin": -560.0,
+ "xMin": -2160.0,
+ "zMin": -2860.0,
  "step": 1.0,
- "width": 1120,
- "height": 1120,
+ "width": 10470,
+ "height": 4170,
  "date": "2025-10-19",
  "source": "LGLN DOP20 RGBI (CC BY 4.0)"
 }

@@ -52,12 +52,18 @@
       "name": "Langeoog",
       "lat": 53.7465,
       "lon": 7.4825,
-      "size_m": 2000,
+      "size_m": 12260,
       "vehicles": [
         "bicycle",
         "carriage"
       ],
-      "ground": "sand"
+      "ground": "sand",
+      "extent": {
+        "west": 1460,
+        "east": 10800,
+        "south": 2950,
+        "north": 1650
+      }
     },
     {
       "id": "spiekeroog",

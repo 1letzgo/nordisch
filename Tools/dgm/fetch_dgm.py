@@ -42,6 +42,7 @@ STAC = "https://dgm.stac.lgln.niedersachsen.de/search"
 MARGIN = 60.0   # same margin as the ground mesh
 STEP = 2.0      # default; an area may set "dgm_step" (5 = terrain cell size, for very large areas)
 COMPACT_SAMPLES = 4_000_000
+SEA_FLOOR = -2.5  # m NHN, fill for missing tiles on islands (below mean low water)
 
 
 def latlon_to_utm(lat, lon, zone=32):
@@ -138,7 +139,9 @@ def process_area(area):
     # values in between (e.g. -72 m at the coast) – nothing in Lower Saxony lies below -30 m NHN, so drop those too.
     grid[grid < -30] = np.nan
     if np.isnan(grid).any():
-        grid[np.isnan(grid)] = np.nanmedian(grid)
+        # Islands: tiles only exist where there is land, the rest is Wadden Sea / open sea – fill with a low
+        # sea floor; the importer (CoastBuilder) turns it into water or tidal flat using the aerial image.
+        grid[np.isnan(grid)] = SEA_FLOOR if area.get("ground") == "sand" else np.nanmedian(grid)
     base = float(grid.min())
     grid -= base
 

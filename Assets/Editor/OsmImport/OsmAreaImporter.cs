@@ -126,9 +126,10 @@ namespace LeGamez.Editor.OsmImport
             if (mask != null && lidarTrees != null) lidarTrees = lidarTrees.FindAll(t => mask.Inside(t.x, t.y));
             var aerial = AerialImage.Load(Path.GetDirectoryName(jsonPath), meta.id);
             aerial?.SetCanopy(lidarTrees);
+            CoastBuilder.Prepare(data, area, terrain, aerial); // islands: sea level, water, tidal flats (rewrites the terrain)
             var sink = new MeshSink();
+            CoarseTerrain.Build(sink, area, WorldStyle.GroundColor(meta.ground), terrain); // before BuildBase: simplifies the field
             GroundBuilder.BuildBase(sink, area, WorldStyle.GroundColor(meta.ground), terrain);
-            CoarseTerrain.Build(sink, area, WorldStyle.GroundColor(meta.ground), terrain);
             GroundBuilder.BuildAreas(data, sink, area);
             int lines = GroundBuilder.BuildLines(data, sink, area);
             // Prefer official LGLN LoD2 buildings (real roof shapes); fall back to OSM extrusion.
@@ -161,6 +162,7 @@ namespace LeGamez.Editor.OsmImport
                 if (m == WorldStyle.MatGround || m == WorldStyle.MatWater) TerrainDrape.Drape(kv.Value, terrain);
                 else if (m == WorldStyle.MatTrees || m == WorldStyle.MatTreeTrunks || m == WorldStyle.MatProps) TerrainDrape.Lift(kv.Value, terrain);
             }
+            CoastBuilder.BuildSea(sink, area); // level sea surface, not draped
 
             string areaDir = $"{GeneratedRoot}/{meta.id}";
             EnsureFolder(areaDir);

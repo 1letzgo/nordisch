@@ -35,6 +35,7 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
    Ohne Datei bleibt die Welt flach. Der Importer baut daraus einen facettierten Boden (5-m-Zellen, `TerrainField`),
    schneidet Straßen/Flächen/Wasser entlang dieser Zellen und legt sie auf (`TerrainDrape.Drape`), hebt Bäume/Props an
    (`Lift`) und stellt Gebäude auf den tiefsten Punkt ihres Grundrisses.
+   Fehlende Kacheln: Inseln (`ground: sand`) → −2,5 m NHN (Meeresboden, siehe `CoastBuilder`), Festland → Median.
 3c. **Bäume aus Laserscan** (nur Niedersachsen, LGLN DOM1 − DGM1, CC BY 4.0; braucht vorher `<id>.lod2.json` als Gebäudemaske):
    ```bash
    python3 Tools/dgm/fetch_trees.py jever
@@ -121,6 +122,14 @@ Pipeline: **Offline-Daten → Unity-Importer → Szene**. Zur Laufzeit wird nich
   Nicht passende Einträge → Warnung im Import-Log.
   Fenster halten ≥ 0,6 m Abstand zum Dach (`BuildingBuilder.RoofGap`, Shader-Regel `head + 0.6` in VertexColorLit, Fensterbänke gleich).
 - `GroundBuilder`: Grund-Kacheln, Flächen (landuse/natural/leisure), Straßen-Bänder mit Mittellinie, Wasser, Hecken/Mauern/Zäune.
+  Geländeblöcke werden bis 40 m zusammengefasst, wenn jede Dreieckshälfte (Diagonale x0z0–x1z1) eben ist (±2 cm) und eine Bodenbedeckung hat.
+- `CoastBuilder` (nur Inseln mit DGM + Luftbild): Meer/Watt bei **Niedrigwasser wie im Luftbild**. Wasser = DOP-NIR < 50 und < 0,5 m NHN
+  oder keine DGM-Kachel (3×3-Mehrheit); Meeresspiegel = Median-DGM der Wasserpixel (≈ −1,5…−1,7 m NHN). `TerrainField.Remap`:
+  Wasser → flacher Grund 0,8 m unter dem Spiegel (watbar), Watt (< 1,2 m NHN) auf ein 40-m-Gitter geglättet (an den Geländeblöcken
+  ausgerichtet → 2 Dreiecke je 40 m), Land ≥ Spiegel + 0,15. `BuildSea` legt nach dem Draping ebene Wasser-Quads (Quadtree bis 80 m)
+  wo Gelände unter dem Spiegel liegt, plus 600 m offenes Meer rund ums Gebiet (Horizont). Bodenbedeckung nach Höhe + DOP
+  (`Classify`, Mehrheit über 15 m): Watt/nasser Sand, Salzwiese, Queller, Sand, Dünengras, Gebüsch, Rasen. OSM-natural-/Wiesenflächen und
+  Tide-Wasser entfallen dort, OSM-Wasser in Meeresfarbe; Zufallsbüsche nur auf Gebüsch/einem Drittel Dünengras (gleiche Zufallszüge).
 - `GardenBuilder`: Gartengrenzen aus ALKIS-Flurstücken (`Data/<id>.parcels.json`, `Tools/alkis/fetch_parcels.py`, INSPIRE-WFS
   LGLN). Wohngrundstücke (120–2500 m², adressiertes Haus, nicht Gewerbe/Schule/Park): Straßenseite niedrige Hecke /
   Jägerzaun / Klinkermäuerchen / offen mit Lücken für Weg + Einfahrt; Nachbar-/Rückgrenzen hohe Hecke / Holz-Sichtschutz /
@@ -267,7 +276,9 @@ Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen sp�
 - iOS/TestFlight: erst `bump_build.py` (+ Commit), dann `BuildIOS`, dann Skill `/testflight-build` auf `Builds/iOS`
   (Version/Build stehen schon richtig in der Info.plist, nichts von Hand ändern). Wird Android im selben Zug released,
   dieselbe Build-Nummer verwenden (also `release_android.sh` zuerst, dann ohne erneutes Hochzählen `BuildIOS`).
-- Generierte Meshes (`Assets/Generated/*/*_meshes.asset`) sind nicht im Repo (>100 MB) – nach dem Klonen `ImportAllBatch`.
+- Generierte Kacheln (`Assets/Generated/*/tiles/`) sind nicht im Repo – nach dem Klonen `ImportAllBatch`.
+- Große Raster `Data/*.dop.png` und `Data/*.dgm.bin` sind nicht im Repo (ganze Inseln/Gemeinden > 100 MB) – nach dem Klonen
+  je Gebiet `Tools/dop/fetch_dop.py <id>` und `Tools/dgm/fetch_dgm.py <id>` laufen lassen (die JSON-Daten sind versioniert).
 
 ## Stolperfallen
 - Unity schreibt Template-Pakete (purchasing, analytics, collab-proxy, multiplayer.center) zurück in `Packages/manifest.json` → wieder entfernen.

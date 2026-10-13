@@ -249,6 +249,7 @@ namespace LeGamez.Editor.OsmImport
                     foreach (var h in poly.holes) if (OsmData.PointInRing(p, h)) { inHole = true; break; }
                     if (inHole || clear.IsBlocked(p, kind == VegetationKind.Tree ? 2.2f : 0.8f)) continue;
                     if (kind == VegetationKind.Tree) EditsPlacer.Emit(sink, "tree", p, 0f, 1f, (s, q, y) => Tree(s, q, rng, 1f));
+                    else if (CoastBuilder.Active && !CoastBuilder.BushFits(p)) { Bush(new MeshSink(), p, rng); continue; } // islands: only where the aerial image shows scrub; same random draws
                     else EditsPlacer.Emit(sink, "bush", p, 0f, 1f, (s, q, y) => Bush(s, q, rng));
                     count++;
                 }
