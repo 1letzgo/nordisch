@@ -238,16 +238,23 @@ Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen sp�
   sonst zurück ins Menü, im Menü App in den Hintergrund. `Assets/link.xml` hält Collider-Klassen fürs Engine-Stripping (`CreatePrimitive`) und alles, was Kartenszenen brauchen.
 
 ## Release (GitHub, öffentlich: https://github.com/1letzgo/nordisch)
-- Android: `Tools/release/release_android.sh` (Unity zu, versionierte Dateien sauber) → Version = Datum (`2026.10.13`, `.2` …),
-  versionCode = 10-Minuten-Schritte seit 2025, signiert mit `~/.config/nordisch/release.keystore`
+- **Versionierung**: `Tools/release/version.json` = {"version": "1.0", "build": N}. Version von Hand (1.0 → 1.1 …),
+  Build-Nummer läuft für iOS und Android gemeinsam hoch (`python3 Tools/release/bump_build.py`). Jeder Build
+  (`BuildScript`) setzt daraus iOS `1.0 (N)`, Android versionName `1.0.N` und versionCode `1000000 + N` (über den alten
+  Datumscodes ~93 600) – nur für die Dauer des Builds, ProjectSettings bleibt unverändert. `ITSAppUsesNonExemptEncryption`
+  setzt `Editor/IosPlistPatch` automatisch.
+- Android: `Tools/release/release_android.sh` (Unity zu, versionierte Dateien sauber) → erhöht die Build-Nummer, committet
+  `version.json` („Release 1.0.N“), signiert mit `~/.config/nordisch/release.keystore`
   (Passwort in `release.env`, **nicht im Repo – sichern, sonst lassen sich Updates nicht mehr über alte Versionen installieren**),
-  Tag `v<version>` + GitHub-Release mit `Nordisch-<version>.apk`. `--dry-run` = nur bauen.
+  Tag `v1.0.N` + GitHub-Release mit `Nordisch-1.0.N.apk`. `--dry-run` = nur bauen (ohne Hochzählen).
+  Alte Datums-Releases (v2026.10.13.x) sehen 1.0.N im In-App-Updater nicht als neuer an – sie laufen ab und verweisen dann auf die Releases-Seite.
 - Release-APKs laufen **15 Tage** nach dem Build ab: `BuildScript.BuildAndroidRelease` bettet `Resources/BuildInfo.txt`
   (nur während des Builds) ein, `Core/BuildExpiry` + Sperrbildschirm im Hauptmenü mit Link auf das neueste Release.
   Normale Builds (BuildAndroid/BuildIOS) laufen nie ab.
 - Karten: `Tools/release/publish_maps.sh` (siehe „Karten-Downloads“), unabhängig vom App-Release.
-- iOS/TestFlight: Skill `/testflight-build` auf `Builds/iOS` nach `BuildIOS`; vorher in `Builds/iOS/Info.plist`
-  `CFBundleShortVersionString` = Release-Version, `CFBundleVersion` = versionCode, `ITSAppUsesNonExemptEncryption` = false.
+- iOS/TestFlight: erst `bump_build.py` (+ Commit), dann `BuildIOS`, dann Skill `/testflight-build` auf `Builds/iOS`
+  (Version/Build stehen schon richtig in der Info.plist, nichts von Hand ändern). Wird Android im selben Zug released,
+  dieselbe Build-Nummer verwenden (also `release_android.sh` zuerst, dann ohne erneutes Hochzählen `BuildIOS`).
 - Generierte Meshes (`Assets/Generated/*/*_meshes.asset`) sind nicht im Repo (>100 MB) – nach dem Klonen `ImportAllBatch`.
 
 ## Stolperfallen

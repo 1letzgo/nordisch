@@ -34,10 +34,49 @@ namespace LeGamez.Editor
         public static void BuildAndroid()
         {
             RemoveStaleBuildInfo();
-            if (!BuildAndroidApk() && Application.isBatchMode) EditorApplication.Exit(1);
+            var (version, build) = ReadVersion();
+            if (!BuildAndroidApk($"{version}.{build}", VersionCode(build)) && Application.isBatchMode) EditorApplication.Exit(1);
         }
 
-        static bool BuildAndroidApk()
+        [System.Serializable] class VersionFile { public string version = "1.0"; public int build; }
+
+        /// <summary>Marketing version ("1.0") and build number from Tools/release/version.json (bumped by bump_build.py).</summary>
+        public static (string version, int build) ReadVersion()
+        {
+            string path = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Tools", "release", "version.json"));
+            var v = File.Exists(path) ? JsonUtility.FromJson<VersionFile>(File.ReadAllText(path)) : new VersionFile();
+            return (v.version, v.build);
+        }
+
+        /// <summary>Android versionCode: above the old date-based codes (~93 600), so new builds install over old ones.</summary>
+        public static int VersionCode(int build) => 1000000 + build;
+
+        /// <summary>Applies version/build to the player settings for one build and puts the old values back
+        /// (ProjectSettings stays unchanged in git).</summary>
+        static bool WithVersion(string name, string iosBuild, int code, System.Func<bool> build)
+        {
+            string prevVersion = PlayerSettings.bundleVersion, prevIos = PlayerSettings.iOS.buildNumber;
+            int prevCode = PlayerSettings.Android.bundleVersionCode;
+            try
+            {
+                PlayerSettings.bundleVersion = name;
+                PlayerSettings.iOS.buildNumber = iosBuild;
+                PlayerSettings.Android.bundleVersionCode = code;
+                return build();
+            }
+            finally
+            {
+                PlayerSettings.bundleVersion = prevVersion;
+                PlayerSettings.iOS.buildNumber = prevIos;
+                PlayerSettings.Android.bundleVersionCode = prevCode;
+                AssetDatabase.SaveAssets();
+            }
+        }
+
+        static bool BuildAndroidApk(string versionName, int versionCode) =>
+            WithVersion(versionName, PlayerSettings.iOS.buildNumber, versionCode, BuildAndroidApkInner);
+
+        static bool BuildAndroidApkInner()
         {
             ProjectSetup.ConfigureAndroid();
             var scenes = EnabledScenes();
@@ -84,27 +123,21 @@ namespace LeGamez.Editor
             var expires = System.DateTime.UtcNow.AddDays(ReleaseLifetimeDays);
             File.WriteAllText(BuildInfoPath, $"version={version}\nexpires={expires:yyyy-MM-ddTHH:mm:ssZ}\n");
             AssetDatabase.ImportAsset(BuildInfoPath);
-            string prevVersion = PlayerSettings.bundleVersion;
-            int prevCode = PlayerSettings.Android.bundleVersionCode;
             string prevKeystore = PlayerSettings.Android.keystoreName, prevAlias = PlayerSettings.Android.keyaliasName;
             bool ok = false;
             try
             {
-                PlayerSettings.bundleVersion = version;
-                PlayerSettings.Android.bundleVersionCode = code;
                 PlayerSettings.Android.useCustomKeystore = true;
                 PlayerSettings.Android.keystoreName = keystore;
                 PlayerSettings.Android.keystorePass = pass;
                 PlayerSettings.Android.keyaliasName = alias;
                 PlayerSettings.Android.keyaliasPass = pass;
-                ok = BuildAndroidApk();
+                ok = BuildAndroidApk(version, code);
             }
             finally
             {
                 // Nothing of the release setup stays in the project: no expiry in later builds, no key path.
                 AssetDatabase.DeleteAsset(BuildInfoPath);
-                PlayerSettings.bundleVersion = prevVersion;
-                PlayerSettings.Android.bundleVersionCode = prevCode;
                 PlayerSettings.Android.useCustomKeystore = false;
                 PlayerSettings.Android.keystoreName = prevKeystore;
                 PlayerSettings.Android.keystorePass = "";
@@ -157,9 +190,15 @@ namespace LeGamez.Editor
                 options = BuildOptions.None,
                 assetBundleManifestPath = BundleManifest(BuildTarget.iOS),
             };
-            var report = BuildPipeline.BuildPlayer(options);
-            Debug.Log($"[LeGamez] iOS build {report.summary.result}: {outDir} ({report.summary.totalSize / (1024 * 1024)} MB)");
-            if (report.summary.result != BuildResult.Succeeded && Application.isBatchMode) EditorApplication.Exit(1);
+            // iOS: CFBundleShortVersionString = "1.0", CFBundleVersion = build number.
+            var (version, build) = ReadVersion();
+            bool ok = WithVersion(version, build.ToString(), PlayerSettings.Android.bundleVersionCode, () =>
+            {
+                var report = BuildPipeline.BuildPlayer(options);
+                Debug.Log($"[LeGamez] iOS build {report.summary.result} {version} ({build}): {outDir} ({report.summary.totalSize / (1024 * 1024)} MB)");
+                return report.summary.result == BuildResult.Succeeded;
+            });
+            if (!ok && Application.isBatchMode) EditorApplication.Exit(1);
         }
     }
 }

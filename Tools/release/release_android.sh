@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds a signed, expiring (15 days) release APK and publishes it as a GitHub release of 1letzgo/nordisch.
-#   Tools/release/release_android.sh            # version = today's date (2026.10.13, then 2026.10.13.2, …)
-#   Tools/release/release_android.sh --dry-run   # build only, no tag/release
+#   Tools/release/release_android.sh            # next build of the version in Tools/release/version.json → v1.0.<build>
+#   Tools/release/release_android.sh --dry-run   # build only (current build number), no bump/tag/release
 # Needs: Unity editor closed, gh logged in, ~/.config/nordisch/release.env (keystore, see CLAUDE.md "Release").
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -18,13 +18,16 @@ if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
   echo "Working tree not clean – commit first (the release is tagged on HEAD)."; git status --short | head; exit 1
 fi
 
-# Version: date, with a running suffix for several releases a day. Version code: 10-minute steps since 2025.
-base=$(date +%Y.%m.%d)
-version=$base; n=1
-while git rev-parse -q --verify "refs/tags/v$version" >/dev/null || gh release view "v$version" -R "$REPO" >/dev/null 2>&1; do
-  n=$((n + 1)); version="$base.$n"
-done
-code=$(( ($(date +%s) - $(date -j -f %Y-%m-%d 2025-01-01 +%s)) / 600 ))
+# Version: "1.0" (hand-edited in Tools/release/version.json) + running build number shared with iOS/TestFlight.
+# versionName = 1.0.<build>, versionCode = 1000000 + build (above the old date-based codes).
+if [[ $DRY == 1 ]]; then
+  read -r marketing build < <(python3 -c "import json;v=json.load(open('Tools/release/version.json'));print(v['version'],v['build'])")
+else
+  read -r marketing build < <(python3 Tools/release/bump_build.py)
+  git commit -q -m "Release $marketing.$build" Tools/release/version.json
+fi
+version="$marketing.$build"
+code=$((1000000 + build))
 expires=$(date -v+15d +%d.%m.%Y)
 echo "Release v$version (versionCode $code), runs until $expires"
 
