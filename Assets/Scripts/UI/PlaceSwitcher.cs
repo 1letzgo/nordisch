@@ -17,6 +17,7 @@ namespace LeGamez.UI
         class Row
         {
             public MapStore.Map map;
+            public StartPoints.Point point;
             public Text status;
             public RectTransform fill;
         }
@@ -88,13 +89,13 @@ namespace LeGamez.UI
 
         void Update()
         {
-            if (builtRevision != MapStore.Revision) Rebuild();
+            if (builtRevision != MapStore.Revision + StartPoints.Revision * 100000) Rebuild();
             foreach (var r in rows) Refresh(r);
         }
 
         void Rebuild()
         {
-            builtRevision = MapStore.Revision;
+            builtRevision = MapStore.Revision + StartPoints.Revision * 100000;
             foreach (Transform c in list) Destroy(c.gameObject);
             rows.Clear();
             string current = AreaInfo.Current != null ? AreaInfo.Current.areaId : null;
@@ -103,7 +104,15 @@ namespace LeGamez.UI
             foreach (var m in MapStore.Maps)
             {
                 if (m.Id == current) continue;
-                rows.Add(BuildRow(m, y, h));
+                rows.Add(BuildRow(m, null, y, h));
+                y -= h + gap;
+            }
+            // Own start points – also those in the current area (beam there directly).
+            foreach (var p in StartPoints.All)
+            {
+                var m = MapStore.Maps.Find(x => x.Id == p.areaId);
+                if (m == null) continue;
+                rows.Add(BuildRow(m, p, y, h));
                 y -= h + gap;
             }
             list.sizeDelta = new Vector2(0, -y);
@@ -112,14 +121,14 @@ namespace LeGamez.UI
                     .Place(new Vector2(0.5f, 1f), new Vector2(0, -60), new Vector2(880, 60));
         }
 
-        Row BuildRow(MapStore.Map m, float y, float h)
+        Row BuildRow(MapStore.Map m, StartPoints.Point point, float y, float h)
         {
-            var row = new Row { map = m };
-            var card = UiKit.Rect($"Row {m.entry.name}", list, new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(880, h));
+            var row = new Row { map = m, point = point };
+            var card = UiKit.Rect($"Row {point?.name ?? m.entry.name}", list, new Vector2(0.5f, 1f), new Vector2(0, y), new Vector2(880, h));
             var bg = UiKit.Panel(card.gameObject, Color.white);
             var btn = card.gameObject.AddComponent<Button>();
             btn.targetGraphic = bg;
-            btn.onClick.AddListener(() => Choose(m));
+            btn.onClick.AddListener(() => Choose(m, point));
 
             var thumb = UiKit.Rect("Thumb", card, new Vector2(0f, 0.5f), new Vector2(14, 0), new Vector2(220, h - 28));
             thumb.gameObject.AddComponent<RectMask2D>();
@@ -139,9 +148,9 @@ namespace LeGamez.UI
             else image.color = UiKit.Sea;
 
             bool island = m.HasVehicle("carriage");
-            UiKit.Label(card, m.entry.name, 44, UiKit.Ink, TextAnchor.UpperLeft, FontStyle.Bold)
+            UiKit.Label(card, point != null ? point.name : m.entry.name, 44, UiKit.Ink, TextAnchor.UpperLeft, FontStyle.Bold)
                 .Place(new Vector2(0f, 1f), new Vector2(262, -24), new Vector2(580, 56));
-            UiKit.Label(card, island ? "Insel" : "Stadt", 26, UiKit.InkSoft, TextAnchor.UpperLeft)
+            UiKit.Label(card, point != null ? $"{m.entry.name} · eigener Startpunkt" : island ? "Insel" : "Stadt", 26, UiKit.InkSoft, TextAnchor.UpperLeft)
                 .Place(new Vector2(0f, 1f), new Vector2(262, -80), new Vector2(580, 36));
             row.status = UiKit.Label(card, "", 28, UiKit.Navy, TextAnchor.UpperLeft, FontStyle.Bold)
                 .Place(new Vector2(0f, 1f), new Vector2(262, -118), new Vector2(580, 40));
@@ -179,18 +188,18 @@ namespace LeGamez.UI
             r.fill.anchorMax = new Vector2(Mathf.Clamp01(m.progress), 1f);
         }
 
-        void Choose(MapStore.Map m)
+        void Choose(MapStore.Map m, StartPoints.Point point)
         {
             if (m.Busy) return;
-            Go(m);
+            Go(m, point);
         }
 
-        void Go(MapStore.Map m)
+        void Go(MapStore.Map m, StartPoints.Point point)
         {
             var flash = BeamFlash.Create(transform.parent);
             flash.StartCoroutine(flash.Fade(0f, 1f, 0.25f)); // world scene reload follows; the loading screen takes over
             gameObject.SetActive(false);
-            MapStore.Start(m); // small area file if needed, then the world switches; tiles follow on demand
+            MapStore.Start(m, point); // small area file if needed, then the world switches; tiles follow on demand
         }
     }
 }

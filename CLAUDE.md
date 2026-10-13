@@ -253,6 +253,9 @@ Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen sp�
   plus eines am Startpunkt (`spawnBikeSpot`). Rennen-Knopf = zweiter Gang auf dem Rad.
 - `Core/PositionMemory`: letzte Position, Blickrichtung und Fahrstatus pro Gebiet (PlayerPrefs; Schlüssel enthält Größe+Zentrum,
   wird also bei Gebietsänderung verworfen). Figurenwahl: `PlayerAvatar.SelectedIndex`.
+- **Eigene Startpunkte** (`Core/StartPoints`, `persistentDataPath/startpoints.json`): „Startpunkt merken“ in der großen
+  Karte speichert Gebiet + Position + Blickrichtung (Name = nächste Straße). Erscheinen im Menü („Wo startest du?“,
+  scrollbar) und in „Andere Orte“; `MapStore.Start(map, point)` → `StartPoints.Pending` → `GameBootstrap` setzt dort ab.
 - `UI/PlaceSwitcher` („Andere Orte“ in der großen Karte): alle Gebiete mit Status; Tipp = hinbeamen (fehlt das Gebiet,
   erst Start-Download). `MapStore.Play` lädt dafür die Welt-Szene mit dem neuen Gebiet neu und gibt das alte erst danach
   frei; jeder `WorldStreamer` übernimmt seine eigene Kachelquelle (`WorldStreamer.Source` → Instanz).

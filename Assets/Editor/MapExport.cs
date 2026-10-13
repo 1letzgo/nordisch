@@ -104,6 +104,9 @@ namespace LeGamez.Editor
                     }
                 }
 
+                // The loop above unloads assets to keep memory flat – reload the area data (and its POIs/streets) fresh.
+                data = AssetDatabase.LoadAssetAtPath<AreaData>(OsmImport.OsmAreaImporter.AreaDataPath(a.id));
+                if (data.streets == null || data.pois == null) Debug.LogWarning($"[Maps] {a.id}: streets/POIs missing in AreaData");
                 string areaFile = Path.Combine(dir, "area.bin");
                 File.WriteAllBytes(areaFile, MapFormat.WriteArea(data, OverviewImage(a.id), pack));
                 m.files.Add(new IndexFile { name = "area.bin", region = "", path = areaFile });
@@ -111,7 +114,7 @@ namespace LeGamez.Editor
                 long areaSize = new FileInfo(areaFile).Length, packSize = new FileInfo(packFile).Length;
                 index.maps.Add(m);
                 if (noMap > 0) Debug.LogWarning($"[Maps] {a.id}: {noMap} regions without minimap image – run SceneSnapshot.RenderThumbnailsBatch -area {a.id}");
-                Debug.Log($"[Maps] {a.id}: area {areaSize / 1024} KB, world pack {packSize / (1024 * 1024)} MB ({pack.Count} entries)");
+                Debug.Log($"[Maps] {a.id}: area {areaSize / 1024} KB ({data.streets?.names.Count ?? 0} streets, {data.pois?.entries.Count ?? 0} POIs), world pack {packSize / (1024 * 1024)} MB ({pack.Count} entries)");
             }
             File.WriteAllText(Path.Combine(OutDir, "index.json"), JsonUtility.ToJson(index, true));
             return true;

@@ -224,9 +224,10 @@ namespace LeGamez.Core
 
         /// <summary>Start a place: fetch/refresh its small area file if needed (online), then play. Offline with an
         /// installed area: play right away (cached tiles only).</summary>
-        public static void Start(Map m)
+        public static void Start(Map m, StartPoints.Point at = null)
         {
             if (m == null || starting) return;
+            StartPoints.Pending = at; // GameBootstrap places the player there instead of spawn / last position
             bool needsArea = !m.Playable || m.status == Status.UpdateAvailable || m.status == Status.UpdateRequired;
             bool online = Application.internetReachability != NetworkReachability.NotReachable;
             if (needsArea && m.latest != null && (online || !m.Playable))

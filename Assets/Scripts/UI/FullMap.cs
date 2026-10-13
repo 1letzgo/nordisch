@@ -143,6 +143,15 @@ namespace LeGamez.UI
             placesBtn.onClick.AddListener(() => { fm.Hide(); PlaceSwitcher.Open(canvasRoot); });
             UiKit.Stretch(UiKit.Label(places, "Andere Orte", 34, UiKit.Navy, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform);
 
+            // Save the current spot as an own start point (menu + "Andere Orte").
+            var save = UiKit.Rect("SaveStart", root, new Vector2(0.5f, 0.5f), new Vector2(mapPx.x / 2 - 190, mapPx.y / 2 + 180), new Vector2(380, 84));
+            UiKit.DropShadow(save, 12f, -4f, 0.3f);
+            var saveImg = UiKit.Panel(save.gameObject, new Color(1, 1, 1, 0.95f));
+            var saveBtn = save.gameObject.AddComponent<Button>();
+            saveBtn.targetGraphic = saveImg;
+            saveBtn.onClick.AddListener(fm.SaveStartPoint);
+            UiKit.Stretch(UiKit.Label(save, "Startpunkt merken", 34, UiKit.Navy, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform);
+
             // Zoom buttons at the right edge of the map.
             for (int i = 0; i < 2; i++)
             {
@@ -351,6 +360,20 @@ namespace LeGamez.UI
             pin.anchoredPosition = WorldToMap(world);
             beamButton.interactable = true;
             hint.text = snapped != null ? $"Ziel: {snapped.name}" : "Ort gewählt";
+        }
+
+        /// <summary>Remembers where the player stands (named after the street) as an own start point.</summary>
+        void SaveStartPoint()
+        {
+            var area = AreaInfo.Current;
+            if (area == null || player == null) return;
+            var p = player.transform.position;
+            string street = area.streets != null ? area.streets.Nearest(p, 40f) : null;
+            string name = !string.IsNullOrEmpty(street) ? street : $"{area.displayName} ({Mathf.RoundToInt(p.x)}, {Mathf.RoundToInt(p.z)})";
+            StartPoints.Add(area.areaId, area.MemoryKey, name, p, player.transform.eulerAngles.y);
+            Hide();
+            var hud = FindAnyObjectByType<Hud>();
+            if (hud != null) hud.ShowToast($"Startpunkt gemerkt: {name}");
         }
 
         void Beam()

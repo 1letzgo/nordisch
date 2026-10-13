@@ -30,6 +30,7 @@ namespace LeGamez.UI
         class CardUi
         {
             public MapStore.Map map;
+            public StartPoints.Point point; // own start point (null = the area's default start)
             public Text status;
             public RectTransform progressFill;
             public Text deleteLabel;
@@ -77,10 +78,10 @@ namespace LeGamez.UI
                 activity.Call<bool>("moveTaskToBack", true);
             }
             bool portrait = Screen.height > Screen.width;
-            if (builtPortrait != portrait || builtRevision != MapStore.Revision)
+            if (builtPortrait != portrait || builtRevision != MapStore.Revision + StartPoints.Revision * 100000)
             {
                 builtPortrait = portrait;
-                builtRevision = MapStore.Revision;
+                builtRevision = MapStore.Revision + StartPoints.Revision * 100000;
                 if (canvasGo != null) Destroy(canvasGo);
                 BuildUi(portrait);
             }
@@ -306,24 +307,50 @@ namespace LeGamez.UI
                 return;
             }
 
+            // Default start of every area, then the player's own start points (of areas we know).
+            var entries = new List<(MapStore.Map map, StartPoints.Point point)>();
+            foreach (var m in maps) entries.Add((m, null));
+            foreach (var p in StartPoints.All)
+            {
+                var m = maps.Find(x => x.Id == p.areaId);
+                if (m != null) entries.Add((m, p));
+            }
+
             const float gap = 28f;
             float top = padding * 0.8f + 90f, bottom = 120f;
-            int cols = 2, rows = Mathf.CeilToInt(maps.Count / 2f);
+            int cols = 2, rows = Mathf.CeilToInt(entries.Count / 2f);
             float cardW = (size.x - 2 * padding - gap * (cols - 1)) / cols;
-            float cardH = Mathf.Min((size.y - top - bottom - gap * (rows - 1)) / rows, cardW * 0.95f);
-            for (int i = 0; i < maps.Count; i++)
+            // Cards keep their size; more than fit scroll (new areas and own start points keep coming).
+            float viewH = size.y - top - bottom;
+            float cardH = Mathf.Min(cardW * 0.95f, Mathf.Max(cardW * 0.78f, (viewH - gap * (Mathf.Min(rows, 2) - 1)) / Mathf.Min(rows, 2)));
+            var view = UiKit.Rect("Places", sheet);
+            view.anchorMin = new Vector2(0, 1); view.anchorMax = new Vector2(1, 1);
+            view.pivot = new Vector2(0.5f, 1f);
+            view.sizeDelta = new Vector2(0, viewH + 30f);
+            view.anchoredPosition = new Vector2(0, -top + 15f);
+            view.gameObject.AddComponent<RectMask2D>().padding = new Vector4(0, -30, 0, 0);
+            view.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0);
+            var content = UiKit.Rect("Content", view);
+            content.anchorMin = new Vector2(0, 1); content.anchorMax = new Vector2(1, 1);
+            content.pivot = new Vector2(0.5f, 1f);
+            content.sizeDelta = new Vector2(0, rows * (cardH + gap) + 30f);
+            var scroll = view.gameObject.AddComponent<ScrollRect>();
+            scroll.content = content;
+            scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            for (int i = 0; i < entries.Count; i++)
             {
                 int c = i % cols, r = i / cols;
-                var pos = new Vector2(padding + c * (cardW + gap), -(top + r * (cardH + gap)));
-                AreaCard(sheet, maps[i], pos, new Vector2(cardW, cardH));
+                var pos = new Vector2(padding + c * (cardW + gap), -(15f + r * (cardH + gap)));
+                AreaCard(content, entries[i].map, entries[i].point, pos, new Vector2(cardW, cardH));
             }
         }
 
-        void AreaCard(RectTransform parent, MapStore.Map map, Vector2 pos, Vector2 size)
+        void AreaCard(RectTransform parent, MapStore.Map map, StartPoints.Point point, Vector2 pos, Vector2 size)
         {
-            var ui = new CardUi { map = map };
+            var ui = new CardUi { map = map, point = point };
             cards.Add(ui);
-            var card = UiKit.Rect($"Card {map.entry.name}", parent, new Vector2(0, 1), pos, size);
+            var card = UiKit.Rect($"Card {point?.name ?? map.entry.name}", parent, new Vector2(0, 1), pos, size);
             UiKit.DropShadow(card, 16f, -6f, 0.28f);
             var bg = UiKit.Panel(card.gameObject, Color.white);
             var btn = card.gameObject.AddComponent<Button>();
@@ -334,7 +361,7 @@ namespace LeGamez.UI
             // Installed → play (also while an update downloads); otherwise the card starts the download.
             btn.onClick.AddListener(() =>
             {
-                MapStore.Start(map); // fetches the small area file if needed, then goes – tiles follow on demand
+                MapStore.Start(map, point); // fetches the small area file if needed, then goes – tiles follow on demand
             });
 
             // Thumbnail, clipped to rounded corners.
@@ -359,14 +386,6 @@ namespace LeGamez.UI
                 fit.aspectRatio = sprite.rect.width / sprite.rect.height;
             }
             else thumbImg.color = UiKit.Sea;
-            // Not on the device yet: washed out.
-            if (!map.Playable)
-            {
-                var veil = UiKit.Rect("Veil", mask);
-                UiKit.Stretch(veil);
-                veil.gameObject.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.45f);
-                veil.GetComponent<Image>().raycastTarget = false;
-            }
 
             // Type badge on the thumbnail.
             bool island = map.HasVehicle("carriage");
@@ -391,7 +410,7 @@ namespace LeGamez.UI
             ui.progressFill.gameObject.AddComponent<Image>().color = UiKit.Mustard;
 
             float textTop = thumbH + 22;
-            UiKit.Label(card, map.entry.name, 40, UiKit.Ink, TextAnchor.UpperLeft, FontStyle.Bold)
+            UiKit.Label(card, point != null ? point.name : map.entry.name, 40, UiKit.Ink, TextAnchor.UpperLeft, FontStyle.Bold)
                 .Place(new Vector2(0, 1), new Vector2(26, -textTop), new Vector2(size.x - 52, 50));
 
             // How you get around there.
@@ -399,11 +418,11 @@ namespace LeGamez.UI
             if (map.HasVehicle("bicycle")) ways.Add("Fahrrad");
             if (map.HasVehicle("car")) ways.Add("Auto");
             if (map.HasVehicle("carriage")) ways.Add("Kutsche");
-            UiKit.Label(card, string.Join(" · ", ways), 26, UiKit.InkSoft, TextAnchor.UpperLeft)
+            UiKit.Label(card, point != null ? $"{map.entry.name} · eigener Startpunkt" : string.Join(" · ", ways), 26, UiKit.InkSoft, TextAnchor.UpperLeft)
                 .Place(new Vector2(0, 1), new Vector2(26, -textTop - 54), new Vector2(size.x - 52, 34));
 
             // Remove from the device (tap twice). Not in the editor – there the scenes are the project's.
-            if (map.Playable && !map.Busy && !Application.isEditor)
+            if (point != null || (map.Playable && !map.Busy && !Application.isEditor))
             {
                 var del = UiKit.Rect("Delete", card, new Vector2(1, 0), new Vector2(-14, 10), new Vector2(170, 52));
                 var delImg = del.gameObject.AddComponent<Image>();
@@ -414,7 +433,11 @@ namespace LeGamez.UI
                 UiKit.Stretch(ui.deleteLabel.rectTransform);
                 delBtn.onClick.AddListener(() =>
                 {
-                    if (Time.unscaledTime < ui.deleteArmedUntil) MapStore.Delete(map);
+                    if (Time.unscaledTime < ui.deleteArmedUntil)
+                    {
+                        if (point != null) StartPoints.Remove(point);
+                        else MapStore.Delete(map);
+                    }
                     else ui.deleteArmedUntil = Time.unscaledTime + 3f;
                 });
             }

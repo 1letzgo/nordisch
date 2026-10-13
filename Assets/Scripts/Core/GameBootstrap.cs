@@ -34,6 +34,15 @@ namespace LeGamez.Core
             Vector3 saved = default;
             float savedYaw = 0f;
             bool hasSaved = area != null && PositionMemory.TryLoad(area.MemoryKey, out saved, out savedYaw) && area.Contains(saved, 2f);
+            // An own start point chosen in the menu / "Andere Orte" wins over the last position.
+            var chosen = StartPoints.Pending;
+            StartPoints.Pending = null;
+            if (chosen != null && area != null && chosen.areaId == area.areaId && chosen.areaKey == area.MemoryKey && area.Contains(chosen.position, 2f))
+            {
+                saved = chosen.position;
+                savedYaw = chosen.yaw;
+                hasSaved = true;
+            }
 
             // The world streams in around the camera – the start surroundings must be there before anything is placed.
             var loading = LoadingScreen(area != null ? area.displayName : "");
