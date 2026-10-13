@@ -76,8 +76,9 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    grep "\[OSM\]" /tmp/import.log
    ```
    Ergebnis: `Assets/Generated/<id>/<id>_area.asset` (`World/AreaData`: Spawn, Grenzen, POIs, Straßen, Ampeln, Schildertexte,
-   Fassaden-Records, Kachelliste, Minimap), Kacheln `Generated/<id>/tiles/`, Eintrag in `Assets/Generated/AreaCatalog.asset`,
-   Thumbnail `Generated/<id>/<id>_thumb.png`, Minimap `Generated/<id>/<id>_map.png`. Es gibt keine Gebietsszenen mehr:
+   Fassaden-Records, Kachelliste, Übersichtskarte), Kacheln `Generated/<id>/tiles/`, Eintrag in `Assets/Generated/AreaCatalog.asset`,
+   Thumbnail `Generated/<id>/<id>_thumb.png`, Kartenbilder (siehe unten) `Generated/<id>/regions~/r<rx>_<rz>.jpg` +
+   Übersicht `Generated/<id>/<id>_map.jpg`. Es gibt keine Gebietsszenen mehr:
    `Assets/Scenes/World.unity` (Licht, Himmel, `World/AreaLoader`) baut das Gebiet aus `AreaData` auf; Materialien/Shader
    liegen in der App (`GameMaterials.worldMaterials`, `signTextMaterial`, vom Importer gesetzt). Editor-Werkzeuge öffnen ein
    Gebiet mit `Editor/AreaPreview.Open` (ungespeicherte Szene, alle Kacheln). Im Editor zeigt das Menü das Gebiet sofort als Karte;
@@ -89,9 +90,10 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
 
 ### Karten-Downloads (App enthält keine Karten)
 - **Format 5** (`World/MapFormat`, eigenes Binärformat – dieselben Dateien für iOS und Android, unabhängig von der
-  Unity-Version): je Gebiet `area.bin` (AreaData als JSON + Minimap-PNG + Fassaden-Records, Deflate) und **eine Datei pro
-  1-km-Region** `r<rx>_<rz>.bin` (Inhaltsverzeichnis + je Kachel ein Deflate-Block: Positionen, Normalen als sbyte,
-  Farben, Fassaden-UVs, Indizes). Export: `Editor/MapExport` (`-executeMethod LeGamez.Editor.MapExport.ExportBatch
+  Unity-Version): je Gebiet `area.bin` (AreaData als JSON + kleine Übersichtskarte `map.jpg` ≤ 2048 px, Deflate;
+  wenige 100 KB) und **eine Datei pro 1-km-Region** `r<rx>_<rz>.bin` („NWR2“: Inhaltsverzeichnis + je Kachel ein
+  Deflate-Block: Positionen, Normalen als sbyte, Farben, Fassaden-UVs, Indizes; dazu Abschnitte (`World/RegionContent`)
+  `facade.bin` = Fassaden-Records der Region und `map.jpg` = scharfes Draufsichtbild der Region, 1024 px ≈ 1 m/px). Export: `Editor/MapExport` (`-executeMethod LeGamez.Editor.MapExport.ExportBatch
   [-areas a,b]`, beliebiges Build-Target) → `Builds/Maps/<id>/` + `Builds/Maps/index.json`. Formate 1–4 waren
   AssetBundles (pro Plattform und Unity-Version) – nicht mehr verwenden.
 - `Tools/release/publish_maps.sh [--dry-run] [--drop-old] [<id> …]` exportiert und lädt **nur geänderte Dateien** (SHA-256)
@@ -179,7 +181,10 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
   Ladenfenster mit dunklem Rahmen; Haustür mit Vordach + Stufe; Dachrinne + Fallrohr an Traufkanten; weiße Ortgangbretter
   an Giebelkanten (Dachkanten, die nur eine Dachfläche hat); Firstziegel; Sockelband. Gebaut wird erst zur Laufzeit
   (`World/FacadeDetails`): 32-m-Zellen im Umkreis von ~95 m um die Kamera, max. 3 Zellen pro Tick, weiter weg wieder
-  verworfen – fern bleiben die Shader-Fenster. Datensatz: 10 floats (kind, x, y, z, along x/z, a, b, c, RGB);
+  verworfen – fern bleiben die Shader-Fenster. Records kommen pro Region: `WorldStreamer.Regions` hält den
+  `RegionContent` jeder Region mit mindestens einer Kachel in der Szene (Gerät: Abschnitt der Regionsdatei,
+  `RegionTileSource.LoadContent`; Editor: `_facade.bytes` aufgeteilt + `regions~`-Bild); kommt/geht eine Region,
+  werden die berührten Zellen neu gebaut. Datensatz: 10 floats (kind, x, y, z, along x/z, a, b, c, RGB);
   Außennormale = (−along.z, along.x). Neue Teile: Kind-Konstante + Builder in `FacadeDetails`, Erfassen in `Lod2Builder`.
 - `CommercialBuilder` (+ `CommercialBuilder.Retail.cs`): Gewerbeimmobilien erkennbar. **Tankstellen** (`amenity=fuel`, Knoten
   oder Fläche): Tankdach = LoD2-„Gebäude“ mit ALKIS-Funktion `31001_2130` (Tankstelle) oder `51009_1610` (Überdachung),
@@ -249,7 +254,12 @@ Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen sp�
   erst Start-Download). `MapStore.Play` lädt dafür die Welt-Szene mit dem neuen Gebiet neu und gibt das alte erst danach
   frei; jeder `WorldStreamer` übernimmt seine eigene Kachelquelle (`WorldStreamer.Source` → Instanz).
 - `UI/FullMap`: Tipp auf Minikarte → große Karte, Beamen. Zoom bis 6× per Zwei-Finger-Pinch, Mausrad oder ＋/−, Ziehen verschiebt;
-  Marker behalten ihre Bildschirmgröße. Kartentextur `AreaInfo.mapTexture` (`Generated/<id>/<id>_map.png`) ~2 px/m (max. 4096). `UI/Navigation`: Minikarte.
+  Marker behalten ihre Bildschirmgröße. Kartentextur `AreaInfo.mapTexture` = Übersicht (`Generated/<id>/<id>_map.jpg`,
+  ≤ 1 px/m, max. 2048 px); stark gezoomt liegen die scharfen Regionsbilder geladener Regionen darüber. `UI/Navigation`:
+  Minikarte = Regionsbilder um den Spieler (`UI/RegionMaps`: bei Bedarf dekodiert, max. 1 pro Frame, ~8 im Speicher)
+  über der Übersicht. Erzeugt von `SceneSnapshot.RenderThumbnails` (Teil des Imports; einzeln:
+  `-executeMethod LeGamez.Editor.SceneSnapshot.RenderThumbnailsBatch -area <id>`): je Region orthografisch genau ihr
+  km² (lädt nur die Kacheln drumherum, `WorldStreamer.KeepInEditor`), Übersicht daraus heruntergerechnet.
 
 ## Bauen
 - Projekt-Setup (Player-Settings, URP, Materialien, Figuren, Logo/Icon): `-executeMethod LeGamez.Editor.ProjectSetup.Run`

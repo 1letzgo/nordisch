@@ -52,7 +52,7 @@ MonoBehaviour:
   - {x: -1585.3455, y: 5.8371596, z: -498.6063, w: -95.783005}
   pois: {fileID: 11400000, guid: e3ee230ffc0444da8bc0aaa970b3376b, type: 2}
   streets: {fileID: 11400000, guid: 0bc39ffa8eea54bbcb7ca155d43e4748, type: 2}
-  mapTexture: {fileID: 2800000, guid: 28998b283f6da4c3689a2b24cc45f88c, type: 3}
+  mapTexture: {fileID: 2800000, guid: 42483b3b32e774b2cad9008225e975ec, type: 3}
   facade: {fileID: 4900000, guid: 13e5bb472eac748068f8936fe8aab93f, type: 3}
   tileKeys:
   - {x: -45, y: -52}

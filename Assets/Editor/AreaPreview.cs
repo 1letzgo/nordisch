@@ -20,12 +20,13 @@ namespace LeGamez.Editor
 
         public static AreaData Find(string id) => All().FirstOrDefault(d => d.areaId == id);
 
-        /// <summary>Opens the preview; returns the area's AreaInfo (also findable via FindAnyObjectByType).</summary>
-        public static AreaInfo Open(AreaData data)
+        /// <summary>Opens the preview; returns the area's AreaInfo (also findable via FindAnyObjectByType).
+        /// <paramref name="allTiles"/> false: no tiles yet (big areas – load parts with WorldStreamer.*InEditor).</summary>
+        public static AreaInfo Open(AreaData data, bool allTiles = true)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             OsmImport.OsmAreaImporter.AddLighting(OsmImport.OsmAreaImporter.EnsureSkyMaterial());
-            var root = AreaLoader.Build(data, null, allTiles: true);
+            var root = AreaLoader.Build(data, null, allTiles);
             return root.GetComponentInChildren<AreaInfo>(true);
         }
     }

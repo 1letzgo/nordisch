@@ -12,9 +12,12 @@ namespace LeGamez.World
     /// depend on the Unity version (AssetBundles did on both).
     ///
     /// Area file "NWA1": named entries [string name, int length, bytes]: area.json (deflate) = <see cref="AreaJson"/>,
-    /// map.png (minimap, raw PNG), facade.bin (deflate, FacadeDetails records).
-    /// Region file "NWR1" (1 km, 5 × 5 tiles): int count, table [int x, int z, long offset, int length], then one
-    /// deflate blob per tile, so a single tile can be read without the others.
+    /// map.jpg (small overview of the whole area for the full map, raw JPEG; older files: map.png).
+    /// Region file "NWR2" (1 km, 5 × 5 tiles): int count, table [int x, int z, long offset, int length], int sections,
+    /// table [string name, long offset, int length], then one deflate blob per tile (so a single tile can be read without
+    /// the others) and the section blobs: <see cref="RegionContent.FacadeSection"/> (deflate, FacadeDetails records of the
+    /// region), <see cref="RegionContent.MapSection"/> (raw JPEG, sharp top-down image of the region for the minimap).
+    /// "NWR1" = the same without the section table.
     /// Tile blob: int parts; per part: byte material, byte flags, byte layer, string group, int vertexCount,
     /// int indexCount, bool uvs; positions (3 floats), normals (3 sbytes), colours (RGBA32), [uvs (4 floats)],
     /// indices (ushort if vertexCount ≤ 65535, else int).
@@ -44,7 +47,8 @@ namespace LeGamez.World
             public List<int> streetNameOf = new List<int>();
         }
 
-        public static byte[] WriteArea(AreaData d, byte[] mapPng, byte[] facade)
+        /// <param name="mapImage">Overview image of the area (JPEG or PNG), or null.</param>
+        public static byte[] WriteArea(AreaData d, byte[] mapImage)
         {
             var j = new AreaJson
             {
@@ -66,15 +70,14 @@ namespace LeGamez.World
             {
                 w.Write(new[] { (byte)'N', (byte)'W', (byte)'A', (byte)'1' });
                 var entries = new List<(string, byte[])> { ("area.json", Deflate(System.Text.Encoding.UTF8.GetBytes(JsonUtility.ToJson(j)))) };
-                if (mapPng != null) entries.Add(("map.png", mapPng));
-                if (facade != null) entries.Add(("facade.bin", Deflate(facade)));
+                if (mapImage != null) entries.Add((IsJpeg(mapImage) ? "map.jpg" : "map.png", mapImage));
                 w.Write(entries.Count);
                 foreach (var (name, bytes) in entries) { w.Write(name); w.Write(bytes.Length); w.Write(bytes); }
             }
             return ms.ToArray();
         }
 
-        /// <summary>Builds a runtime AreaData (with POI database, street index, minimap texture, facade bytes).</summary>
+        /// <summary>Builds a runtime AreaData (with POI database, street index, overview map texture).</summary>
         public static AreaData ReadArea(byte[] file)
         {
             var entries = new Dictionary<string, byte[]>();
@@ -100,12 +103,11 @@ namespace LeGamez.World
             d.pois.entries = j.pois;
             d.streets = ScriptableObject.CreateInstance<StreetIndex>();
             d.streets.names = j.streetNames; d.streets.segments = j.streetSegments; d.streets.nameOf = j.streetNameOf;
-            if (entries.TryGetValue("map.png", out var png))
+            if (entries.TryGetValue("map.jpg", out var img) || entries.TryGetValue("map.png", out img))
             {
-                var tex = new Texture2D(2, 2, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
-                if (tex.LoadImage(png, true)) d.mapTexture = tex;
+                var tex = new Texture2D(2, 2, IsJpeg(img) ? TextureFormat.RGB24 : TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
+                if (tex.LoadImage(img, true)) d.mapTexture = tex;
             }
-            if (entries.TryGetValue("facade.bin", out var facade)) d.facadeBytes = Inflate(facade);
             return d;
         }
 
@@ -121,24 +123,76 @@ namespace LeGamez.World
 
         // ------------------------------------------------------------------ region / tiles
 
-        public static byte[] WriteRegion(List<WorldTile> tiles)
+        /// <param name="sections">Extra named blobs of the region (see <see cref="RegionContent"/>), stored as given.</param>
+        public static byte[] WriteRegion(List<WorldTile> tiles, List<(string name, byte[] bytes)> sections = null)
         {
             var blobs = new List<byte[]>();
             foreach (var t in tiles) blobs.Add(Deflate(EncodeTile(t)));
+            sections ??= new List<(string, byte[])>();
             using var ms = new MemoryStream();
             using (var w = new BinaryWriter(ms))
             {
-                w.Write(new[] { (byte)'N', (byte)'W', (byte)'R', (byte)'1' });
+                w.Write(new[] { (byte)'N', (byte)'W', (byte)'R', (byte)'2' });
                 w.Write(tiles.Count);
-                long offset = 4 + 4 + tiles.Count * (4 + 4 + 8 + 4);
+                long offset = 4 + 4 + tiles.Count * (4 + 4 + 8 + 4) + SectionTableSize(sections);
                 for (int i = 0; i < tiles.Count; i++)
                 {
                     w.Write(tiles[i].key.x); w.Write(tiles[i].key.y); w.Write(offset); w.Write(blobs[i].Length);
                     offset += blobs[i].Length;
                 }
+                w.Write(sections.Count);
+                foreach (var (name, bytes) in sections) { w.Write(name); w.Write(offset); w.Write(bytes.Length); offset += bytes.Length; }
                 foreach (var b in blobs) w.Write(b);
+                foreach (var (_, bytes) in sections) w.Write(bytes);
             }
             return ms.ToArray();
+        }
+
+        static long SectionTableSize(List<(string name, byte[] bytes)> sections)
+        {
+            using var ms = new MemoryStream();
+            using (var w = new BinaryWriter(ms))
+            {
+                w.Write(sections.Count);
+                foreach (var (name, _) in sections) { w.Write(name); w.Write(0L); w.Write(0); }
+            }
+            return ms.ToArray().Length;
+        }
+
+        /// <summary>Section table of a region file: name → (offset, length); empty for "NWR1" files.</summary>
+        public static Dictionary<string, (long offset, int length)> ReadRegionSections(Stream s)
+        {
+            var r = new BinaryReader(s);
+            var magic = r.ReadBytes(4);
+            if (magic.Length != 4 || magic[0] != 'N' || magic[1] != 'W' || magic[2] != 'R') throw new InvalidDataException("not a region file");
+            var result = new Dictionary<string, (long, int)>();
+            int n = r.ReadInt32();
+            if (magic[3] < '2') return result;
+            s.Position += n * (4 + 4 + 8 + 4);
+            int sections = r.ReadInt32();
+            for (int i = 0; i < sections; i++) result[r.ReadString()] = (r.ReadInt64(), r.ReadInt32());
+            return result;
+        }
+
+        /// <summary>Thread-safe: facade records + minimap image of a region file (no Unity objects touched).</summary>
+        public static RegionContent ReadRegionContent(string path, Vector2Int region)
+        {
+            var c = new RegionContent { key = region };
+            using var fs = File.OpenRead(path);
+            var sections = ReadRegionSections(fs);
+            byte[] Section(string name)
+            {
+                if (!sections.TryGetValue(name, out var at)) return null;
+                var b = new byte[at.length];
+                fs.Position = at.offset;
+                int read = 0;
+                while (read < b.Length) { int k = fs.Read(b, read, b.Length - read); if (k <= 0) break; read += k; }
+                return b;
+            }
+            var facade = Section(RegionContent.FacadeSection);
+            if (facade != null) c.facade = RegionContent.ToFloats(Inflate(facade));
+            c.mapImage = Section(RegionContent.MapSection);
+            return c;
         }
 
         /// <summary>Table of contents of a region file: tile key → (offset, length).</summary>
@@ -267,6 +321,8 @@ namespace LeGamez.World
         }
 
         // ------------------------------------------------------------------ helpers
+
+        public static bool IsJpeg(byte[] b) => b != null && b.Length > 2 && b[0] == 0xFF && b[1] == 0xD8;
 
         public static byte[] Deflate(byte[] data)
         {

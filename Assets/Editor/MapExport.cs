@@ -10,8 +10,9 @@ namespace LeGamez.Editor
 {
     /// <summary>
     /// Writes the download files of each area (format 5, World/MapFormat – the same files for iOS and Android, independent
-    /// of the Unity version) to Builds/Maps/: &lt;id&gt;.area (AreaData + minimap + facade records) and one
-    /// &lt;id&gt;-r&lt;rx&gt;_&lt;rz&gt;.region per 1 km region with its tiles, plus index.json for Tools/release/publish_maps.py.
+    /// of the Unity version) to Builds/Maps/&lt;id&gt;/: area.bin (AreaData + small overview map) and one r&lt;rx&gt;_&lt;rz&gt;.bin per
+    /// 1 km region with its tiles, facade records and minimap image (<see cref="RegionContent"/>), plus index.json for
+    /// Tools/release/publish_maps.py.
     /// Batch: Unity -batchmode -quit -projectPath . -executeMethod LeGamez.Editor.MapExport.ExportBatch [-areas a,b]
     /// </summary>
     public static class MapExport
@@ -75,12 +76,11 @@ namespace LeGamez.Editor
                     thumb = Path.GetFullPath(AreaCatalog.ThumbPath(a.id)),
                 };
 
-                string mapPng = AreaCatalog.MapPath(a.id);
-                byte[] png = File.Exists(mapPng) ? File.ReadAllBytes(mapPng) : null;
-                byte[] facade = data.facade != null ? data.facade.bytes : null;
                 string areaFile = Path.Combine(dir, "area.bin");
-                File.WriteAllBytes(areaFile, MapFormat.WriteArea(data, png, facade));
+                File.WriteAllBytes(areaFile, MapFormat.WriteArea(data, OverviewImage(a.id)));
                 m.files.Add(new IndexFile { name = "area.bin", region = "", path = areaFile });
+                var facade = RegionContent.SplitFacade(data.facade != null ? RegionContent.ToFloats(data.facade.bytes) : null);
+                int noMap = 0;
 
                 long total = new FileInfo(areaFile).Length;
                 foreach (var g in data.tileKeys.GroupBy(WorldStreamer.RegionOf).OrderBy(g => g.Key.x).ThenBy(g => g.Key.y))
@@ -89,7 +89,12 @@ namespace LeGamez.Editor
                         .Where(t => t != null).ToList();
                     string rk = $"{g.Key.x}_{g.Key.y}";
                     string file = Path.Combine(dir, $"r{rk}.bin");
-                    File.WriteAllBytes(file, MapFormat.WriteRegion(tiles));
+                    var sections = new List<(string, byte[])>();
+                    if (facade.TryGetValue(g.Key, out var rec)) sections.Add((RegionContent.FacadeSection, MapFormat.Deflate(RegionContent.ToBytes(rec))));
+                    string mapFile = WorldStreamer.EditorRegionMapPath(a.id, g.Key);
+                    if (File.Exists(mapFile)) sections.Add((RegionContent.MapSection, File.ReadAllBytes(mapFile)));
+                    else noMap++;
+                    File.WriteAllBytes(file, MapFormat.WriteRegion(tiles, sections));
                     total += new FileInfo(file).Length;
                     m.files.Add(new IndexFile { name = $"r{rk}.bin", region = rk, path = file });
                     var sp = data.spawn;
@@ -100,10 +105,39 @@ namespace LeGamez.Editor
                     if (g.Key.x % 4 == 0) EditorUtility.UnloadUnusedAssetsImmediate();
                 }
                 index.maps.Add(m);
-                Debug.Log($"[Maps] {a.id}: area {new FileInfo(areaFile).Length / (1024 * 1024)} MB + {m.files.Count - 1} regions, total {total / (1024 * 1024)} MB, start {m.start.Count} regions");
+                if (noMap > 0) Debug.LogWarning($"[Maps] {a.id}: {noMap} regions without minimap image – run SceneSnapshot.RenderThumbnailsBatch -area {a.id}");
+                Debug.Log($"[Maps] {a.id}: area {new FileInfo(areaFile).Length / 1024} KB + {m.files.Count - 1} regions, total {total / (1024 * 1024)} MB, start {m.start.Count} regions");
             }
             File.WriteAllText(Path.Combine(OutDir, "index.json"), JsonUtility.ToJson(index, true));
             return true;
+        }
+
+        /// <summary>Overview JPEG of the area (SceneSnapshot.RenderThumbnails); areas not re-rendered since the region
+        /// images came still have the old large PNG – shrunk to an overview here.</summary>
+        static byte[] OverviewImage(string id)
+        {
+            string jpg = AreaCatalog.MapPath(id);
+            if (File.Exists(jpg)) return File.ReadAllBytes(jpg);
+            string png = Path.ChangeExtension(jpg, ".png");
+            if (!File.Exists(png)) return null;
+            var src = new Texture2D(2, 2);
+            if (!src.LoadImage(File.ReadAllBytes(png))) { Object.DestroyImmediate(src); return null; }
+            float s = Mathf.Min(1f, (float)SceneSnapshot.OverviewMax / Mathf.Max(src.width, src.height));
+            int w = Mathf.RoundToInt(src.width * s), h = Mathf.RoundToInt(src.height * s);
+            var rt = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32);
+            Graphics.Blit(src, rt);
+            var prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            var dst = new Texture2D(w, h, TextureFormat.RGB24, false);
+            dst.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+            dst.Apply();
+            RenderTexture.active = prev;
+            RenderTexture.ReleaseTemporary(rt);
+            var bytes = dst.EncodeToJPG(85);
+            Object.DestroyImmediate(src);
+            Object.DestroyImmediate(dst);
+            Debug.LogWarning($"[Maps] {id}: no {jpg} – overview made from the old PNG, region minimaps missing (re-import)");
+            return bytes;
         }
     }
 }

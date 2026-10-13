@@ -32,14 +32,18 @@ namespace LeGamez.UI
     }
 
     /// <summary>
-    /// Round heading-up minimap: pre-rendered top-down area image under a circular mask,
-    /// landmark dots, player arrow in the centre, "N" on the rim.
+    /// Round heading-up minimap: pre-rendered top-down images under a circular mask – the sharp 1 km region images
+    /// (<see cref="RegionMaps"/>) around the player over the small overview of the whole area (shown where a region
+    /// isn't loaded yet) – landmark dots, player arrow in the centre, "N" on the rim.
     /// </summary>
     public class MiniMap : MonoBehaviour
     {
         public float metersVisible = 130f;   // radius shown, in metres
 
-        RectTransform rotator, map, playerArrow, north;
+        RectTransform rotator, map, regionLayer, playerArrow, north;
+        readonly Dictionary<Vector2Int, RawImage> regionImages = new Dictionary<Vector2Int, RawImage>();
+        readonly HashSet<Vector2Int> wantedRegions = new HashSet<Vector2Int>();
+        float nextRegionCheck;
         float radius;
         float pixelsPerMeter;
         Vector2 mapCenter;
@@ -79,6 +83,7 @@ namespace LeGamez.UI
             raw.texture = tex;
             raw.color = tex != null ? Color.white : new Color(0.6f, 0.75f, 0.55f);
             raw.raycastTarget = false;
+            regionLayer = UiKit.Rect("Regions", map, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero); // under the dots
 
             if (area != null && area.pois != null)
             {
@@ -121,6 +126,30 @@ namespace LeGamez.UI
             // North marker sits on the rim at the screen-angle of world north.
             north.anchoredPosition = RimPoint(-viewYaw, radius + 2f);
 
+            if (Time.unscaledTime >= nextRegionCheck)
+            {
+                nextRegionCheck = Time.unscaledTime + 0.25f;
+                UpdateRegions(p);
+            }
+        }
+
+        /// <summary>Sharp images of the regions within reach of the visible circle (decoded a little ahead).</summary>
+        void UpdateRegions(Vector3 p)
+        {
+            float reach = metersVisible + 120f, s = WorldStreamer.RegionSize;
+            wantedRegions.Clear();
+            for (int x = Mathf.FloorToInt((p.x - reach) / s); x <= Mathf.FloorToInt((p.x + reach) / s); x++)
+            for (int z = Mathf.FloorToInt((p.z - reach) / s); z <= Mathf.FloorToInt((p.z + reach) / s); z++)
+            {
+                float dx = Mathf.Max(x * s - p.x, 0f, p.x - (x + 1) * s), dz = Mathf.Max(z * s - p.z, 0f, p.z - (z + 1) * s);
+                if (dx * dx + dz * dz <= reach * reach) wantedRegions.Add(new Vector2Int(x, z));
+            }
+            RegionMaps.Show(regionLayer, regionImages, wantedRegions, (r, rt) =>
+            {
+                var b = RegionContent.Bounds(r);
+                rt.anchoredPosition = (b.center - mapCenter) * pixelsPerMeter;
+                rt.sizeDelta = b.size * pixelsPerMeter;
+            });
         }
 
         /// <summary>Point on a circle for a bearing relative to "up" (clockwise degrees).</summary>

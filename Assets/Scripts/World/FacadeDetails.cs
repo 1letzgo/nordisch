@@ -6,15 +6,14 @@ namespace LeGamez.World
     /// <summary>
     /// Close-up building detail that would be far too heavy to bake for a whole town: 3D window frames with
     /// Sprossen, stone sills, brick lintels (Rollschicht), door canopies and steps, gutters and downpipes.
-    /// The importer writes a compact record list (Assets/Generated/&lt;id&gt;/&lt;id&gt;_facade.bytes); here the records are
-    /// sorted into 32 m cells and meshes are built only for cells near the camera (and dropped again behind it).
-    /// Far away the shader-painted windows of the building mesh remain.
+    /// The importer writes a compact record list (Assets/Generated/&lt;id&gt;/&lt;id&gt;_facade.bytes), the map export splits it
+    /// per 1 km region (<see cref="RegionContent"/>). Records of the regions the <see cref="streamer"/> has in the scene
+    /// are sorted into 32 m cells and meshes are built only for cells near the camera (and dropped again behind it);
+    /// a region coming or going rebuilds the cells it touches. Far away the shader-painted windows of the building mesh remain.
     /// </summary>
     public class FacadeDetails : MonoBehaviour
     {
-        public TextAsset data;
-        /// <summary>Same records from a downloaded map (format 5); used when <see cref="data"/> is null.</summary>
-        [System.NonSerialized] public byte[] bytes;
+        public WorldStreamer streamer;
         public Material material;
         public float radius = 95f;
 
@@ -24,9 +23,11 @@ namespace LeGamez.World
         public const int FlagBrick = 1, FlagMullion = 2;
 
         const float Cell = 32f;
-        float[] rec;
-        readonly Dictionary<Vector2Int, List<int>> cells = new Dictionary<Vector2Int, List<int>>();
+        /// <summary>Records per cell: (record array of a region, index of the record in it).</summary>
+        readonly Dictionary<Vector2Int, List<(float[] rec, int i)>> cells = new Dictionary<Vector2Int, List<(float[], int)>>();
         readonly Dictionary<Vector2Int, GameObject> built = new Dictionary<Vector2Int, GameObject>();
+        readonly Dictionary<Vector2Int, float[]> regions = new Dictionary<Vector2Int, float[]>(); // what is in 'cells'
+        int version = -1;
         float nextCheck;
         Transform cam;
 
@@ -44,16 +45,62 @@ namespace LeGamez.World
 
         void Start()
         {
-            var src = data != null ? data.bytes : bytes;
-            if (src == null || material == null) { enabled = false; return; }
-            rec = new float[src.Length / 4];
-            System.Buffer.BlockCopy(src, 0, rec, 0, rec.Length * 4);
+            if (streamer == null || material == null) enabled = false;
+        }
+
+        /// <summary>Takes over regions that came or went since the last call.</summary>
+        void Sync()
+        {
+            if (streamer == null || streamer.RegionsVersion == version) return;
+            version = streamer.RegionsVersion;
+            List<Vector2Int> gone = null;
+            foreach (var kv in regions)
+                if (!streamer.Regions.TryGetValue(kv.Key, out var c) || c.facade != kv.Value) (gone ??= new List<Vector2Int>()).Add(kv.Key);
+            if (gone != null) foreach (var r in gone) RemoveRegion(r);
+            foreach (var kv in streamer.Regions)
+                if (kv.Value.facade != null && !regions.ContainsKey(kv.Key)) AddRegion(kv.Key, kv.Value.facade);
+        }
+
+        static Vector2Int CellOf(float[] rec, int i) => new Vector2Int(Mathf.FloorToInt(rec[i + 1] / Cell), Mathf.FloorToInt(rec[i + 3] / Cell));
+
+        void AddRegion(Vector2Int r, float[] rec)
+        {
+            regions[r] = rec;
             for (int i = 0; i + Stride <= rec.Length; i += Stride)
             {
-                var k = new Vector2Int(Mathf.FloorToInt(rec[i + 1] / Cell), Mathf.FloorToInt(rec[i + 3] / Cell));
-                if (!cells.TryGetValue(k, out var l)) cells[k] = l = new List<int>();
-                l.Add(i);
+                var k = CellOf(rec, i);
+                if (!cells.TryGetValue(k, out var l)) cells[k] = l = new List<(float[], int)>();
+                l.Add((rec, i));
+                Drop(k); // cells on the region border get rebuilt with the new records
             }
+        }
+
+        void RemoveRegion(Vector2Int r)
+        {
+            var rec = regions[r];
+            regions.Remove(r);
+            for (int i = 0; i + Stride <= rec.Length; i += Stride)
+            {
+                var k = CellOf(rec, i);
+                if (!cells.TryGetValue(k, out var l)) continue;
+                l.RemoveAll(e => e.rec == rec);
+                if (l.Count == 0) cells.Remove(k);
+                Drop(k);
+            }
+        }
+
+        void Drop(Vector2Int k)
+        {
+            if (!built.TryGetValue(k, out var go)) return;
+            built.Remove(k);
+            var mesh = go.GetComponent<MeshFilter>().sharedMesh;
+            if (Application.isPlaying) { Destroy(mesh); Destroy(go); }
+            else { DestroyImmediate(mesh); DestroyImmediate(go); }
+        }
+
+        void OnDestroy()
+        {
+            foreach (var go in built.Values) if (go != null) Destroy(go.GetComponent<MeshFilter>().sharedMesh);
         }
 
         void Update()
@@ -67,19 +114,14 @@ namespace LeGamez.World
         /// <summary>Builds up to <paramref name="budget"/> missing cells around <paramref name="position"/> and drops far ones.</summary>
         public void Refresh(Vector3 position, int budget)
         {
-            if (rec == null) Start();
+            Sync();
             var p = new Vector2(position.x, position.z);
             // Drop cells that fell behind.
             List<Vector2Int> drop = null;
             foreach (var kv in built)
                 if (Distance(kv.Key, p) > radius + 25f) (drop ??= new List<Vector2Int>()).Add(kv.Key);
             if (drop != null)
-                foreach (var k in drop)
-                {
-                    Destroy(built[k].GetComponent<MeshFilter>().sharedMesh);
-                    Destroy(built[k]);
-                    built.Remove(k);
-                }
+                foreach (var k in drop) Drop(k);
             // Build the nearest missing cells, a few per tick so walking never hitches.
             int r = Mathf.CeilToInt(radius / Cell);
             var centre = new Vector2Int(Mathf.FloorToInt(p.x / Cell), Mathf.FloorToInt(p.y / Cell));
@@ -107,7 +149,7 @@ namespace LeGamez.World
         void Build(Vector2Int k)
         {
             v.Clear(); nrm.Clear(); col.Clear(); tri.Clear();
-            foreach (int i in cells[k])
+            foreach (var (rec, i) in cells[k])
             {
                 int kind = (int)rec[i];
                 var o = new Vector3(rec[i + 1], rec[i + 2], rec[i + 3]);

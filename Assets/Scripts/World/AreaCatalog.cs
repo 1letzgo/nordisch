@@ -12,8 +12,9 @@ namespace LeGamez.World
         public const string AssetPath = "Assets/Generated/AreaCatalog.asset";
         /// <summary>Menu card image (rendered by SceneSnapshot.RenderThumbnails, published next to the bundle).</summary>
         public static string ThumbPath(string id) => $"Assets/Generated/{id}/{id}_thumb.png";
-        /// <summary>Top-down map texture for minimap/full map; referenced by AreaInfo.mapTexture, so it travels in the bundle.</summary>
-        public static string MapPath(string id) => $"Assets/Generated/{id}/{id}_map.png";
+        /// <summary>Small top-down overview of the whole area (JPEG, max. 2048 px) for the full map; AreaData.mapTexture, travels
+        /// in the area file. The minimap uses the sharp per-region images (WorldStreamer.EditorRegionMapPath).</summary>
+        public static string MapPath(string id) => $"Assets/Generated/{id}/{id}_map.jpg";
 
         [System.Serializable]
         public class Entry
