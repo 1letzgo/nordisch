@@ -445,7 +445,7 @@ namespace LeGamez.UI
         static void RefreshCard(CardUi ui)
         {
             var m = ui.map;
-            string size = m.latest != null ? MapStore.Megabytes(m.latest.size) : "";
+            string size = m.latest != null ? MapStore.Megabytes(m.DownloadSize) : "";
             string text;
             switch (m.status)
             {

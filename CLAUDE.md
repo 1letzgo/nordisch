@@ -73,15 +73,23 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
 7. **Veröffentlichen**: `Tools/release/publish_maps.sh [<id> …]` – siehe „Karten-Downloads“.
 
 ### Karten-Downloads (App enthält keine Karten)
-- Jede Stadt = zwei AssetBundles pro Plattform: `<id>.bundle` (AreaData + POIs + Straßen + Fassaden + Minimap)
+- Jede Stadt = `<id>.bundle` (AreaData + POIs + Straßen + Fassaden + Minimap) + **ein Bundle pro 1-km-Region**
+  (`<id>-r<rx>_<rz>.bundle`, deren 5 × 5 Kacheln) pro Plattform – Format 4. Früher (Format 2/3): ein Kachel-Bundle
   und `<id>.tiles.bundle` (Welt-Kacheln, einzeln ladbar; Szenen-Bundles dürfen keine anderen Assets enthalten), gebaut von
   `Editor/MapBundles` (`-buildTarget iOS|Android -executeMethod LeGamez.Editor.MapBundles.BuildBatch [-areas a,b]`)
   nach `Builds/Maps/<platform>/<id>.bundle` (LZMA) + `index.json`.
 - `Tools/release/publish_maps.sh [--dry-run] [--drop-old] [<id> …]` baut iOS + Android und lädt **nur geänderte** Karten
   (Inhalts-CRC) in die GitHub-**Pre-Release `maps`** (nie „latest“ → stört den APK-Updater nicht). Katalog
   `https://github.com/1letzgo/nordisch/releases/download/maps/maps.json`: je Karte Name/Lage/Fahrzeuge/Thumbnail-URL und
-  `builds[]` = {platform, format, unity, version (yyyyMMddHHmm), url, size, sha256, crc, files[] = {name, url, size, sha256}}
-  (Format 2: `map.bundle` + `tiles.bundle`; Format 1 hatte nur url/size/sha256). Alte, nicht mehr referenzierte Assets werden gelöscht.
+  `builds[]` = {platform, format, unity, version (yyyyMMddHHmm), url, size, sha256, files[] = {name, region, url, size,
+  sha256, crc}, start[] = Regionen ≤ 1,2 km um den Spawn}. Dateien liegen inhaltsadressiert (`…-<sha12>.bundle`) in der
+  Pre-Release **`maps-<id>`** (Asset-Limit pro Release), Katalog + Thumbnails in `maps`. Unveränderte Regionen behalten
+  ihre URL → kein Upload, kein erneuter Download.
+- **Nur Benötigtes auf dem Gerät**: „Laden“ holt `map.bundle` + Startregionen; alle anderen Regionen lädt
+  `Core/RegionTileSource` bei Bedarf (Kachel gebraucht oder Spieler ≤ 1,6 km entfernt, eine Region nach der anderen).
+  Regionen = LRU-Cache (`MapStore.CacheLimit` 1 GB, `usage.json`), beim nächsten Start gekürzt. Offline: fehlende Kacheln
+  werden nach 10 s erneut versucht; Spawn/Beamen warten nicht auf sie. Updates holen nur Dateien, die auf dem Gerät liegen
+  und deren SHA-256 sich geändert hat. Alte, nicht mehr referenzierte Assets werden gelöscht.
 - App: `Core/MapStore` – Katalog einmal pro App-Start laden (Kopie für offline), Download → Größe + SHA-256 prüfen →
   `RecompressAssetBundleAsync` nach LZ4 → `persistentDataPath/maps/<id>/map.bundle` + `info.json` (iOS: kein iCloud-Backup).
   Spielen = Bundles laden, `AreaLoader.Pending` = AreaData, Welt-Szene (Build-Index 1) laden; zurück im Menü wird entladen.

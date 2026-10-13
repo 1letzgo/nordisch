@@ -9,7 +9,7 @@ namespace LeGamez.World
     /// Keeps only the world tiles (<see cref="WorldTile"/>) around the camera in memory: loads those within
     /// <see cref="loadRadius"/> (nearest first, a few at a time, one instantiated per frame) and drops tiles beyond
     /// <see cref="unloadRadius"/>. Fog ends at 650 m, so nothing further away is ever visible. Lets areas grow far beyond
-    /// what a phone could hold as one scene. On devices the tiles come from the map's tiles bundle (set by MapStore),
+    /// what a phone could hold as one scene. On devices the tiles come from 1 km region bundles (Core/RegionTileSource, downloaded on demand),
     /// in the editor straight from Assets/Generated/&lt;id&gt;/tiles/.
     /// </summary>
     public class WorldStreamer : MonoBehaviour
@@ -23,12 +23,30 @@ namespace LeGamez.World
         public float unloadRadius = 960f;
 
         public static WorldStreamer Instance { get; private set; }
-        /// <summary>Bundle with this area's tiles on devices (MapStore sets it before loading the scene).</summary>
-        public static AssetBundle Bundle;
+        /// <summary>Where tiles come from on devices (Core/RegionTileSource: region bundles, downloaded on demand).
+        /// Null in the editor: tiles load straight from Assets/Generated.</summary>
+        public static ITileSource Source;
+
+        public interface ITileSource
+        {
+            /// <summary>Loads a tile (fetching its region first if needed); done(null) if it is not available right now.</summary>
+            IEnumerator Load(string areaId, Vector2Int key, System.Action<WorldTile> done);
+            /// <summary>The tile's objects are gone – free its assets.</summary>
+            void Release(Vector2Int key, WorldTile tile);
+            /// <summary>Called with the focus a few times per second: fetch what will be needed soon.</summary>
+            void Prefetch(Vector3 focus);
+        }
 
         public static string TileName(string id, Vector2Int k) => $"{id}_{k.x}_{k.y}";
         public static string EditorTilePath(string id, Vector2Int k) => $"Assets/Generated/{id}/tiles/{TileName(id, k)}.asset";
         public static Vector2Int KeyOf(float x, float z) => new Vector2Int(Mathf.FloorToInt(x / TileSize), Mathf.FloorToInt(z / TileSize));
+
+        /// <summary>Download unit: 1 km (5 × 5 tiles), one bundle per region ("r&lt;rx&gt;_&lt;rz&gt;.bundle").</summary>
+        public const float RegionSize = 1000f;
+        public const int TilesPerRegion = 5;
+        public static Vector2Int RegionOf(Vector2Int tile) =>
+            new Vector2Int(Mathf.FloorToInt((float)tile.x / TilesPerRegion), Mathf.FloorToInt((float)tile.y / TilesPerRegion));
+        public static Vector2Int RegionAt(float x, float z) => RegionOf(KeyOf(x, z));
 
         class Slot
         {
@@ -38,6 +56,8 @@ namespace LeGamez.World
         }
 
         readonly Dictionary<Vector2Int, Slot> slots = new Dictionary<Vector2Int, Slot>();
+        /// <summary>Tiles whose region could not be fetched (offline): not asked again before this time, and not waited for.</summary>
+        readonly Dictionary<Vector2Int, float> retryAt = new Dictionary<Vector2Int, float>();
         HashSet<Vector2Int> exists;
         Vector3? focusOverride;
         int inFlight;
@@ -55,7 +75,7 @@ namespace LeGamez.World
 
         void OnDestroy()
         {
-            foreach (var kv in slots) Release(kv.Value);
+            foreach (var kv in slots) Release(kv.Key, kv.Value);
             slots.Clear();
             if (Instance == this) Instance = null;
         }
@@ -93,7 +113,8 @@ namespace LeGamez.World
             scratch.Clear();
             foreach (var kv in slots)
                 if (!kv.Value.loading && Distance(kv.Key, p) > unloadRadius) scratch.Add(kv.Key);
-            foreach (var k in scratch) { Release(slots[k]); slots.Remove(k); }
+            foreach (var k in scratch) { Release(k, slots[k]); slots.Remove(k); }
+            Source?.Prefetch(p);
 
             // Wanted tiles, nearest first.
             scratch.Clear();
@@ -103,7 +124,7 @@ namespace LeGamez.World
             for (int z = c.y - r; z <= c.y + r; z++)
             {
                 var k = new Vector2Int(x, z);
-                if (exists.Contains(k) && !slots.ContainsKey(k) && Distance(k, p) <= loadRadius) scratch.Add(k);
+                if (exists.Contains(k) && !slots.ContainsKey(k) && Distance(k, p) <= loadRadius && !Waiting(k)) scratch.Add(k);
             }
             scratch.Sort((a, b) => Distance(a, p).CompareTo(Distance(b, p)));
             foreach (var k in scratch)
@@ -119,11 +140,11 @@ namespace LeGamez.World
         {
             inFlight++;
             string name = TileName(areaId, k);
-            if (Bundle != null)
+            if (Source != null)
             {
-                var req = Bundle.LoadAssetAsync<WorldTile>(name);
-                yield return req;
-                slot.tile = req.asset as WorldTile;
+                WorldTile loadedTile = null;
+                yield return Source.Load(areaId, k, t => loadedTile = t);
+                slot.tile = loadedTile;
             }
 #if UNITY_EDITOR
             else slot.tile = UnityEditor.AssetDatabase.LoadAssetAtPath<WorldTile>(EditorTilePath(areaId, k));
@@ -135,14 +156,18 @@ namespace LeGamez.World
             slot.loading = false;
             if (slot.tile == null)
             {
-                Debug.LogWarning($"[World] tile {name} missing");
-                exists.Remove(k); // don't wait for it or ask again
+                if (Source != null) retryAt[k] = Time.unscaledTime + 10f; // region not downloadable right now (offline)
+                else
+                {
+                    Debug.LogWarning($"[World] tile {name} missing");
+                    exists.Remove(k); // don't wait for it or ask again
+                }
                 slots.Remove(k);
                 yield break;
             }
             if (!slots.TryGetValue(k, out var current) || current != slot || Distance(k, Focus) > unloadRadius)
             {
-                Release(slot); // no longer wanted
+                Release(k, slot); // no longer wanted
                 if (slots.TryGetValue(k, out current) && current == slot) slots.Remove(k);
                 yield break;
             }
@@ -169,18 +194,15 @@ namespace LeGamez.World
             return root;
         }
 
-        void Release(Slot slot)
+        void Release(Vector2Int key, Slot slot)
         {
             if (slot.root != null) DestroyImmediate(slot.root);
             slot.root = null;
-            // Assets from a bundle can be dropped one by one; they load again on the next request.
-            if (Bundle != null && slot.tile != null)
-            {
-                foreach (var part in slot.tile.parts) if (part.mesh != null) Resources.UnloadAsset(part.mesh);
-                Resources.UnloadAsset(slot.tile);
-            }
+            if (Source != null && slot.tile != null) Source.Release(key, slot.tile);
             slot.tile = null;
         }
+
+        bool Waiting(Vector2Int k) => retryAt.TryGetValue(k, out var t) && Time.unscaledTime < t;
 
         /// <summary>True when every tile touching the circle is in the scene.</summary>
         public bool IsReady(Vector3 p, float radius)
@@ -191,7 +213,7 @@ namespace LeGamez.World
             for (int z = c.y - r; z <= c.y + r; z++)
             {
                 var k = new Vector2Int(x, z);
-                if (!exists.Contains(k) || Distance(k, p) > radius) continue;
+                if (!exists.Contains(k) || Distance(k, p) > radius || Waiting(k)) continue; // offline: don't wait forever
                 if (!slots.TryGetValue(k, out var s) || s.root == null) return false;
             }
             return true;
