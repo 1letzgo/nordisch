@@ -169,6 +169,7 @@ namespace LeGamez.Editor.OsmImport
                 if (m == WorldStyle.MatGround || m == WorldStyle.MatWater) TerrainDrape.Drape(kv.Value, terrain);
                 else if (m == WorldStyle.MatTrees || m == WorldStyle.MatTreeTrunks || m == WorldStyle.MatProps) TerrainDrape.Lift(kv.Value, terrain);
             }
+            TerrainDrape.Lift(sink.instances, terrain); // instanced trees, bushes, lamps
             CoastBuilder.BuildSea(sink, area); // level sea surface, not draped
 
             string areaDir = $"{GeneratedRoot}/{meta.id}";
@@ -235,7 +236,7 @@ namespace LeGamez.Editor.OsmImport
                       $"furniture {furniture.mapped} mapped/{furniture.benches} benches/{furniture.planters} planters/{furniture.seating} café tables/{furniture.fountains} fountains, {edits} hand-placed/{EditsPlacer.ChangedCount} edited, " +
                       $"facade {FacadeRecords.Windows} windows/{FacadeRecords.Doors} doors/{FacadeRecords.Gutters} gutters/{FacadeRecords.Verges} verges/{FacadeRecords.Ridges} ridges, traffic {traffic.junctionSignals} signal junctions/{traffic.crossingSignals} signal crossings/{traffic.heads} heads/{traffic.zebras} zebras/{traffic.lanes} lanes/{traffic.stops} stop/{traffic.giveWays} give way/{traffic.priority} priority/{traffic.speed} speed/{traffic.oneway} one-way/{traffic.names} names/{traffic.mapped} mapped, {pois.Count} POIs, " +
                       $"{(maskStats.HasValue ? $"mask -{maskStats.Value.nodes} nodes/-{maskStats.Value.polygons} areas/-{maskStats.Value.ways} ways/{maskStats.Value.pieces} cut, {CoarseTerrain.Blocks} coarse terrain blocks, " : "")}" +
-                      $"{sink.Batches.Count()} meshes in {sw.ElapsedMilliseconds} ms -> {areaPath}");
+                      $"{sink.Batches.Count()} meshes + {sink.instances.Count} instances in {sw.ElapsedMilliseconds} ms -> {areaPath}");
             return areaPath;
         }
 
@@ -254,6 +255,18 @@ namespace LeGamez.Editor.OsmImport
             EnsureFolder(tileDir);
 
             var tiles = new Dictionary<Vector2Int, WorldTile>();
+            WorldTile TileAt(Vector2Int key)
+            {
+                if (!tiles.TryGetValue(key, out var tile))
+                {
+                    tile = ScriptableObject.CreateInstance<WorldTile>();
+                    tile.key = key;
+                    tile.name = WorldStreamer.TileName(id, key);
+                    AssetDatabase.CreateAsset(tile, WorldStreamer.EditorTilePath(id, key));
+                    tiles[key] = tile;
+                }
+                return tile;
+            }
             {
                 foreach (var kv in sink.Batches)
                 {
@@ -261,14 +274,7 @@ namespace LeGamez.Editor.OsmImport
                     if (kv.Value.vertices.Count == 0) continue;
                     float chunkSize = mat == WorldStyle.MatDetails ? MeshSink.DetailChunkSize : MeshSink.ChunkSize;
                     var key = WorldStreamer.KeyOf((chunk.x + 0.5f) * chunkSize, (chunk.y + 0.5f) * chunkSize);
-                    if (!tiles.TryGetValue(key, out var tile))
-                    {
-                        tile = ScriptableObject.CreateInstance<WorldTile>();
-                        tile.key = key;
-                        tile.name = WorldStreamer.TileName(id, key);
-                        AssetDatabase.CreateAsset(tile, WorldStreamer.EditorTilePath(id, key));
-                        tiles[key] = tile;
-                    }
+                    var tile = TileAt(key);
 
                     string style = WorldStyle.MaterialOf(mat);
                     bool facadeData = style == WorldStyle.MatBuildings || style == WorldStyle.MatGround;
@@ -297,6 +303,9 @@ namespace LeGamez.Editor.OsmImport
                         flags = (byte)((collider ? WorldTile.FlagCollider : 0) | (casts ? WorldTile.FlagShadows : 0)),
                     });
                 }
+                // Instanced trees/bushes/lamps go to the tile under their origin (crowns may overhang its edge a bit –
+                // the renderer's bounds include them).
+                foreach (var inst in sink.instances) TileAt(WorldStreamer.KeyOf(inst.position.x, inst.position.z)).instances.Add(inst);
                 foreach (var t in tiles.Values) EditorUtility.SetDirty(t);
             }
             AssetDatabase.SaveAssets();
@@ -599,6 +608,7 @@ namespace LeGamez.Editor.OsmImport
                     AssetDatabase.CreateAsset(mat, path);
                 }
                 mat.shader = shader;
+                mat.enableInstancing = true; // trees/bushes/lamps: Graphics.RenderMeshInstanced (keeps the INSTANCING_ON variants in builds)
                 mat.SetFloat("_ShadowStrength", 0.68f);
                 if (name == WorldStyle.MatWater)
                 {

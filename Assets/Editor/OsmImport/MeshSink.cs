@@ -28,6 +28,13 @@ namespace LeGamez.Editor.OsmImport
 
         public IEnumerable<KeyValuePair<(string mat, Vector2Int chunk), Batch>> Batches => batches;
 
+        /// <summary>Trees, bushes, lamps: drawn from the app's prototype meshes (GPU instancing), stored per tile as
+        /// records instead of geometry. Positions are local (y relative to the terrain until the importer lifts them).</summary>
+        public readonly List<LeGamez.World.WorldTile.Instance> instances = new List<LeGamez.World.WorldTile.Instance>();
+
+        public void AddInstance(byte proto, Vector3 position, float yaw, Vector3 scale, Color32 color) =>
+            instances.Add(new LeGamez.World.WorldTile.Instance { proto = proto, position = position, yaw = yaw, scale = scale, color = color });
+
         public static Vector2Int ChunkOf(Vector2 p) =>
             new Vector2Int(Mathf.FloorToInt(p.x / ChunkSize), Mathf.FloorToInt(p.y / ChunkSize));
 

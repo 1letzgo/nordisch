@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
+using LeGamez.World;
 using UnityEngine;
 
 namespace LeGamez.Editor
@@ -22,6 +23,21 @@ namespace LeGamez.Editor
                     byMat.TryGetValue(mat, out var s);
                     byMat[mat] = (s.tris + m.triangles.Length / 3, s.verts + m.vertexCount, s.meshes + 1);
                 }
+                // Instanced trees/bushes/lamps: records, drawn from shared prototype meshes (World/InstancePrototypes).
+                var perProto = new long[InstancePrototypes.Count];
+                int calls = 0, withInstances = 0;
+                foreach (var t in tilePaths.Select(AssetDatabase.LoadAssetAtPath<WorldTile>).Where(t => t != null))
+                {
+                    var used = new HashSet<int>();
+                    foreach (var i in t.instances) { if (i.proto < perProto.Length) perProto[i.proto]++; used.Add(i.proto); }
+                    calls += used.Count;
+                    if (used.Count > 0) withInstances++;
+                }
+                long instances = perProto.Sum(), drawn = Enumerable.Range(0, perProto.Length).Sum(p => perProto[p] * InstancePrototypes.Triangles(p));
+                if (instances > 0)
+                    Debug.Log($"[Stats] {path}: {instances} instances ({drawn / 1000}k tris when drawn, {calls} tile×prototype batches = " +
+                              $"{(float)calls / Mathf.Max(1, withInstances):0.0} per tile with instances, {withInstances} such tiles): " +
+                              string.Join(", ", Enumerable.Range(0, perProto.Length).Where(p => perProto[p] > 0).Select(p => $"#{p} {perProto[p]}×{InstancePrototypes.Triangles(p)}")));
                 long total = byMat.Values.Sum(v => v.tris);
                 Debug.Log($"[Stats] {path}: {total / 1000}k tris, {byMat.Values.Sum(v => v.verts) / 1000}k verts\n" +
                           string.Join("\n", byMat.OrderByDescending(kv => kv.Value.tris)

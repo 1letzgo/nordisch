@@ -26,7 +26,25 @@ namespace LeGamez.World
             public string group;
         }
 
+        /// <summary>One tree crown, trunk, bush or lamp drawn from a shared prototype mesh (<see cref="InstancePrototypes"/>,
+        /// GPU instancing via <see cref="InstancedProps"/>) instead of geometry baked into the tile.</summary>
+        [System.Serializable]
+        public struct Instance
+        {
+            /// <summary>Prototype index (InstancePrototypes.Trunk, Crown …).</summary>
+            public byte proto;
+            /// <summary>World position of the prototype's origin (trunk/bush/lamp foot, crown centre, conifer crown base).</summary>
+            public Vector3 position;
+            /// <summary>Degrees, clockwise from north (Quaternion.Euler(0, yaw, 0)).</summary>
+            public float yaw;
+            /// <summary>Non-uniform scale: crown radius / height factor / crown radius, trunk radius / length / radius …</summary>
+            public Vector3 scale;
+            /// <summary>Actual colour; the tint is colour / prototype reference colour.</summary>
+            public Color32 color;
+        }
+
         public Vector2Int key;
         public List<Part> parts = new List<Part>();
+        public List<Instance> instances = new List<Instance>();
     }
 }

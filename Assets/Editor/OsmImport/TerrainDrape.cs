@@ -26,6 +26,18 @@ namespace LeGamez.Editor.OsmImport
             }
         }
 
+        /// <summary>Instances (trees, bushes, lamps): the prototype origin moves up by the terrain height below it.</summary>
+        public static void Lift(List<LeGamez.World.WorldTile.Instance> list, TerrainField t)
+        {
+            if (t.IsFlat) return;
+            for (int i = 0; i < list.Count; i++)
+            {
+                var inst = list[i];
+                inst.position.y += t.Height(inst.position.x, inst.position.z);
+                list[i] = inst;
+            }
+        }
+
         /// <summary>Moves vertices [start, end) up by a constant (buildings sit on their footprint minimum).</summary>
         public static void Offset(MeshSink.Batch b, int start, float dy)
         {

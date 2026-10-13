@@ -89,9 +89,9 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
 7. **Veröffentlichen**: `Tools/release/publish_maps.sh [<id> …]` – siehe „Karten-Downloads“.
 
 ### Karten-Downloads (App enthält keine Karten, lädt nie ganze Karten)
-- **Format 6** (`World/MapFormat`, dieselben Dateien für iOS und Android, unabhängig von der Unity-Version): je Gebiet
+- **Format 7** (= 6 + Instanzen in den Kacheln; `World/MapFormat`, dieselben Dateien für iOS und Android, unabhängig von der Unity-Version): je Gebiet
   `area.bin` (AreaData-JSON + kleine Übersichtskarte + **Index des World-Packs**, ~0,2–1 MB) und `world.bin` (alle
-  Einträge hintereinander: `t/<x>_<z>` = 200-m-Kachel (Deflate), `f/<rx>_<rz>` = Fassaden-Records der 1-km-Region,
+  Einträge hintereinander: `t/<x>_<z>` = 200-m-Kachel (Deflate; Geometrie + Abschnitt „INS1“ mit Baum-/Busch-/Laternen-Instanzen), `f/<rx>_<rz>` = Fassaden-Records der 1-km-Region,
   `m/<rx>_<rz>` = Minimap-JPEG der Region). Die App holt **einzelne Einträge per HTTP-Range** (`Core/PackTileSource`,
   GitHub-Release-Assets liefern 206) und cached sie unter ihrem Inhalts-Hash (`maps/<id>/cache/<entry>-<hash>.bin`).
   Export: `Editor/MapExport` (`-executeMethod LeGamez.Editor.MapExport.ExportBatch [-areas a,b]`) → `Builds/Maps/<id>/`
@@ -177,7 +177,13 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
   Schrift = TextMesh (eingebauter Font) auf Layer 8 mit Shader `LeGamez/SignText` (Tiefentest, keine Rückseite;
   `SignTextFont` hält die Font-Textur aktuell), Material `Assets/Generated/Materials/SignText.mat`.
 - `PropPlacer`: LiDAR-Bäume (`<id>.trees.json`, Höhe/Krone echt) bzw. ohne Datei OSM-Bäume, Baumgruppen in Parks/Wäldern (mit Abstand zu Wegen), Büsche auf Dünen/Heide, Straßenlaternen.
-  Kronen = facettierter Hauptklumpen + Ring kleinerer Klumpen bis zum gemessenen Radius (~40–100 Dreiecke), Nadelbäume 3 Kegel.
+  **Bäume, Büsche, Laternen sind GPU-Instanzen** (keine Kachelgeometrie): `MeshSink.AddInstance` → `WorldTile.instances`
+  (Prototyp, Position, Yaw, Skalierung xyz, Farbe). Prototypen erzeugt die App selbst (`World/InstancePrototypes`, beim
+  ersten Gebrauch, deterministisch): Stamm (r 1, Länge 1), 4 Laubkronen + 2 hohe mit Aufsatz (Radius 1, halbe Höhe 0,9;
+  Instanz-Skalierung = Kronenradius / halbe Höhe ÷ 0,9), 2 Nadelkronen (3 Kegel, Radius/Höhe 1), 3 Büsche, Laterne.
+  Ein Baum = Stamm + Krone. Farbe → Tint = Instanzfarbe ÷ Referenzfarbe des Prototyps (`_InstanceTint`).
+  Gelände: `TerrainDrape.Lift(instances)`. Edits verschieben/drehen/skalieren Instanzen wie Geometrie (`EditsPlacer.AppendAll`).
+  Formänderungen an Prototypen wirken in allen Karten ohne Neuexport.
   Pflanzen-Builder ziehen aus dem gemeinsamen `rng` genau so viele Zahlen wie früher (`Fork`), sonst verschieben sich IDs/Edits.
 - Nahdetails an LoD2-Häusern (`FacadeRecords` im Importer → `Assets/Generated/<id>/<id>_facade.bytes`, nicht im Repo):
   je Shader-Fenster (gleiches Raster wie `FacadeMask`) 3D-Rahmen mit Sprossen, Fensterbank, bei Klinker Rollschicht-Sturz;
@@ -205,7 +211,7 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
 - `PoiExtractor`: benannte Sehenswürdigkeiten → Punkte/Namen auf Mini- und Großkarte (Beam-Ziele). Kein Stempelheft mehr.
 - Straßenindex (`StreetIndex`, `<id>_streets.asset`): benannte OSM-Wege + Plätze als Segmente → HUD zeigt unter dem
   Ortsnamen die aktuelle Straße (`UI/StreetDisplay`, nächste Straße ≤ 30 m, 4 m Trägheit gegen Flackern).
-- `MeshSink`: Geometrie pro Material und 100-m-Chunk; Kollider für Gebäude, Stämme, Props
+- `MeshSink`: Geometrie pro Material und 100-m-Chunk (+ Instanzliste); Kollider für Gebäude, Props (Stämme/Laternen: Kapseln)
   (Stämme/Props liegen auf Layer 2, damit die Kamera sie ignoriert).
 - **Nachladen (Streaming)**: Welt-Meshes stecken nur in Kacheln. `OsmAreaImporter.WriteTiles` sortiert die Chunks in
   200-m-Kacheln (`World/WorldTile`, Meshes als Sub-Assets, `Assets/Generated/<id>/tiles/`, nicht im Repo); Meshes ohne
@@ -213,9 +219,16 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
   Kamera (nächste zuerst, max. 3 parallel, 1 pro Frame instanziiert) und gibt sie ab 960 m wieder frei.
   `GameBootstrap` wartet mit Ladebildschirm, bis der Start-Umkreis (220 m) steht; Beamen (`FullMap`) lädt das Ziel hinter
   dem Blitz vor. Editor-Werkzeuge, die die ganze Welt brauchen (`SceneSnapshot`), rufen `LoadAllInEditor()` auf.
-  `-executeMethod LeGamez.Editor.MeshStats.Print` zeigt Dreiecke je Materialgruppe und Gebiet.
+  `-executeMethod LeGamez.Editor.MeshStats.Print` zeigt Dreiecke je Materialgruppe und Gebiet (+ Instanzen je Prototyp).
+- **Instanzen zeichnen** (`World/InstancedProps`, je Kachel vom Streamer angelegt): `Graphics.RenderMeshInstanced` pro
+  Prototyp (≤ 1023 je Aufruf) in `LateUpdate`, Unity cullt per Kachel-/Prototyp-Bounds (Kamera + Schatten), Schatten an.
+  Kollision: CapsuleCollider je Stamm/Laterne auf einem Kind-Objekt der Kachel (Layer 2, kein Mesh-Cooking).
+  Außerhalb des Play-Modes (Snapshots, Thumbnails, Minimap – `camera.Render` sieht keine Instanced-Draws) werden die
+  Instanzen zu normalen Meshes gebacken (gleiche Formen/Farben). Materialien brauchen `enableInstancing` (sonst strippt
+  der Build die INSTANCING_ON-Varianten; `EnsureMaterials` setzt es).
 - Shader `Assets/Shaders/VertexColorLit.shader`: Vertex-Farben, Fenster/Sprossen (Laibungsschatten, Gardinen), Klinker, Putz,
   Sockel, Traufband, Dachpfannen, Wasser, großflächige Farbvariation auf Boden/Flachdächern. Bordsteinbänder: `GroundBuilder.Kerbs`.
+  `multi_compile_instancing` in allen Pässen; `_InstanceTint` nur in der Instancing-Variante (normale Meshes unverändert).
 - Himmel `Assets/Shaders/Sky.shader` (Verlauf, Sonne, ziehende Wolken); Licht/Nebel in `OsmAreaImporter.AddLighting`,
   HDR + Bloom/Farbkorrektur in `ProjectSetup` (`ConfigureUrp`, `CreatePostProfile`).
 

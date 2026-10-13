@@ -28,6 +28,8 @@ Shader "LeGamez/VertexColorLit"
             #pragma multi_compile_fog
             #pragma shader_feature_local _WATER_ANIM
             #pragma shader_feature_local _FACADE
+            // Trees/bushes/lamps are drawn with Graphics.RenderMeshInstanced (World/InstancedProps).
+            #pragma multi_compile_instancing
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -39,12 +41,20 @@ Shader "LeGamez/VertexColorLit"
                 float _FloorHeight;
             CBUFFER_END
 
+            #if defined(UNITY_INSTANCING_ENABLED)
+            // Per-instance colour: instance colour / prototype reference colour (InstancePrototypes.TintOf).
+            UNITY_INSTANCING_BUFFER_START(PerInstance)
+                UNITY_DEFINE_INSTANCED_PROP(float4, _InstanceTint)
+            UNITY_INSTANCING_BUFFER_END(PerInstance)
+            #endif
+
             struct Attributes
             {
                 float4 positionOS : POSITION;
                 float3 normalOS   : NORMAL;
                 half4  color      : COLOR;
                 float4 facade     : TEXCOORD0; // (u along wall, height, wall top, window span); y < 0 = none
+                UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             struct Varyings
@@ -60,11 +70,15 @@ Shader "LeGamez/VertexColorLit"
             Varyings vert (Attributes v)
             {
                 Varyings o;
+                UNITY_SETUP_INSTANCE_ID(v);
                 VertexPositionInputs pos = GetVertexPositionInputs(v.positionOS.xyz);
                 o.positionCS = pos.positionCS;
                 o.positionWS = pos.positionWS;
                 o.normalWS = TransformObjectToWorldNormal(v.normalOS);
                 o.color = v.color * _Tint;
+                #if defined(UNITY_INSTANCING_ENABLED)
+                    o.color.rgb *= (half3)UNITY_ACCESS_INSTANCED_PROP(PerInstance, _InstanceTint).rgb;
+                #endif
                 o.fogFactor = ComputeFogFactor(pos.positionCS.z);
                 o.facade = v.facade;
                 return o;
@@ -261,6 +275,7 @@ Shader "LeGamez/VertexColorLit"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
+            #pragma multi_compile_instancing
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -268,12 +283,13 @@ Shader "LeGamez/VertexColorLit"
             float3 _LightDirection;
             float3 _LightPosition;
 
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; };
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct Varyings { float4 positionCS : SV_POSITION; };
 
             Varyings vert (Attributes v)
             {
                 Varyings o;
+                UNITY_SETUP_INSTANCE_ID(v);
                 float3 positionWS = TransformObjectToWorld(v.positionOS.xyz);
                 float3 normalWS = TransformObjectToWorldNormal(v.normalOS);
                 #if _CASTING_PUNCTUAL_LIGHT_SHADOW
@@ -305,12 +321,13 @@ Shader "LeGamez/VertexColorLit"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            #pragma multi_compile_instancing
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-            struct Attributes { float4 positionOS : POSITION; };
+            struct Attributes { float4 positionOS : POSITION; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct Varyings { float4 positionCS : SV_POSITION; };
 
-            Varyings vert (Attributes v) { Varyings o; o.positionCS = TransformObjectToHClip(v.positionOS.xyz); return o; }
+            Varyings vert (Attributes v) { Varyings o; UNITY_SETUP_INSTANCE_ID(v); o.positionCS = TransformObjectToHClip(v.positionOS.xyz); return o; }
             half4 frag (Varyings i) : SV_Target { return 0; }
             ENDHLSL
         }
