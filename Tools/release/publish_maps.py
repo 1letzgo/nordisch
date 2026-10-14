@@ -162,6 +162,20 @@ def main():
                 starts.append(entry)
             e["starts"] = starts
 
+    # Areas merged into others or dropped (e.g. "oldenburg" → part of "westerstede"): remove their builds of the
+    # formats published now, so current apps don't list them; older apps keep their older-format builds.
+    exported = {m["id"] for idx in indexes for m in idx["maps"]}
+    formats = {idx["format"] for idx in indexes}
+    for e in list(entries.values()):
+        if e["id"] in exported:
+            continue
+        before = len(e.get("builds", []))
+        e["builds"] = [b for b in e.get("builds", []) if b.get("format") not in formats]
+        if len(e["builds"]) != before:
+            print(f"  {e['id']:<14} not exported – dropped its format {sorted(formats)} builds")
+        if not e["builds"]:
+            del entries[e["id"]]
+
     catalog = {"schema": 1, "updated": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
                "maps": sorted(entries.values(), key=lambda e: -e.get("lat", 0))}
     out = os.path.join(ROOT, "Builds", "Maps", "maps.json")
