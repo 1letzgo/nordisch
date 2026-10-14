@@ -65,6 +65,68 @@ namespace LeGamez.World
             return proto >= 0 && proto < meshes.Length ? meshes[proto] : null;
         }
 
+        static Mesh[] farMeshes;
+
+        /// <summary>
+        /// Distant stand-in of a prototype (~250 m and beyond, see InstancedProps): crowns and bushes as a 6-sided double
+        /// cone (12 tris) / conifers as a cone (6 tris) filling the prototype's bounds in its reference colour; null for
+        /// trunks and lamps, which are simply skipped that far away.
+        /// </summary>
+        public static Mesh GetFar(int proto)
+        {
+            if (farMeshes == null)
+            {
+                farMeshes = new Mesh[Count];
+                for (int p = 0; p < Count; p++)
+                {
+                    if (p == Trunk || p == Lamp) continue;
+                    var full = Get(p);
+                    if (full == null) continue;
+                    bool cone = p >= Conifer && p < Conifer + ConiferCount;
+                    farMeshes[p] = FarShape(full.bounds, Reference(p), cone);
+                }
+            }
+            return proto >= 0 && proto < farMeshes.Length ? farMeshes[proto] : null;
+        }
+
+        static Mesh FarShape(Bounds b, Color32 color, bool cone)
+        {
+            const int sides = 6;
+            var v = new List<Vector3>();
+            var n = new List<Vector3>();
+            var c = new List<Color32>();
+            var t = new List<int>();
+            Vector3 top = new Vector3(b.center.x, b.max.y, b.center.z);
+            Vector3 bottom = new Vector3(b.center.x, b.min.y, b.center.z);
+            float ringY = cone ? b.min.y + b.size.y * 0.08f : b.center.y;
+            var shade = new Color32((byte)(color.r * 0.8f), (byte)(color.g * 0.8f), (byte)(color.b * 0.8f), color.a);
+            void Tri(Vector3 a, Vector3 b1, Vector3 c1, Color32 col)
+            {
+                var nrm = Vector3.Cross(b1 - a, c1 - a).normalized;
+                int i = v.Count;
+                v.Add(a); v.Add(b1); v.Add(c1);
+                n.Add(nrm); n.Add(nrm); n.Add(nrm);
+                c.Add(col); c.Add(col); c.Add(col);
+                t.Add(i); t.Add(i + 1); t.Add(i + 2);
+            }
+            for (int k = 0; k < sides; k++)
+            {
+                float a0 = k * Mathf.PI * 2f / sides, a1 = (k + 1) * Mathf.PI * 2f / sides;
+                var p0 = new Vector3(b.center.x + Mathf.Cos(a0) * b.extents.x, ringY, b.center.z + Mathf.Sin(a0) * b.extents.z);
+                var p1 = new Vector3(b.center.x + Mathf.Cos(a1) * b.extents.x, ringY, b.center.z + Mathf.Sin(a1) * b.extents.z);
+                Tri(top, p1, p0, color);                 // upper half (clockwise seen from outside → faces out)
+                if (!cone) Tri(bottom, p0, p1, shade);   // lower half, a little darker like the shaded underside
+            }
+            var mesh = new Mesh { name = "FarProto" };
+            mesh.SetVertices(v);
+            mesh.SetNormals(n);
+            mesh.SetColors(c);
+            mesh.SetTriangles(t, 0);
+            mesh.RecalculateBounds();
+            mesh.UploadMeshData(true);
+            return mesh;
+        }
+
         public static int Triangles(int proto)
         {
             var m = Get(proto);

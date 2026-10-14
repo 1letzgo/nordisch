@@ -9,7 +9,8 @@ namespace LeGamez.World
     /// Graphics.RenderMeshInstanced – one call per prototype (and per 1023 instances). Before submitting, each batch is
     /// culled on the CPU against the main camera (frustum widened by <see cref="ShadowMargin"/> so off-screen trees still
     /// cast their shadows into view, and <see cref="MaxDistance"/> – fog ends at 650 m); batches beyond
-    /// <see cref="ShadowDistance"/> are drawn without shadow casting (URP draws no shadows that far anyway). Per-instance colour goes in as
+    /// <see cref="ShadowDistance"/> are drawn without shadow casting (URP draws no shadows that far anyway), beyond
+    /// <see cref="FarDistance"/> with simple stand-in meshes. Per-instance colour goes in as
     /// <c>_InstanceTint</c> (VertexColorLit, instancing variant). Trunks and lamp poles block the player with capsule
     /// colliders on a child object (layer 2, like the former MeshColliders).
     /// Outside play mode (editor snapshots, thumbnails: camera.Render doesn't see queued instanced draws) the instances
@@ -19,11 +20,13 @@ namespace LeGamez.World
     {
         const int MaxPerCall = 1023;
         const float MaxDistance = 700f, ShadowDistance = 140f, ShadowMargin = 25f;
+        /// <summary>Beyond this, crowns/bushes are drawn as simple stand-ins (InstancePrototypes.GetFar), trunks and lamps not at all.</summary>
+        const float FarDistance = 250f;
         static readonly int TintId = Shader.PropertyToID("_InstanceTint");
 
         class Batch
         {
-            public Mesh mesh;
+            public Mesh mesh, far;
             public RenderParams rp, rpNoShadow;
             public Matrix4x4[] matrices;
         }
@@ -96,7 +99,7 @@ namespace LeGamez.World
                     };
                     var noShadow = rp;
                     noShadow.shadowCastingMode = ShadowCastingMode.Off;
-                    batches.Add(new Batch { mesh = mesh, matrices = matrices, rp = rp, rpNoShadow = noShadow });
+                    batches.Add(new Batch { mesh = mesh, far = InstancePrototypes.GetFar(p), matrices = matrices, rp = rp, rpNoShadow = noShadow });
                 }
             }
         }
@@ -134,6 +137,13 @@ namespace LeGamez.World
                 var bounds = b.rp.worldBounds;
                 float d = haveCamera ? Mathf.Sqrt(bounds.SqrDistance(camPos)) : 0f;
                 if (haveCamera && (d > MaxDistance || !GeometryUtility.TestPlanesAABB(planes, bounds))) { Culled++; continue; }
+                if (d > FarDistance)
+                {
+                    if (b.far == null) { Culled++; continue; } // trunks, lamps: invisible that far
+                    Submitted++;
+                    Graphics.RenderMeshInstanced(b.rpNoShadow, b.far, 0, b.matrices);
+                    continue;
+                }
                 Submitted++;
                 Graphics.RenderMeshInstanced(d > ShadowDistance ? b.rpNoShadow : b.rp, b.mesh, 0, b.matrices);
             }
