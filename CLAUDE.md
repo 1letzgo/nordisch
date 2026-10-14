@@ -15,6 +15,8 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    ```
    - `lat/lon` = Mittelpunkt (Marktplatz/Altstadt wählen), `size_m` = Kantenlänge (1000; Inseln 1000–1200).
    - Inseln: `"ground": "sand"`, `"vehicles": ["bicycle", "carriage"]` (autofrei). Das Badge „Insel“ im Menü kommt von `carriage`.
+   - Mehrere Startpunkte (optional): `"starts": [{"name": "Westerstede"}, {"name": "Oldenburg", "lat": 53.1395, "lon": 8.2145}]`
+     – ohne lat/lon = Mittelpunkt, optional `yaw`; ohne Liste = ein Start mit Gebietsnamen. Siehe „Startpunkte“.
 2. **OSM-Daten holen** (Straßen, Flächen, Wasser, Bäume, Barrieren, POIs):
    ```bash
    python3 Tools/osm/fetch_area.py jever
@@ -76,6 +78,39 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    (10 m, 3× [1 2 1]-Blur, Ton = Helligkeit) – keine falschen „Pflaster“-Flecken auf Äckern, Feldformen laufen über den Maskenrand
    (gilt auch ohne Maske, z. B. Felder am Rand kleiner Karten; CoarseTerrain/Waldbäume nur mit Maske). Ansichten einzelner Stellen ohne
    alle Kacheln zu laden: `-executeMethod LeGamez.Editor.AreaViewSnapshot.Render -area <id> -views "name:x,z,yaw,höhe,neigung;…"`.
+3f. **Autobahn + zweite Stadt im selben Gebiet** (Westerstede: A28 bis Oldenburg, Gebiet bis 20,4 km Ost / 14,2 km Süd;
+   Gebiete haben je ein eigenes Koordinatensystem, deshalb ein Gebiet statt zwei verbundener Karten). In `"mask"`:
+   `"motorway": {"refs": ["A 28"], "clip": [x0,x1,z0,z1], "corridor": 45, "landscape": 220, "strip": 25}` → Autobahn
+   (+ Rampen nahe dran) als **176** = Autobahnkorridor (feines Gelände, Straßen, Bäume, keine Häuser/Gärten/Möbel), Straßen,
+   die ihn kreuzen/anbinden, als 25-m-Streifen derselben Stufe, beidseitig **160** = Landschaftsband (grobes Gelände, aber
+   Straßen, Wasser, Zäune, LiDAR-Bäume); `"extra": [[x0,x1,z0,z1], …]` = Siedlungsrechtecke außerhalb der Gemeinde
+   (Oldenburg: Dreieck Oldenburg-West → Haarentor → Innenstadt, 3,4 km²). Stufen: ≥ 128 Straßen/Bäume (`AreaMask.Inside`),
+   ≥ 176 feines Gelände (`FineTerrain`, DOP in voller Auflösung), ≥ 192 Häuser/LoD2/Flurstücke/Hecken/Flächen/Knoten
+   (`AreaMask.Detail`, `area_mask.AreaMask.load(id, detail=True)`). **Gebiet vergrößern ohne alles neu zu holen**: alte
+   Maske nach `Data/<id>.old.mask.png/.json` kopieren, `make_mask.py <id> --keep-old` (alte Pixel bleiben exakt →
+   Objekt-IDs/Edits stabil), `fetch_area.py <id> --add` (nur 3-km-Kacheln mit neuen Maskenpixeln, alte Elemente bleiben
+   unverändert), `fetch_dgm.py/fetch_dop.py <id> --reuse` (vorhandene Raster übernehmen, nur fehlende Kacheln laden);
+   LoD2/Bäume/Flurstücke/Hecken über ein temporäres Gebiet `<id>_add` mit Maske = nur neue Teile holen und hinten anhängen
+   (Reihenfolge der alten Einträge bleibt → gleiche Zufallszüge). Importer: `BridgeBuilder` (Brücken mit Lücke darunter
+   ≥ 1,8 m: Fahrbahnplatte zwischen den Endhöhen, Kappen, Brüstung, Pfeiler wo unten nichts fährt; Kollider, nicht
+   drapiert – das DGM hat keine Brücken), `MotorwayBuilder` (Rand-/Leitlinien, Standstreifen, Schutzplanken beidseitig mit
+   Lücken an Rampen), `TrafficBuilder.Motorway` (blaue Vorwegweiser 500 m vor jeder Ausfahrt mit Nummer/Name/`destination`
+   der Rampe, „Ausfahrt“-Schild; `motorway_junction` aus traffic.json). Rampen haben Rang 3 (Vorfahrt achten am Ende),
+   an Autobahn-Ein-/Ausfädelungen keine Schilder. Straßenindex: Autobahn heißt nach `ref` („A 28“), Rampen
+   „Anschlussstelle“; `StreetIndex.fast` markiert sie → Auto bis 130 km/h (`Car.MotorwaySpeed`, sonst 90).
+   Schutzplanken: durchgehender, geschlossener Streifen (Holm 0,6–1,05 m über Unterfahrschutz bis zum Boden, 20 cm dick,
+   Props-Kollider) entlang verketteter Fahrbahnen/Rampen (Gehrung, keine Keillücken), Höhe = höchster Punkt zwischen
+   Mittellinie und Planke + 1,05 m (Dämme, Widerlager bis 12 m tiefer). Lücken nur, wo eine *anschließende* Fahrbahn
+   (gemeinsamer Punkt, Rampen-Ketten) nahe kommt – nie für die Gegenfahrbahn (Mittelplanke), Parallelstraßen oder
+   Brücken darüber. Sackgassen (Autobahn verlässt den gebauten Teil) bekommen eine Sperre quer. Höhe > Radius der
+   Auto-Kapsel (0,95 m), sonst klettert der CharacterController darüber; im Auto `stepOffset` ≤ 0,25 m, `slopeLimit` 35°.
+   `BridgeBuilder` nimmt als Endhöhe den höchsten Boden ≤ 25 m vor dem Brückenende (das DGM hat dort oft eine Grube)
+   und füllt die Grube im Fahrbahnstreifen auf (vor `BuildBase`, nicht auf anderen Fahrbahnen); Brüstungen mit
+   geschlossenen Enden. Prüfen: `-executeMethod LeGamez.Editor.MotorwayDriveTest.Run -area <id> [-fresh] [-trace x,z]`
+   (Auto-Kapsel fährt von jedem 150. m jeder Autobahn-Fahrbahn 180 m geradeaus mit ±10/25°; `-fresh` baut Planken
+   neu ohne Re-Import). Westerstede: 1439 von 1452 Fahrten an der Planke, 12 durch Ausfahrtslücken, 1 auf Fahrbahn. `"key_size"` (areas.json) hält `AreaData.sizeMeters` und damit
+   `AreaInfo.MemoryKey` beim Vergrößern um denselben Mittelpunkt stabil (gespeicherte Positionen/eigene Startpunkte
+   bleiben gültig). HUD-Titel = nächster Startpunkt (Westerstede/Oldenburg), Fahrradplätze bis 80.
 4. **In Unity importieren** (baut alle Gebiete, Menü-Vorschaubilder, Minimap-Karten, Hauptmenü-Szene):
    ```bash
    /Applications/Unity/Hub/Editor/6000.3.26f1/Unity.app/Contents/MacOS/Unity -batchmode -quit -projectPath . -buildTarget iOS \
@@ -104,8 +139,15 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
   Export: `Editor/MapExport` (`-executeMethod LeGamez.Editor.MapExport.ExportBatch [-areas a,b]`) → `Builds/Maps/<id>/`
   + `Builds/Maps/index.json`. Vorher: Format 5 = eine Datei pro Region, Formate 1–4 = AssetBundles.
 - **Starten**: Startpunkt antippen (`MapStore.Start`) → nur `area.bin` holen/auffrischen, Welt-Szene, Ladebildschirm
-  wartet auf die Kacheln um den Start (~1–3 MB). Weitere Kacheln, sobald der Streamer sie braucht, plus Vorladen bis 1,1 km.
+  wartet auf die Kacheln um den Start (~1–3 MB). Weitere Kacheln, sobald der Streamer sie braucht, plus Vorladen bis 1,1 km (in Fahrt ab 10 m/s um den Punkt 15 s voraus, alle 0,1 s, bis 6 Anfragen;
+  der Streamer sortiert ab 5 m/s nach Abstand zu einem Punkt 4 s voraus). Fahrzeuge bremsen auf 5 m/s, solange die Kachel
+  unter oder vor ihnen (3 s) noch nicht in der Szene ist (`WorldStreamer.Ready`, `VehicleSteering.speedLimit`).
   Cache = LRU (`MapStore.CacheLimit` 1 GB). Offline: gecachte Kacheln, fehlende werden nach 20 s erneut versucht.
+- **Startpunkte im Katalog**: `index.json` je Karte `starts[]` = {name, x, z, yaw, thumb (lokaler Pfad, leer = Kartenbild)}
+  (`MapStore.Entry.starts`, eine Menükarte je Start; fehlt das Feld → ein Start mit Kartennamen) und `start[]` = Regionen
+  ≤ 1,2 km um **alle** Startpunkte. Kartenbilder: `Generated/<id>/<id>_thumb.png` (erster Start) und `<id>_thumb_<k>.png`
+  (`SceneSnapshot.RenderThumbnails`, gleiche Ansicht um den Start). `publish_maps.py` muss `starts` in den Katalog übernehmen
+  und die Start-Bilder hochladen (`thumb` → URL), sonst zeigt die App nur eine Karte pro Gebiet.
 - `Tools/release/publish_maps.sh [--dry-run] [--drop-old] [<id> …]` exportiert und lädt **nur geänderte Dateien** (SHA-256)
   hoch (bei Format 6: `area.bin` + `world.bin` je Gebiet). Katalog `https://github.com/1letzgo/nordisch/releases/download/maps/maps.json` (Pre-Release `maps`, nie „latest“ →
   stört den APK-Updater nicht): je Karte Name/Lage/Fahrzeuge/Thumbnail-URL und `builds[]` = {platform ("any"), format,
@@ -280,9 +322,18 @@ Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen sp�
   plus eines am Startpunkt (`spawnBikeSpot`). Rennen-Knopf = zweiter Gang auf dem Rad.
 - `Core/PositionMemory`: letzte Position, Blickrichtung und Fahrstatus pro Gebiet (PlayerPrefs; Schlüssel enthält Größe+Zentrum,
   wird also bei Gebietsänderung verworfen). Figurenwahl: `PlayerAvatar.SelectedIndex`.
+- **Startpunkte eines Gebiets** (areas.json `starts`, z. B. Westerstede + Oldenburg in einem Gebiet): Importer sucht je
+  Start einen begehbaren Punkt ≤ 200 m (`FindSpawn`) + Fahrradplatz → `AreaData.starts` (name, position, yaw, bikeSpot;
+  `spawn`/`spawnBikeSpot` = erster Start für alte Apps) → `MapFormat.AreaJson.starts` (kein Formatwechsel: alte Apps
+  ignorieren es, Dateien ohne Liste → `AreaData.StartList()` = Spawn). Menü + „Andere Orte“: eine Karte/Zeile je Start
+  (`StartPoints.Default(areaId, k, name)`, nicht gespeichert). `GameBootstrap`: gewählter Start setzt dort ab – die letzte
+  Position (`PositionMemory`) gewinnt nur, wenn sie näher an diesem als an jedem anderen Start liegt (Gebiete mit einem
+  Start: wie bisher „weiter, wo ich war“); frischer Start = zu Fuß. Startrad am Start, der dem Spieler am nächsten ist.
+  Start im aktuellen Gebiet („Andere Orte“, auch eigene Startpunkte) = direkt hinbeamen (`FullMap.BeamTo`), kein Neuladen.
 - **Eigene Startpunkte** (`Core/StartPoints`, `persistentDataPath/startpoints.json`): „Startpunkt merken“ in der großen
   Karte speichert Gebiet + Position + Blickrichtung (Name = nächste Straße). Erscheinen im Menü („Wo startest du?“,
-  scrollbar) und in „Andere Orte“; `MapStore.Start(map, point)` → `StartPoints.Pending` → `GameBootstrap` setzt dort ab.
+  scrollbar) und in „Andere Orte“; `MapStore.Start(map, point)` → `StartPoints.Pending` → `GameBootstrap` setzt dort ab
+  (gewinnt immer gegen die letzte Position).
 - `UI/PlaceSwitcher` („Andere Orte“ in der großen Karte): alle Gebiete mit Status; Tipp = hinbeamen (fehlt das Gebiet,
   erst Start-Download). `MapStore.Play` lädt dafür die Welt-Szene mit dem neuen Gebiet neu und gibt das alte erst danach
   frei; jeder `WorldStreamer` übernimmt seine eigene Kachelquelle (`WorldStreamer.Source` → Instanz).

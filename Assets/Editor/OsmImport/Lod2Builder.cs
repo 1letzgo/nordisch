@@ -76,7 +76,7 @@ namespace LeGamez.Editor.OsmImport
             }
             if (n == 0) return false;
             Vector3 centre = sum / n;
-            if (!area.Contains(new Vector2(centre.x, centre.z), -20f) || !AreaMask.Allows(centre.x, centre.z)) return false;
+            if (!area.Contains(new Vector2(centre.x, centre.z), -20f) || !AreaMask.AllowsDetail(centre.x, centre.z)) return false;
 
             var use = Classify(b.TryGetValue("function", out var f) ? (string)f : null);
             var style = PickStyle(use, island, rng, maxY);

@@ -13,183 +13,183 @@ MonoBehaviour:
   m_Name: westerstede_pois
   m_EditorClassIdentifier: Assembly-CSharp::LeGamez.Quests.PoiDatabase
   entries:
+  - id: way/32378823
+    name: Augusteum
+    category: 1
+    position: {x: 19255.266, y: 21.403124, z: -13364.797}
+    lat: 53.13613255489536
+    lon: 8.216641560526623
+  - id: way/28777483
+    name: Prinzenpalais
+    category: 1
+    position: {x: 19323.896, y: 21.091248, z: -13346.897}
+    lat: 53.13629443213651
+    lon: 8.217672137521324
+  - id: way/32144438
+    name: St. Peter
+    category: 2
+    position: {x: 18769.773, y: 21.750874, z: -12575.4375}
+    lat: 53.14327129795431
+    lon: 8.209351296582668
+  - id: way/22981582
+    name: Schloss Oldenburg
+    category: 0
+    position: {x: 19266.215, y: 22.305262, z: -13190.192}
+    lat: 53.13771162856718
+    lon: 8.216805976549626
   - id: way/115815558
     name: Bethaus Felde
     category: 2
-    position: {x: -177.47525, y: 10.0284, z: 2846.478}
+    position: {x: -177.47525, y: 26.728401, z: 2846.478}
     lat: 53.282742742664134
     lon: 7.924834990240601
+  - id: way/24752270
+    name: Altes Rathaus
+    category: 0
+    position: {x: 19090.793, y: 22.924442, z: -13040.662}
+    lat: 53.13906393809236
+    lon: 8.214171800751908
+  - id: way/24752350
+    name: Lambertikirche
+    category: 2
+    position: {x: 19120.285, y: 22.553358, z: -13094.4375}
+    lat: 53.13857760866026
+    lon: 8.214614662319397
+  - id: way/149934483
+    name: Garnisonkirche
+    category: 2
+    position: {x: 18819.826, y: 22.503017, z: -12360.824}
+    lat: 53.14521219980511
+    lon: 8.21010290011843
+  - id: way/32381111
+    name: Oldenburgisches Staatstheater
+    category: 8
+    position: {x: 18811.367, y: 21.130733, z: -13038}
+    lat: 53.13908801345705
+    lon: 8.20997587803573
+  - id: node/544939432
+    name: Oldenburger Computer-Museum
+    category: 1
+    position: {x: 19533.707, y: 22.145973, z: -12497.991}
+    lat: 53.14397170030082
+    lon: 8.220822701638165
+  - id: way/1320476593
+    name: "Haus f\xFCr Medienkunst Oldenburg"
+    category: 1
+    position: {x: 18719.592, y: 22.608532, z: -12539.019}
+    lat: 53.14360066060116
+    lon: 8.208597757360582
+  - id: way/33101117
+    name: Horst-Janssen-Museum
+    category: 1
+    position: {x: 19126.182, y: 20.963104, z: -12438.064}
+    lat: 53.14451366095895
+    lon: 8.214703205304314
+  - id: node/2758402872
+    name: Landesmuseum Kunst & Kultur Oldenburg
+    category: 1
+    position: {x: 19236.535, y: 21.86041, z: -13214.444}
+    lat: 53.137492300758424
+    lon: 8.216360299438398
+  - id: way/33101120
+    name: Stadtmuseum Oldenburg
+    category: 1
+    position: {x: 19158.172, y: 21.426476, z: -12464.23}
+    lat: 53.144277022909996
+    lon: 8.215183578126425
+  - id: node/4391346443
+    name: Lappan
+    category: 0
+    position: {x: 19037.357, y: 22.253317, z: -12608.1455}
+    lat: 53.14297549597724
+    lon: 8.213369400114496
   - id: way/229132531
     name: Pauluskirche
     category: 2
-    position: {x: -2916.7437, y: 5.0484314, z: -6141.3794}
+    position: {x: -2916.7437, y: 21.748432, z: -6141.3794}
     lat: 53.201459100742206
     lon: 7.883701496893409
+  - id: way/34585972
+    name: Pulverturm
+    category: 0
+    position: {x: 19077.922, y: 20.37853, z: -13194.91}
+    lat: 53.137668962357786
+    lon: 8.213978525405567
   - id: way/24959207
     name: St.-Petri-Kirche
     category: 2
-    position: {x: 44.08541, y: 10.12992, z: 58.729584}
+    position: {x: 44.08541, y: 26.82992, z: 58.729584}
     lat: 53.25753113375423
     lon: 7.928161996816975
-  - id: way/32991198
-    name: Christus-Kirche
-    category: 2
-    position: {x: -344.03055, y: 11.447274, z: 6475.3687}
-    lat: 53.31556140369656
-    lon: 7.9223339570337545
   - id: way/691606009
     name: Herz-Jesu-Kirche Westerstede
     category: 2
-    position: {x: -196.21773, y: 8.762173, z: -173.78305}
+    position: {x: -196.21773, y: 25.462172, z: -173.78305}
     lat: 53.25542835521427
     lon: 7.92455354882743
+  - id: way/22902639
+    name: Schlossgarten
+    category: 0
+    position: {x: 18831.654, y: 20.470402, z: -13475.974}
+    lat: 53.13512710372409
+    lon: 8.210280514002715
+  - id: way/42524421
+    name: Schlosswache
+    category: 0
+    position: {x: 19184.996, y: 21.019144, z: -13132.714}
+    lat: 53.13823144801501
+    lon: 8.215586376852775
+  - id: way/32991198
+    name: Christus-Kirche
+    category: 2
+    position: {x: -344.03055, y: 28.147274, z: 6475.3687}
+    lat: 53.31556140369656
+    lon: 7.9223339570337545
+  - id: way/237442075
+    name: Ehrenhalle der oldenburgischen Artillerie
+    category: 3
+    position: {x: 18209.623, y: 21.056007, z: -12675.514}
+    lat: 53.14236623734445
+    lon: 8.20093994764419
+  - id: node/2967124016
+    name: Stadtbibliothek im PFL
+    category: 8
+    position: {x: 18636.63, y: 21.39513, z: -12644.866}
+    lat: 53.14264340431804
+    lon: 8.20735199656981
+  - id: way/32379380
+    name: "Nieders\xE4chsisches Landesarchiv Standort Oldenburg"
+    category: 8
+    position: {x: 19496.201, y: 20.891706, z: -13545.514}
+    lat: 53.13449820326772
+    lon: 8.220259504904359
   - id: node/278829715
     name: "Stadtb\xFCcherei Westerstede"
     category: 8
-    position: {x: -119.064476, y: 8.679564, z: -97.75848}
+    position: {x: -119.064476, y: 25.379564, z: -97.75848}
     lat: 53.256115899974155
     lon: 7.925712100052619
+  - id: way/965738655
+    name: Friedenskirche
+    category: 2
+    position: {x: 18613.686, y: 21.149124, z: -12766.637}
+    lat: 53.141542146266296
+    lon: 8.207007444404589
+  - id: node/2143494007
+    name: Kulturetage
+    category: 8
+    position: {x: 19461.426, y: 20.355185, z: -12643.341}
+    lat: 53.14265719951966
+    lon: 8.21973730952627
+  - id: node/14249001524
+    name: Zeitraum Atelier
+    category: 1
+    position: {x: 18972.701, y: 21.515327, z: -13039.561}
+    lat: 53.13907390031223
+    lon: 8.212398506781375
   - id: node/1625905876
     name: "Ammerl\xE4nder Spielzeugmuseum"
     category: 1
-    position: {x: -359.34445, y: 8.233633, z: -114.73158}
+    position: {x: -359.34445, y: 24.933634, z: -114.73158}
     lat: 53.25596239999781
     lon: 7.922103999881711
-  - id: node/11359645280
-    name: "Ammerl\xE4nder Flora (Brunnenskulptur)"
-    category: 5
-    position: {x: 130.29233, y: 7.474124, z: -276.09222}
-    lat: 53.254503099968154
-    lon: 7.929456499990279
-  - id: way/27382485
-    name: Friedhofsvereinigung Ocholt-Howiek e.V.
-    category: 2
-    position: {x: -3644.52, y: 4.9436564, z: -6736.874}
-    lat: 53.1960736156471
-    lon: 7.872773037186794
-  - id: node/277797259
-    name: Ev.-Methodistische Kirche
-    category: 2
-    position: {x: -151.7358, y: 6.784123, z: 370.1354}
-    lat: 53.260347399989996
-    lon: 7.925221499919096
-  - id: way/267608612
-    name: Bienenpark Hollriede
-    category: 0
-    position: {x: -3872.569, y: 10.594976, z: 3965.3496}
-    lat: 53.29286150098011
-    lon: 7.869348599117972
-  - id: way/319240922
-    name: "Hollweger M\xFChle"
-    category: 0
-    position: {x: -1685.899, y: 7.613319, z: 1951.5814}
-    lat: 53.27464955071625
-    lon: 7.902184146608019
-  - id: way/319390244
-    name: Evangelisch-Freikirchliche Gemeinde (Baptisten), Westerstede
-    category: 2
-    position: {x: -598.18445, y: 7.2436028, z: -261.96936}
-    lat: 53.25463082315597
-    lon: 7.918517522779695
-  - id: way/586393563
-    name: Auferstehungskirche Ihausen
-    category: 2
-    position: {x: -6751.083, y: 8.080794, z: 1700.6589}
-    lat: 53.272380278687095
-    lon: 7.826124162650383
-  - id: way/636780685
-    name: "Landerlebnis Jan\xDFen"
-    category: 0
-    position: {x: 776.2006, y: 7.719553, z: -2692.0955}
-    lat: 53.23265344964472
-    lon: 7.939155609621762
-  - id: way/229247982
-    name: Glockenturm Ocholt
-    category: 0
-    position: {x: -2904.525, y: 4.8371453, z: -6164.128}
-    lat: 53.20125336942059
-    lon: 7.88388497649382
-  - id: node/11359625646
-    name: Marktfrau (Oma Apen)
-    category: 5
-    position: {x: 4.2953515, y: 9.255926, z: 57.55377}
-    lat: 53.25752050001047
-    lon: 7.927564500000231
-  - id: way/743132204
-    name: Neuapostolische Kirche Westerstede
-    category: 2
-    position: {x: -317.8197, y: 8.33798, z: -44.20244}
-    lat: 53.25660024564224
-    lon: 7.922727545211011
-  - id: node/303596844
-    name: "Kirchenb\xFCro"
-    category: 2
-    position: {x: 166.16684, y: 9.045199, z: 137.80838}
-    lat: 53.25824630003551
-    lon: 7.929995200027116
-  - id: node/959120403
-    name: Draisinen-Bahnhof Westerstede
-    category: 0
-    position: {x: 172.9262, y: 5.9158483, z: -885.2223}
-    lat: 53.24899429983505
-    lon: 7.930096700058173
-  - id: way/305134713
-    name: Rathaus Am Markt
-    category: 8
-    position: {x: -25.545975, y: 9.057137, z: 75.0413}
-    lat: 53.257678652286366
-    lon: 7.927116395684024
-  - id: way/24958203
-    name: Rathaus Zum Stadtpark
-    category: 8
-    position: {x: -93.83231, y: 8.532866, z: -55.36126}
-    lat: 53.25649932841843
-    lon: 7.926090992090556
-  - id: node/11359625647
-    name: "Stehendes M\xE4dchen"
-    category: 5
-    position: {x: -130.73851, y: 8.411442, z: -69.042404}
-    lat: 53.25637560001289
-    lon: 7.925536800032955
-  - id: node/765990444
-    name: Gefallenendenkmal Hollwege
-    category: 3
-    position: {x: -1446.4213, y: 6.388811, z: 1423.6182}
-    lat: 53.26987480026102
-    lon: 7.905780200866388
-  - id: node/1356238560
-    name: Mahnmal 1. und 2. Weltkrieg
-    category: 3
-    position: {x: -5448.8896, y: 5.7406516, z: 26.637276}
-    lat: 53.25724089999182
-    lon: 7.8456782019126745
-  - id: node/1356238561
-    name: Denkmal 1. und 2. Weltkrieg
-    category: 3
-    position: {x: -6752.446, y: 6.877924, z: 1596.3568}
-    lat: 53.27143699976055
-    lon: 7.82610369863325
-  - id: node/1384194807
-    name: Ehrenmal WK I und II
-    category: 3
-    position: {x: -241.13904, y: 8.217099, z: -70.02651}
-    lat: 53.256366700018575
-    lon: 7.92387899995077
-  - id: node/1700989841
-    name: Mahnmal WK I + II
-    category: 3
-    position: {x: 246.53986, y: 6.8793025, z: -4874.7983}
-    lat: 53.21291370177579
-    lon: 7.931202099990294
-  - id: node/7430001238
-    name: "Der Froschk\xF6nig"
-    category: 3
-    position: {x: -655.7836, y: 6.072991, z: -168.20517}
-    lat: 53.25547879999206
-    lon: 7.9176526000240095
-  - id: node/13064409047
-    name: Geburtsort Astronom Friedrich Tietjen
-    category: 3
-    position: {x: 6040.15, y: 11.689272, z: 92.34035}
-    lat: 53.257835099999006
-    lon: 8.018200299990196

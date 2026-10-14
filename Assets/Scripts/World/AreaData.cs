@@ -22,6 +22,9 @@ namespace LeGamez.World
         [Header("Start")]
         public Vector3 spawn;
         public Vector3 spawnBikeSpot;
+        /// <summary>Default start points (areas.json "starts"); the first one is <see cref="spawn"/>. Empty in data written
+        /// before start lists existed – use <see cref="StartList"/>.</summary>
+        public List<Start> starts = new List<Start>();
         public List<Vector3> bikeSpots = new List<Vector3>();
         public List<Vector4> carSpots = new List<Vector4>();
 
@@ -38,5 +41,22 @@ namespace LeGamez.World
         public List<TrafficLights.Head> trafficHeads = new List<TrafficLights.Head>();
         public List<TrafficLights.Signal> trafficSignals = new List<TrafficLights.Signal>();
         public List<SignTexts.Item> signTexts = new List<SignTexts.Item>();
+
+        /// <summary>A default start point of the area: menu card / "Andere Orte" row, starter bike next to it.</summary>
+        [System.Serializable]
+        public class Start
+        {
+            public string name;
+            public Vector3 position;
+            public float yaw;
+            public Vector3 bikeSpot; // zero = none found
+        }
+
+        /// <summary>The start points; older data without a list has exactly one: the spawn, named after the area.</summary>
+        public List<Start> StartList()
+        {
+            if (starts != null && starts.Count > 0) return starts;
+            return new List<Start> { new Start { name = displayName, position = spawn, bikeSpot = spawnBikeSpot } };
+        }
     }
 }

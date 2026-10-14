@@ -30,6 +30,8 @@ namespace LeGamez.Vehicles
         public override float MaxSteer => 38f;                    // ~3.2 m turning radius at walking pace
         public override float LateralAccel => 12f;                // arcade grip: tight turns at town speed
         public override float TopSpeed => 25f;                    // ~90 km/h
+        /// <summary>Top speed on motorways and their ramps (VehicleManager, from the area's street index): ~130 km/h.</summary>
+        public const float MotorwaySpeed = 36.5f;
         public override float AccelTime => 4.5f;
         public override float BrakeDecel => 11f;
         public override float CoastDecel => 1.6f;

@@ -34,14 +34,30 @@ namespace LeGamez.Core
             Vector3 saved = default;
             float savedYaw = 0f;
             bool hasSaved = area != null && PositionMemory.TryLoad(area.MemoryKey, out saved, out savedYaw) && area.Contains(saved, 2f);
-            // An own start point chosen in the menu / "Andere Orte" wins over the last position.
+            // An own start point chosen in the menu / "Andere Orte" wins over the last position. A default start point of
+            // the area (e.g. "Westerstede" / "Oldenburg" in one area) resumes the last position only if that lies nearer to
+            // it than to any other start of the area – otherwise the player starts fresh there, on foot.
             var chosen = StartPoints.Pending;
             StartPoints.Pending = null;
-            if (chosen != null && area != null && chosen.areaId == area.areaId && chosen.areaKey == area.MemoryKey && area.Contains(chosen.position, 2f))
+            if (chosen != null && area != null && chosen.areaId == area.areaId)
             {
-                saved = chosen.position;
-                savedYaw = chosen.yaw;
-                hasSaved = true;
+                if (chosen.IsDefault)
+                {
+                    int k = Mathf.Clamp(chosen.StartIndex, 0, area.starts.Count - 1);
+                    if (k >= 0 && (!hasSaved || area.NearestStart(saved) != k))
+                    {
+                        saved = area.starts[k].position;
+                        savedYaw = area.starts[k].yaw;
+                        hasSaved = true;
+                        PositionMemory.ForgetRide(area.MemoryKey);
+                    }
+                }
+                else if (chosen.areaKey == area.MemoryKey && area.Contains(chosen.position, 2f))
+                {
+                    saved = chosen.position;
+                    savedYaw = chosen.yaw;
+                    hasSaved = true;
+                }
             }
 
             // The world streams in around the camera – the start surroundings must be there before anything is placed.
@@ -56,6 +72,9 @@ namespace LeGamez.Core
                 spawn = safe + Vector3.up * 0.15f;
                 resumed = true;
             }
+            // The starter bike waits at the start point nearest to where the player begins.
+            int near = area != null ? area.NearestStart(spawn) : -1;
+            if (near >= 0) area.spawnBikeSpot = area.starts[near].bikeSpot;
             var player = CreatePlayer(spawn);
             if (resumed) player.transform.rotation = Quaternion.Euler(0f, savedYaw, 0f);
             if (area != null) player.gameObject.AddComponent<PositionMemory>().areaId = area.MemoryKey;

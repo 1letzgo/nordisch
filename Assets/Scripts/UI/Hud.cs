@@ -121,9 +121,24 @@ namespace LeGamez.UI
             return hud;
         }
 
+        float nextTitle;
+
+        /// <summary>Areas with several towns (Westerstede + Oldenburg): the title names the start point nearest to the player.</summary>
+        void UpdateTitle()
+        {
+            if (Time.time < nextTitle || titleLabel == null) return;
+            nextTitle = Time.time + 1f;
+            var area = LeGamez.World.AreaInfo.Current;
+            var player = NavState.Player;
+            if (area == null || player == null || area.starts == null || area.starts.Count < 2) return;
+            int k = area.NearestStart(player.position);
+            if (k >= 0 && titleLabel.text != area.starts[k].name) titleLabel.text = area.starts[k].name;
+        }
+
         void Update()
         {
             if (Screen.safeArea != appliedSafeArea) ApplySafeArea();
+            UpdateTitle();
             // Android back button arrives as Escape: close the big map first, otherwise back to the menu.
             var kb = UnityEngine.InputSystem.Keyboard.current;
             if (kb != null && kb.escapeKey.wasPressedThisFrame && !FullMap.CloseIfOpen() && !PlaceSwitcher.CloseIfOpen())

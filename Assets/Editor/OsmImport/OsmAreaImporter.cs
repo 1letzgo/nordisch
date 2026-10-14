@@ -92,7 +92,7 @@ namespace LeGamez.Editor.OsmImport
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(MenuScenePath, true), new EditorBuildSettingsScene(WorldScenePath, true) };
         }
 
-        static void UpdateCatalog(OsmAreaMeta meta, int poiCount)
+        static void UpdateCatalog(OsmAreaMeta meta, int poiCount, List<AreaData.Start> starts)
         {
             EnsureFolder(GeneratedRoot);
             string path = AreaCatalog.AssetPath;
@@ -112,6 +112,7 @@ namespace LeGamez.Editor.OsmImport
                 lon = meta.lon,
                 poiCount = poiCount,
                 vehicles = new List<string>(meta.vehicles),
+                starts = starts.ConvertAll(x => x.name),
             });
             catalog.areas.Sort((a, b) => b.lat.CompareTo(a.lat));
             EditorUtility.SetDirty(catalog);
@@ -137,10 +138,14 @@ namespace LeGamez.Editor.OsmImport
             aerial?.SetBuiltUp(data); // open country: smoothed fields/meadows instead of per-pixel cover
             var sink = new MeshSink();
             CoarseTerrain.Build(sink, area, WorldStyle.GroundColor(meta.ground), terrain); // before BuildBase: simplifies the field
+            // Decks instead of draped ribbons where there is a gap below; fills the pits at bridge ends (before BuildBase).
+            int bridges = BridgeBuilder.Prepare(data, area, terrain);
             GroundBuilder.BuildBase(sink, area, WorldStyle.GroundColor(meta.ground), terrain);
             int terrainTris = CoarseTerrain.TerrainTriangles(sink);
             GroundBuilder.BuildAreas(data, sink, area);
             int lines = GroundBuilder.BuildLines(data, sink, area);
+            BridgeBuilder.Build(data, sink, terrain);
+            var motorway = MotorwayBuilder.Build(data, sink, area, terrain); // lane markings, guard rails
             // Prefer official LGLN LoD2 buildings (real roof shapes); fall back to OSM extrusion.
             string lod2Path = Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".lod2.json");
             bool island = meta.ground == "sand";
@@ -207,18 +212,16 @@ namespace LeGamez.Editor.OsmImport
             d.areaId = meta.id;
             d.displayName = meta.name;
             d.projection = data.projection;
-            d.sizeMeters = Mathf.Max(area.Width, area.Height);
+            // Only part of AreaInfo.MemoryKey (saved positions, own start points). An area that grew around the same
+            // centre keeps its frame – "key_size" in areas.json keeps the old value, so nothing saved is lost.
+            d.sizeMeters = KeySize(meta.id) ?? Mathf.Max(area.Width, area.Height);
             d.boundsMin = new Vector2(area.xMin, area.zMin);
             d.boundsMax = new Vector2(area.xMax, area.zMax);
             d.allowedVehicles = new List<string>(meta.vehicles);
             d.attribution = hasLod2 ? "© OpenStreetMap-Mitwirkende (ODbL) · 3D-Gebäude, Gelände, Luftbilder © LGLN (CC BY 4.0)" : "© OpenStreetMap-Mitwirkende (ODbL)";
-            var spawnXZ = FindSpawn(data, area);
-            d.spawn = new Vector3(spawnXZ.x, terrain.Height(spawnXZ.x, spawnXZ.z) + 0.2f, spawnXZ.z);
-            var spawn2 = new Vector2(spawnXZ.x, spawnXZ.z);
-            var bikeSpot = FreeBikeSpot(data, spawn2, NearbyBuildings(data, spawn2, 15f));
-            d.spawnBikeSpot = bikeSpot.HasValue
-                ? new Vector3(bikeSpot.Value.x, terrain.Height(bikeSpot.Value.x, bikeSpot.Value.y), bikeSpot.Value.y)
-                : Vector3.zero;
+            d.starts = Starts(data, area, terrain);
+            d.spawn = d.starts[0].position;          // old apps only know the first start
+            d.spawnBikeSpot = d.starts[0].bikeSpot;
             d.bikeSpots = BikeSpots(data, area, terrain);
             d.carSpots = CarSpots(data, area, terrain);
             d.pois = poiDb;
@@ -228,12 +231,13 @@ namespace LeGamez.Editor.OsmImport
             // World geometry: one asset per WorldStreamer tile (meshes as sub-assets), loaded around the camera at runtime.
             d.tileKeys = WriteTiles(sink, meta.id, areaDir);
             EditorUtility.SetDirty(d);
-            UpdateCatalog(meta, pois.Count);
+            UpdateCatalog(meta, pois.Count, d.starts);
             AssetDatabase.SaveAssets();
 
             // Leave a preview of the area open (unsaved scene with all tiles) for snapshot tools.
             AreaPreview.Open(d);
 
+            Debug.Log($"[OSM] {meta.name}: motorway {motorway.carriageways} carriageway pieces/{motorway.ramps} ramps/{motorway.railKm:F1} km guard rail/{motorway.deadEnds} dead-end barriers/{traffic.motorway} exit signs, {bridges} bridge decks");
             Debug.Log($"[OSM] {meta.name}: {buildings} buildings (+{osmExtra} OSM-only), {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, gardens {gardens.plots} plots/{gardens.measured} measured hedges/{gardens.hedges} hedges/{gardens.fences} fences/{gardens.walls} walls/{gardens.drawn} drawn, terrain {(terrain.IsFlat ? "flat" : "DGM1")}, aerial {(aerial != null ? "DOP20" : "-")}, trees {(lidarTrees != null ? "LiDAR" : "OSM")}, " +
                       $"furniture {furniture.mapped} mapped/{furniture.benches} benches/{furniture.planters} planters/{furniture.seating} café tables/{furniture.fountains} fountains, {edits} hand-placed/{EditsPlacer.ChangedCount} edited, " +
                       $"facade {FacadeRecords.Windows} windows/{FacadeRecords.Doors} doors/{FacadeRecords.Gutters} gutters/{FacadeRecords.Verges} verges/{FacadeRecords.Ridges} ridges, traffic {traffic.junctionSignals} signal junctions/{traffic.crossingSignals} signal crossings/{traffic.heads} heads/{traffic.zebras} zebras/{traffic.lanes} lanes/{traffic.stops} stop/{traffic.giveWays} give way/{traffic.priority} priority/{traffic.speed} speed/{traffic.oneway} one-way/{traffic.names} names/{traffic.mapped} mapped, {pois.Count} POIs, " +
@@ -334,14 +338,20 @@ namespace LeGamez.Editor.OsmImport
                 idx = ScriptableObject.CreateInstance<StreetIndex>();
                 AssetDatabase.CreateAsset(idx, path);
             }
-            idx.names.Clear(); idx.segments.Clear(); idx.nameOf.Clear();
+            idx.names.Clear(); idx.segments.Clear(); idx.nameOf.Clear(); idx.fast.Clear();
             var ids = new Dictionary<string, int>();
             foreach (var w in data.ways)
             {
-                if (w.tags.Get("highway") == null || w.tags.Is("area", "yes")) continue;
+                string hw = w.tags.Get("highway");
+                if (hw == null || w.tags.Is("area", "yes")) continue;
                 string name = w.tags.Get("name");
+                // Motorways are known by their number ("A 28"), their ramps rarely have a name at all.
+                bool motorway = hw == "motorway" || hw == "motorway_link";
+                if (string.IsNullOrEmpty(name) && motorway)
+                    name = hw == "motorway" ? w.tags.Get("ref")?.Split(';')[0].Trim() : "Anschlussstelle";
                 if (string.IsNullOrEmpty(name)) continue;
                 if (!ids.TryGetValue(name, out int n)) { n = idx.names.Count; ids[name] = n; idx.names.Add(name); }
+                if (motorway && !idx.fast.Contains(n)) idx.fast.Add(n);
                 for (int i = 0; i < w.points.Count - 1; i++)
                 {
                     idx.segments.Add(new Vector4(w.points[i].x, w.points[i].y, w.points[i + 1].x, w.points[i + 1].y));
@@ -366,18 +376,66 @@ namespace LeGamez.Editor.OsmImport
             return idx;
         }
 
-        static Vector3 FindSpawn(OsmData data, AreaRect area)
+        /// <summary>
+        /// Default start points from "starts" of this area in Tools/osm/areas.json: [{name, lat?, lon?, yaw?}] – an entry
+        /// without lat/lon is the area centre; no list = one start at the centre named like the area. Each gets a spawn
+        /// (<see cref="FindSpawn"/> around it) and a checked spot for the starter bike. Never empty.
+        /// </summary>
+        static List<AreaData.Start> Starts(OsmData data, AreaRect area, TerrainField terrain)
         {
-            // Walkable way vertex near the centre with open space around it (no narrow alleys,
+            var specs = new List<(string name, Vector2 at, float yaw)>();
+            string areasPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Tools", "osm", "areas.json"));
+            if (File.Exists(areasPath))
+            {
+                var root = (Dictionary<string, object>)MiniJson.Parse(File.ReadAllText(areasPath));
+                foreach (Dictionary<string, object> a in (List<object>)root["areas"])
+                {
+                    if ((string)a["id"] != data.meta.id || !a.TryGetValue("starts", out var startsObj)) continue;
+                    foreach (Dictionary<string, object> st in (List<object>)startsObj)
+                    {
+                        string name = st.TryGetValue("name", out var n) ? (string)n : data.meta.name;
+                        var at = st.ContainsKey("lat") && st.ContainsKey("lon")
+                            ? data.projection.ToLocal(System.Convert.ToDouble(st["lat"]), System.Convert.ToDouble(st["lon"]))
+                            : Vector2.zero;
+                        float yaw = st.TryGetValue("yaw", out var y) ? (float)System.Convert.ToDouble(y) : 0f;
+                        if (!area.Contains(at, 5f)) { Debug.LogWarning($"[OSM] start '{name}' lies outside the area – skipped"); continue; }
+                        specs.Add((name, at, yaw));
+                    }
+                }
+            }
+            if (specs.Count == 0) specs.Add((data.meta.name, Vector2.zero, 0f));
+
+            var result = new List<AreaData.Start>();
+            foreach (var (name, at, yaw) in specs)
+            {
+                var xz = FindSpawn(data, at);
+                var s2 = new Vector2(xz.x, xz.z);
+                var bike = FreeBikeSpot(data, s2, NearbyBuildings(data, s2, 15f));
+                result.Add(new AreaData.Start
+                {
+                    name = name,
+                    position = new Vector3(xz.x, terrain.Height(xz.x, xz.z) + 0.2f, xz.z),
+                    yaw = yaw,
+                    bikeSpot = bike.HasValue ? new Vector3(bike.Value.x, terrain.Height(bike.Value.x, bike.Value.y), bike.Value.y) : Vector3.zero,
+                });
+                Debug.Log($"[OSM] start '{name}' at ({xz.x:F0}, {xz.z:F0}), {Vector2.Distance(s2, at):F0} m from the wanted spot{(bike.HasValue ? "" : ", no bike spot")}");
+            }
+            return result;
+        }
+
+        static Vector3 FindSpawn(OsmData data, Vector2 centre)
+        {
+            // Walkable way vertex within 200 m of the centre with open space around it (no narrow alleys,
             // never inside a building). Wider street types are preferred.
+            var near = Rect.MinMaxRect(centre.x - 200f, centre.y - 200f, centre.x + 200f, centre.y + 200f);
             var buildings = new List<List<Vector2>>();
             foreach (var p in data.polygons)
-                if (p.tags.Has("building") && GeoUtil.Overlaps(p.outer, 200f))
+                if (p.tags.Has("building") && GeoUtil.Bounds(p.outer).Overlaps(near))
                     buildings.Add(PolygonTriangulator.Clean(p.outer));
 
             bool Blocked(Vector2 p) => IsObstructed(data, p, 0f);
 
-            Vector2 best = Vector2.zero;
+            Vector2 best = centre;
             float bestScore = float.MaxValue;
             foreach (var w in data.ways)
             {
@@ -391,10 +449,11 @@ namespace LeGamez.Editor.OsmImport
                 }
                 foreach (var p in w.points)
                 {
-                    if (p.magnitude > 200f) continue;
+                    float dist = (p - centre).magnitude;
+                    if (dist > 200f) continue;
                     float clearance = Clearance(p, buildings);
                     if (clearance < 6f || Blocked(p)) continue;
-                    float score = p.magnitude + penalty - Mathf.Min(clearance, 20f);
+                    float score = dist + penalty - Mathf.Min(clearance, 20f);
                     if (score < bestScore) { bestScore = score; best = p; }
                 }
             }
@@ -468,6 +527,17 @@ namespace LeGamez.Editor.OsmImport
         /// Cars from "car_spots" ([{lat, lon}]) of this area in Tools/osm/areas.json – e.g. a house address.
         /// Each is moved to the edge of the nearest drivable street and lined up with it.
         /// </summary>
+        /// <summary>"key_size" of the area in Tools/osm/areas.json, if set.</summary>
+        static float? KeySize(string id)
+        {
+            string areasPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Tools", "osm", "areas.json"));
+            if (!File.Exists(areasPath)) return null;
+            var root = (Dictionary<string, object>)MiniJson.Parse(File.ReadAllText(areasPath));
+            foreach (Dictionary<string, object> a in (List<object>)root["areas"])
+                if ((string)a["id"] == id && a.TryGetValue("key_size", out var v)) return System.Convert.ToSingle(v);
+            return null;
+        }
+
         static List<Vector4> CarSpots(OsmData data, AreaRect area, TerrainField terrain)
         {
             var result = new List<Vector4>();
@@ -512,7 +582,7 @@ namespace LeGamez.Editor.OsmImport
             return result;
         }
 
-        /// <summary>Up to 40 bicycle parkings, at least 40 m apart, as places for parked bikes.</summary>
+        /// <summary>Up to 80 bicycle parkings (two towns in one area), at least 40 m apart, as places for parked bikes.</summary>
         static List<Vector3> BikeSpots(OsmData data, AreaRect area, TerrainField terrain)
         {
             var spots = new List<Vector3>();
@@ -529,7 +599,7 @@ namespace LeGamez.Editor.OsmImport
                 if (free == null) continue;
                 var q = free.Value;
                 spots.Add(new Vector3(q.x, terrain.Height(q.x, q.y), q.y));
-                if (spots.Count >= 40) break;
+                if (spots.Count >= 80) break;
             }
             return spots;
         }

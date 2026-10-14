@@ -231,7 +231,7 @@ def process_area(area):
     s, w, n, e = latlon_bbox(area, 20)
     bdom, dgm, dop = tiles("bdom", [w, s, e, n]), tiles("dgm1", [w, s, e, n]), tiles("dop", [w, s, e, n])
     plots, houses = load_plots(aid)
-    mask = AreaMask.load(aid)  # large areas: only tiles inside the mask (make_mask.py)
+    mask = AreaMask.load(aid, detail=True)  # large areas: only tiles inside the mask (make_mask.py; houses only where the mask is detailed)
     if mask is not None:
         bdom = {k: v for k, v in bdom.items() if mask.utm_tile_inside(k, frame, utm_to_latlon)}
     edges = border_edges(plots)

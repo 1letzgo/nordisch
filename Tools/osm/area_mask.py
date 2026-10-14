@@ -7,8 +7,11 @@ fetched inside; terrain and aerial image cover the whole rectangle. Without a ma
 Mask PNG (8 bit grey, top row = north edge, like dop.png); pixel values:
     0   outside                      32  outside, forest (coarse terrain is coloured as forest)
     64  outside, lake / pond (coarse terrain is coloured as water; the OSM water area is dropped)
+    160 landscape (band along a motorway: coarse terrain, but roads, water, barriers and LiDAR trees)
+    176 motorway corridor (detailed terrain, roads, trees – still no houses, gardens or furniture)
     192 road corridor                255 settlement
-Anything >= 128 counts as inside. Data/<id>.mask.json: {"xMin", "zMin", "step", "width", "height", ...};
+Anything >= 128 counts as inside (roads, trees); houses, LoD2, parcels and hedges need >= 192 ("detail",
+AreaMask.load(id, detail=True)). Data/<id>.mask.json: {"xMin", "zMin", "step", "width", "height", ...};
 pixel (col, row) covers x in [xMin + col*step, +step), z in [zMax - (row+1)*step, zMax - row*step).
 """
 import json
@@ -20,25 +23,27 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "Data"
 
-OUTSIDE, FOREST, WATER, CORRIDOR, SETTLEMENT = 0, 32, 64, 192, 255
+OUTSIDE, FOREST, WATER, LANDSCAPE, MOTORWAY, CORRIDOR, SETTLEMENT = 0, 32, 64, 160, 176, 192, 255
+INSIDE, FINE, DETAIL = 128, 176, 192  # roads/trees, detailed terrain, houses
 
 
 class AreaMask:
-    def __init__(self, img, meta):
+    def __init__(self, img, meta, level=128):
         self.img = img
         self.meta = meta
         self.x0, self.z0, self.step = float(meta["xMin"]), float(meta["zMin"]), float(meta["step"])
         self.h, self.w = img.shape
         self.z1 = self.z0 + self.h * self.step
-        self.inside_img = img >= 128
+        self.inside_img = img >= level
 
     @staticmethod
-    def load(area_id):
+    def load(area_id, detail=False, level=None):
+        """detail=True: only the parts where houses are built (>= 192) count as inside; level: any other threshold."""
         png, js = DATA / f"{area_id}.mask.png", DATA / f"{area_id}.mask.json"
         if not png.exists() or not js.exists():
             return None
         from PIL import Image
-        return AreaMask(np.array(Image.open(png).convert("L")), json.loads(js.read_text()))
+        return AreaMask(np.array(Image.open(png).convert("L")), json.loads(js.read_text()), level or (DETAIL if detail else INSIDE))
 
     def _index(self, x, z):
         c = np.floor((np.asarray(x, dtype=np.float64) - self.x0) / self.step).astype(np.int64)

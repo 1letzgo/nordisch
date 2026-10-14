@@ -20,6 +20,8 @@ namespace LeGamez.World
         public List<Vector3> bikeSpots = new List<Vector3>();
         [Tooltip("Checked free spot next to the spawn for the starter bike (zero = none).")]
         public Vector3 spawnBikeSpot;
+        [Tooltip("Default start points (the first = spawnPoint); GameBootstrap puts the starter bike at the nearest one.")]
+        public List<AreaData.Start> starts = new List<AreaData.Start>();
         [Tooltip("Parked cars: (x, y, z, yaw), filled by the importer from car_spots in areas.json.")]
         public List<Vector4> carSpots = new List<Vector4>();
         [Tooltip("Top-down render of the area (+MapMargin) for minimap and full map, set by SceneSnapshot.RenderThumbnails.")]
@@ -53,6 +55,19 @@ namespace LeGamez.World
         void OnDestroy()
         {
             if (Current == this) Current = null;
+        }
+
+        /// <summary>Index of the default start point closest to <paramref name="p"/> (x/z), -1 without start points.</summary>
+        public int NearestStart(Vector3 p)
+        {
+            int best = -1;
+            float bestD = float.MaxValue;
+            for (int i = 0; i < starts.Count; i++)
+            {
+                float dx = starts[i].position.x - p.x, dz = starts[i].position.z - p.z, d = dx * dx + dz * dz;
+                if (d < bestD) { bestD = d; best = i; }
+            }
+            return best;
         }
 
         public bool IsVehicleAllowed(string vehicleId) => allowedVehicles.Contains(vehicleId);

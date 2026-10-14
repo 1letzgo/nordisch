@@ -22,7 +22,7 @@ namespace LeGamez.Vehicles
         Transform avatarModel;
         ThirdPersonCamera cam;
         CharacterController controller;
-        float walkSpeed, runSpeed, turnSmooth, ccRadius, ccHeight;
+        float walkSpeed, runSpeed, turnSmooth, ccRadius, ccHeight, ccStep, ccSlope;
         Vector3 ccCenter;
 
         void Start()
@@ -72,6 +72,7 @@ namespace LeGamez.Vehicles
             if (player == null || hud == null) return;
             if (riding != null)
             {
+                UpdateLimits();
                 riding.SteerAngle = player.SteerAngle;
                 riding.Animate(player.SignedSpeed);
                 hud.SetGear(player.Reversing);
@@ -89,6 +90,27 @@ namespace LeGamez.Vehicles
             }
             hud.SetInteract(nearest != null ? nearest.MountIcon : (UiKit.IconKind?)null);
             if (nearest != null && GameInput.ConsumeInteract()) Mount(nearest);
+        }
+
+        float nextLimitCheck;
+
+        /// <summary>
+        /// Top speed by road (cars: 130 km/h on motorways and their ramps, see <see cref="Car.MotorwaySpeed"/>) and a
+        /// brake when the tile ahead is not in the scene yet – driving fast must never reach ground that isn't there.
+        /// </summary>
+        void UpdateLimits()
+        {
+            var s = player.Steering;
+            if (s == null || Time.time < nextLimitCheck) return;
+            nextLimitCheck = Time.time + 0.2f;
+            var p = player.transform.position;
+            var area = AreaInfo.Current;
+            if (riding is Car car)
+                s.maxSpeed = area != null && area.streets != null && area.streets.OnFastRoad(p, 9f) ? Car.MotorwaySpeed : car.TopSpeed;
+            var streamer = WorldStreamer.Instance;
+            float v = Mathf.Abs(player.SignedSpeed);
+            var ahead = p + player.transform.forward * Mathf.Max(20f, v * 3f) * Mathf.Sign(player.SignedSpeed == 0f ? 1f : player.SignedSpeed);
+            s.speedLimit = streamer == null || (streamer.Ready(p) && streamer.Ready(ahead)) ? float.MaxValue : 5f;
         }
 
         void Mount(Vehicle v, bool silent = false)
@@ -109,7 +131,11 @@ namespace LeGamez.Vehicles
 
             if (controller != null)
             {
-                ccRadius = controller.radius; ccHeight = controller.height; ccCenter = controller.center;
+                ccRadius = controller.radius; ccHeight = controller.height; ccCenter = controller.center; ccStep = controller.stepOffset; ccSlope = controller.slopeLimit;
+                // Wide car capsule: a low step offset, or it climbs over guard rails and kerb-high obstacles.
+                controller.stepOffset = Mathf.Min(ccStep, 0.25f);
+                // Cars don't drive up 50° banks – and on a steep bank next to the guard rail the capsule could climb it.
+                if (v is Car) controller.slopeLimit = 35f;
                 controller.radius = v.ColliderRadius;
                 controller.height = Mathf.Max(ccHeight, v.ColliderRadius * 2f + 0.05f);
                 controller.center = new Vector3(0, controller.height * 0.5f, 0);
@@ -163,6 +189,8 @@ namespace LeGamez.Vehicles
                 controller.radius = ccRadius;
                 controller.height = ccHeight;
                 controller.center = ccCenter;
+                controller.stepOffset = ccStep;
+                controller.slopeLimit = ccSlope;
             }
             if (avatarModel != null)
             {

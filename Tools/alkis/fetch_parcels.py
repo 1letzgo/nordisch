@@ -90,7 +90,7 @@ def process_area(area):
     x0, x1, z0, z1 = local_bounds(area)
     s, w, n, e = latlon_bbox(area, MARGIN_M)
     parcels, seen = [], set()
-    mask = AreaMask.load(area["id"])  # large areas: only requests touching the mask (make_mask.py)
+    mask = AreaMask.load(area["id"], detail=True)  # large areas: only requests touching the mask (make_mask.py; houses only where the mask is detailed)
     lat = s
     tiles = 0
     while lat < n:

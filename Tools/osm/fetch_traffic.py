@@ -22,11 +22,12 @@ from fetch_area import fetch, AREAS_FILE, OUT_DIR, ROOT
 def query(s, w, n, e):
     b = f"{s:.6f},{w:.6f},{n:.6f},{e:.6f}"
     return f"""
-[out:json][timeout:90];
+[out:json][timeout:300];
 (
   node["highway"~"^(traffic_signals|crossing|stop|give_way)$"]({b});
   node["traffic_sign"]({b});
   node["crossing"]({b});
+  node["highway"="motorway_junction"]({b});
 );
 out body;
 """

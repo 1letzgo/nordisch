@@ -40,6 +40,9 @@ namespace LeGamez.World
             public Vector2 boundsMin, boundsMax;
             public List<string> allowedVehicles = new List<string>();
             public Vector3 spawn, spawnBikeSpot;
+            /// <summary>Default start points (first = spawn). Older apps ignore the field; area files without it get one
+            /// start = spawn (<see cref="AreaData.StartList"/>), so no format change was needed.</summary>
+            public List<AreaData.Start> starts = new List<AreaData.Start>();
             public List<Vector3> bikeSpots = new List<Vector3>();
             public List<Vector4> carSpots = new List<Vector4>();
             public List<Vector2Int> tileKeys = new List<Vector2Int>();
@@ -50,6 +53,7 @@ namespace LeGamez.World
             public List<string> streetNames = new List<string>();
             public List<Vector4> streetSegments = new List<Vector4>();
             public List<int> streetNameOf = new List<int>();
+            public List<int> streetFast = new List<int>();
         }
 
         /// <param name="mapImage">Overview image of the area (JPEG or PNG), or null.</param>
@@ -61,7 +65,7 @@ namespace LeGamez.World
                 areaId = d.areaId, displayName = d.displayName, attribution = d.attribution, projection = d.projection,
                 sizeMeters = d.sizeMeters, boundsMin = d.boundsMin, boundsMax = d.boundsMax,
                 allowedVehicles = d.allowedVehicles, spawn = d.spawn, spawnBikeSpot = d.spawnBikeSpot,
-                bikeSpots = d.bikeSpots, carSpots = d.carSpots, tileKeys = d.tileKeys,
+                starts = d.starts ?? new List<AreaData.Start>(), bikeSpots = d.bikeSpots, carSpots = d.carSpots, tileKeys = d.tileKeys,
                 trafficHeads = d.trafficHeads, trafficSignals = d.trafficSignals, signTexts = d.signTexts,
                 pois = d.pois != null ? d.pois.entries : new List<PoiEntry>(),
             };
@@ -70,6 +74,7 @@ namespace LeGamez.World
                 j.streetNames = d.streets.names;
                 j.streetSegments = d.streets.segments;
                 j.streetNameOf = d.streets.nameOf;
+                j.streetFast = d.streets.fast;
             }
             using var ms = new MemoryStream();
             using (var w = new BinaryWriter(ms))
@@ -104,12 +109,14 @@ namespace LeGamez.World
             d.areaId = j.areaId; d.displayName = j.displayName; d.attribution = j.attribution; d.projection = j.projection;
             d.sizeMeters = j.sizeMeters; d.boundsMin = j.boundsMin; d.boundsMax = j.boundsMax;
             d.allowedVehicles = j.allowedVehicles; d.spawn = j.spawn; d.spawnBikeSpot = j.spawnBikeSpot;
+            d.starts = j.starts ?? new List<AreaData.Start>();
             d.bikeSpots = j.bikeSpots; d.carSpots = j.carSpots; d.tileKeys = j.tileKeys;
             d.trafficHeads = j.trafficHeads; d.trafficSignals = j.trafficSignals; d.signTexts = j.signTexts;
             d.pois = ScriptableObject.CreateInstance<PoiDatabase>();
             d.pois.entries = j.pois;
             d.streets = ScriptableObject.CreateInstance<StreetIndex>();
             d.streets.names = j.streetNames; d.streets.segments = j.streetSegments; d.streets.nameOf = j.streetNameOf;
+            d.streets.fast = j.streetFast ?? new List<int>();
             if (entries.TryGetValue("pack.idx", out var idx)) d.pack = ReadPackIndex(Inflate(idx));
             if (entries.TryGetValue("map.jpg", out var img) || entries.TryGetValue("map.png", out img))
             {
