@@ -22,13 +22,13 @@ MonoBehaviour:
   - id: way/28777483
     name: Prinzenpalais
     category: 1
-    position: {x: 19323.896, y: 21.01189, z: -13346.897}
+    position: {x: 19323.896, y: 20.963581, z: -13346.897}
     lat: 53.13629443213651
     lon: 8.217672137521324
   - id: way/32144438
     name: St. Peter
     category: 2
-    position: {x: 18769.773, y: 21.745255, z: -12575.4375}
+    position: {x: 18769.773, y: 21.72666, z: -12575.4375}
     lat: 53.14327129795431
     lon: 8.209351296582668
   - id: way/22981582
@@ -46,7 +46,7 @@ MonoBehaviour:
   - id: way/24752270
     name: Altes Rathaus
     category: 0
-    position: {x: 19090.793, y: 22.91149, z: -13040.662}
+    position: {x: 19090.793, y: 22.744884, z: -13040.662}
     lat: 53.13906393809236
     lon: 8.214171800751908
   - id: way/24752350
@@ -58,7 +58,7 @@ MonoBehaviour:
   - id: way/149934483
     name: Garnisonkirche
     category: 2
-    position: {x: 18819.826, y: 22.505032, z: -12360.824}
+    position: {x: 18819.826, y: 22.50534, z: -12360.824}
     lat: 53.14521219980511
     lon: 8.21010290011843
   - id: way/32381111
@@ -100,13 +100,13 @@ MonoBehaviour:
   - id: node/4391346443
     name: Lappan
     category: 0
-    position: {x: 19037.357, y: 22.256756, z: -12608.1455}
+    position: {x: 19037.357, y: 22.252298, z: -12608.1455}
     lat: 53.14297549597724
     lon: 8.213369400114496
   - id: way/229132531
     name: Pauluskirche
     category: 2
-    position: {x: -2916.7437, y: 21.748432, z: -6141.3794}
+    position: {x: -2916.7437, y: 21.715353, z: -6141.3794}
     lat: 53.201459100742206
     lon: 7.883701496893409
   - id: way/34585972
@@ -130,13 +130,13 @@ MonoBehaviour:
   - id: way/22902639
     name: Schlossgarten
     category: 0
-    position: {x: 18831.654, y: 20.454971, z: -13475.974}
+    position: {x: 18831.654, y: 20.492912, z: -13475.974}
     lat: 53.13512710372409
     lon: 8.210280514002715
   - id: way/42524421
     name: Schlosswache
     category: 0
-    position: {x: 19184.996, y: 21.019144, z: -13132.714}
+    position: {x: 19184.996, y: 21.019047, z: -13132.714}
     lat: 53.13823144801501
     lon: 8.215586376852775
   - id: way/32991198
@@ -166,7 +166,7 @@ MonoBehaviour:
   - id: node/278829715
     name: "Stadtb\xFCcherei Westerstede"
     category: 8
-    position: {x: -119.064476, y: 25.355553, z: -97.75848}
+    position: {x: -119.064476, y: 25.271082, z: -97.75848}
     lat: 53.256115899974155
     lon: 7.925712100052619
   - id: way/965738655
@@ -178,18 +178,18 @@ MonoBehaviour:
   - id: node/2143494007
     name: Kulturetage
     category: 8
-    position: {x: 19461.426, y: 20.361727, z: -12643.341}
+    position: {x: 19461.426, y: 20.361807, z: -12643.341}
     lat: 53.14265719951966
     lon: 8.21973730952627
   - id: node/14249001524
     name: Zeitraum Atelier
     category: 1
-    position: {x: 18972.701, y: 21.49094, z: -13039.561}
+    position: {x: 18972.701, y: 21.477186, z: -13039.561}
     lat: 53.13907390031223
     lon: 8.212398506781375
   - id: node/1625905876
     name: "Ammerl\xE4nder Spielzeugmuseum"
     category: 1
-    position: {x: -359.34445, y: 24.925182, z: -114.73158}
+    position: {x: -359.34445, y: 24.91782, z: -114.73158}
     lat: 53.25596239999781
     lon: 7.922103999881711

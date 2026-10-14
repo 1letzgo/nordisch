@@ -42,14 +42,15 @@ namespace LeGamez.Editor.OsmImport
 
             static float Smooth(float x) => x * x * (3f - 2f * x);
 
-            /// <summary>Runs the deck on by e0/e1 metres beyond the way's first/last point (straight on).</summary>
-            public void Extend(float e0, float e1)
+            /// <summary>Runs the deck on over the approaches: <paramref name="run0"/>/<paramref name="run1"/> = the approach's
+            /// centre line from the way's first/last point outwards (that point first), cut after e0/e1 metres.</summary>
+            public void Extend(List<Vector2> run0, float e0, List<Vector2> run1, float e1)
             {
                 var wp = way.points;
                 ext0 = e0; ext1 = e1;
                 pts = new List<Vector2>(wp);
-                if (e0 > 0f) pts.Insert(0, wp[0] + (wp[0] - wp[1]).normalized * e0);
-                if (e1 > 0f) pts.Add(wp[wp.Count - 1] + (wp[wp.Count - 1] - wp[wp.Count - 2]).normalized * e1);
+                if (e0 > 0f) { var r = CutRun(run0, e0); for (int i = 1; i < r.Count; i++) pts.Insert(0, r[i]); }
+                if (e1 > 0f) { var r = CutRun(run1, e1); for (int i = 1; i < r.Count; i++) pts.Add(r[i]); }
                 along = new float[pts.Count];
                 for (int i = 1; i < pts.Count; i++) along[i] = along[i - 1] + Vector2.Distance(pts[i - 1], pts[i]);
                 bounds = GeoUtil.Bounds(pts);
@@ -166,18 +167,29 @@ namespace LeGamez.Editor.OsmImport
                 if (l.Count < 2) continue;
                 float h = float.MinValue;
                 foreach (var (d, start) in l) h = Mathf.Max(h, start ? d.h0 : d.h1);
+                // Mid-span joint of a viaduct in two ways over low ground: both ends' abutment searches find the valley –
+                // the joint takes at least the straight line between the two far ends (no dip with a 20 % plunge).
+                if (l.Count == 2)
+                {
+                    var (da, sa) = l[0];
+                    var (db, sb) = l[1];
+                    float fa = sa ? da.h1 : da.h0, fb = sb ? db.h1 : db.h0;
+                    float la = da.Length, lb = db.Length;
+                    if (la + lb > 1f) h = Mathf.Max(h, Mathf.Lerp(fa, fb, la / (la + lb)));
+                }
                 foreach (var (d, start) in l) { if (start) d.h0 = h; else d.h1 = h; shared.Add((d, start)); }
             }
             // A road, path or railway passing right next to a free deck end (OSM bridges are often drawn short): with 5 m
             // terrain cells the approach's last cell and the way below cannot both be right, so the deck runs on over
             // the approach until the way below is clear (RoadProfile stops the approach's profile there).
+            BuildBelow(data);
             foreach (var d in decks.Values)
             {
-                var wp = d.way.points;
-                float e0 = shared.Contains((d, true)) ? 0f : Extension(data, t, d, wp[0], (wp[0] - wp[1]).normalized, d.h0);
-                float e1 = shared.Contains((d, false)) ? 0f : Extension(data, t, d, wp[wp.Count - 1], (wp[wp.Count - 1] - wp[wp.Count - 2]).normalized, d.h1);
+                List<Vector2> run0 = null, run1 = null;
+                float e0 = shared.Contains((d, true)) ? 0f : Extension(t, d, true, roadsByEnd, out run0);
+                float e1 = shared.Contains((d, false)) ? 0f : Extension(t, d, false, roadsByEnd, out run1);
                 if (e0 <= 0f && e1 <= 0f) continue;
-                d.Extend(e0, e1);
+                d.Extend(run0, e0, run1, e1);
                 Debug.Log($"[OSM] bridge {d.way.id} ({d.way.tags.Get("highway")}) extended by {e0:0}/{e1:0} m: a way passes close below its end");
             }
             below = null;
@@ -190,13 +202,13 @@ namespace LeGamez.Editor.OsmImport
         /// <summary>Free deck ends (onto an approach road): the way's end point, where the built deck ends (further out
         /// when extended) and the deck surface height there – anchors for <see cref="RoadProfile"/> (the approach's
         /// ground = this minus the road's layer offset).</summary>
-        public static IEnumerable<(Vector2 end, Vector2 built, float surface)> FreeEnds()
+        public static IEnumerable<(Vector2 end, Vector2 built, float ext, float surface)> FreeEnds()
         {
             foreach (var d in decks.Values)
             {
                 var wp = d.way.points;
-                if (!shared.Contains((d, true))) yield return (wp[0], d.pts[0], d.h0);
-                if (!shared.Contains((d, false))) yield return (wp[wp.Count - 1], d.pts[d.pts.Count - 1], d.h1);
+                if (!shared.Contains((d, true))) yield return (wp[0], d.pts[0], d.ext0, d.h0);
+                if (!shared.Contains((d, false))) yield return (wp[wp.Count - 1], d.pts[d.pts.Count - 1], d.ext1, d.h1);
             }
         }
 
@@ -227,29 +239,140 @@ namespace LeGamez.Editor.OsmImport
         }
 
         const float MinStep = 0.03f, MaxStep = 1.2f;
-        const float MaxExtension = 8f, BelowClear = 5f; // m: deck run-on at most; way below clear of the end by its half width + this
+        const float MaxExtension = 30f; // m the deck may run on over an approach
 
-        /// <summary>How far the deck has to run on beyond <paramref name="end"/> (along <paramref name="u"/>) until every
-        /// way passing below (its ground ≥ 2.5 m under the deck) is <see cref="BelowClear"/> beyond its edge; 0 = none
-        /// or no help (a way running alongside).</summary>
-        static float Extension(OsmData data, TerrainField t, Deck d, Vector2 end, Vector2 u, float surface)
+        /// <summary>
+        /// How far the deck has to run on over its approach (along the approach's centre line, returned in
+        /// <paramref name="run"/> from the deck end outwards) so that no terrain cell at its end is shared with a way
+        /// passing below. The ground is built from <see cref="TerrainField.CellSize"/> cells: the approach needs every
+        /// corner of the cells it touches at its own height (<see cref="RoadProfile"/>), the way below its own low corners –
+        /// a corner both need tilts a cell (the approach drops off before the deck end: a jagged step across the
+        /// carriageway). 0 = none needed or no help (a way alongside; the deck stops short of a road joining the approach
+        /// at grade – its parapet would block it).
+        /// </summary>
+        static float Extension(TerrainField t, Deck d, bool start, Dictionary<Vector2Int, List<OsmWay>> roadsByEnd, out List<Vector2> run)
         {
-            BuildBelow(data);
+            var wp = d.way.points;
+            var end = start ? wp[0] : wp[wp.Count - 1];
+            var u = start ? (wp[0] - wp[1]).normalized : (wp[wp.Count - 1] - wp[wp.Count - 2]).normalized;
+            float surface = start ? d.h0 : d.h1;
             var key = Key10(end);
-            float ext = 0f;
+            // The approach: the joining carriageway that runs on straightest.
+            run = null;
+            OsmWay approach = null;
+            float best = 0.5f;
+            if (roadsByEnd.TryGetValue(key, out var joined))
+                foreach (var o in joined)
+                {
+                    if (o == d.way || decks.ContainsKey(o)) continue;
+                    var op = o.points;
+                    bool first = Key10(op[0]) == key;
+                    var r = new List<Vector2>(op.Count);
+                    for (int i = 0; i < op.Count; i++) r.Add(first ? op[i] : op[op.Count - 1 - i]);
+                    float dot = Vector2.Dot((r[1] - r[0]).normalized, u);
+                    if (dot > best) { best = dot; run = r; approach = o; }
+                }
+            if (run == null) run = new List<Vector2> { end, end + u * MaxExtension };
+            float runLen = 0f;
+            for (int i = 1; i < run.Count; i++) runLen += Vector2.Distance(run[i - 1], run[i]);
+            float hw = d.width * 0.5f + Edge;
+            float limit = Mathf.Min(MaxExtension, runLen - 2f);
+            var near = GeoUtil.Bounds(run);
+            near.xMin -= 40f; near.yMin -= 40f; near.xMax += 40f; near.yMax += 40f;
+            var lower = new List<(OsmWay way, float hw)>();
             foreach (var (o, ob) in below)
             {
-                if (o == d.way || end.x < ob.xMin - 30f || end.x > ob.xMax + 30f || end.y < ob.yMin - 30f || end.y > ob.yMax + 30f) continue;
+                if (o == d.way || o == approach || !ob.Overlaps(near)) continue;
                 var op = o.points;
-                if (Key10(op[0]) == key || Key10(op[op.Count - 1]) == key) continue; // the approach itself
-                float need = GroundBuilder.LineWidth(o.tags) * 0.5f + BelowClear;
-                if (Distance(op, end, out var closest) >= need || t.Height(closest.x, closest.y) > surface - d.y - 2.5f) continue;
-                float e = 1f;
-                while (e <= MaxExtension && Distance(op, end + u * e, out _) < need) e += 1f;
-                if (e > MaxExtension) return 0f;
-                ext = Mathf.Max(ext, e);
+                if (Distance(op, end, out var closest) > MaxExtension + 40f) continue;
+                if (t.Height(closest.x, closest.y) < surface - d.y - 1f) { lower.Add((o, GroundBuilder.LineWidth(o.tags) * 0.5f)); continue; }
+                // A road joining the approach at grade (a ramp leaving right after the bridge, a side road): stop short of it.
+                if (!GroundBuilder.Carriageway(o.tags, out float ow, out _)) continue;
+                foreach (var q in op)
+                {
+                    float at = RunPosition(run, q);
+                    if (at >= 0f) limit = Mathf.Min(limit, at - hw - ow * 0.5f - 3f);
+                }
             }
-            return ext;
+            if (lower.Count == 0) return 0f;
+            for (float e = 0f; e <= limit; e += 1f)
+            {
+                var c = PointOn(run, e, out var v);
+                if (!SharesCell(c, v, d.width * 0.5f, lower)) return e;
+            }
+            Debug.Log($"[OSM] bridge {d.way.id}: no clear end within {Mathf.Max(0f, limit):0} m at {end} – a way below stays close");
+            return 0f;
+        }
+
+        /// <summary>A terrain cell at the approach end <paramref name="c"/> (direction <paramref name="v"/> away from the
+        /// deck: from half a cell diagonal under the deck to 6 m out, carriageway + 0.5 m + half a diagonal across) is next
+        /// to – shares a corner with – a cell of a way below.</summary>
+        static bool SharesCell(Vector2 c, Vector2 v, float hw, List<(OsmWay way, float hw)> lower)
+        {
+            float cs = TerrainField.CellSize, half = cs * 0.7072f;
+            var n = new Vector2(-v.y, v.x);
+            float side = hw + 0.5f + half;
+            float xMin = float.MaxValue, xMax = float.MinValue, zMin = float.MaxValue, zMax = float.MinValue;
+            foreach (var k in new[] { c - v * half + n * side, c - v * half - n * side, c + v * (6f + half) + n * side, c + v * (6f + half) - n * side })
+            { xMin = Mathf.Min(xMin, k.x); xMax = Mathf.Max(xMax, k.x); zMin = Mathf.Min(zMin, k.y); zMax = Mathf.Max(zMax, k.y); }
+            for (int cz = Mathf.FloorToInt(zMin / cs); cz <= Mathf.FloorToInt(zMax / cs); cz++)
+            for (int cx = Mathf.FloorToInt(xMin / cs); cx <= Mathf.FloorToInt(xMax / cs); cx++)
+            {
+                var m = new Vector2((cx + 0.5f) * cs, (cz + 0.5f) * cs) - c;
+                float a = Vector2.Dot(m, v), l = Mathf.Abs(Vector2.Dot(m, n));
+                if (a < -half || a > 6f + half || l > side) continue;
+                for (int dz = -1; dz <= 1; dz++)
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    var q = new Vector2((cx + dx + 0.5f) * cs, (cz + dz + 0.5f) * cs);
+                    foreach (var (o, ohw) in lower)
+                        if (Distance(o.points, q, out _) <= ohw + 0.5f + half) return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>Arc length of the vertex of <paramref name="run"/> at <paramref name="q"/> (a shared node), −1 if none.</summary>
+        static float RunPosition(List<Vector2> run, Vector2 q)
+        {
+            var k = Key10(q);
+            float s = 0f;
+            for (int i = 0; i < run.Count; i++)
+            {
+                if (i > 0) s += Vector2.Distance(run[i - 1], run[i]);
+                if (s > MaxExtension + 40f) break;
+                if (Key10(run[i]) == k) return s;
+            }
+            return -1f;
+        }
+
+        /// <summary>Point at arc length s along the polyline (clamped to its end), with its direction.</summary>
+        static Vector2 PointOn(List<Vector2> pts, float s, out Vector2 dir)
+        {
+            dir = Vector2.up;
+            for (int i = 0; i < pts.Count - 1; i++)
+            {
+                float len = Vector2.Distance(pts[i], pts[i + 1]);
+                if (len < 1e-4f) continue;
+                dir = (pts[i + 1] - pts[i]) / len;
+                if (s <= len || i == pts.Count - 2) return pts[i] + dir * Mathf.Min(s, len);
+                s -= len;
+            }
+            return pts[pts.Count - 1];
+        }
+
+        /// <summary>The polyline from its first point up to arc length s (ending exactly there).</summary>
+        static List<Vector2> CutRun(List<Vector2> pts, float s)
+        {
+            var r = new List<Vector2> { pts[0] };
+            for (int i = 0; i < pts.Count - 1; i++)
+            {
+                float len = Vector2.Distance(pts[i], pts[i + 1]);
+                if (s <= len + 1e-3f) { if (s > 1e-3f) r.Add(pts[i] + (pts[i + 1] - pts[i]) * Mathf.Clamp01(s / Mathf.Max(len, 1e-4f))); return r; }
+                r.Add(pts[i + 1]);
+                s -= len;
+            }
+            return r;
         }
 
         static Vector2Int Key10(Vector2 p) => new Vector2Int(Mathf.RoundToInt(p.x * 10f), Mathf.RoundToInt(p.y * 10f));
@@ -361,11 +484,80 @@ namespace LeGamez.Editor.OsmImport
                 float lw = GroundBuilder.LineWidth(w.tags);
                 if (lw > 0f) below.AddLine(w.points, lw * 0.5f + 1.2f);
             }
-            foreach (var d in decks.Values) BuildDeck(sink, t, d, below);
+            // Carriageways a deck may run alongside (the other carriageway's deck, a ramp merging): their ribbons keep
+            // free of this deck's parapet.
+            var roads = new List<Side>();
+            foreach (var w in data.ways)
+                if (w.points.Count >= 2 && GroundBuilder.Carriageway(w.tags, out float rw, out float ry))
+                    roads.Add(new Side { way = w, hw = rw * 0.5f, y = ry, bounds = GeoUtil.Bounds(decks.TryGetValue(w, out var od) ? od.pts : w.points), deck = od });
+            logged.Clear();
+            foreach (var d in decks.Values) BuildDeck(sink, t, d, below, roads);
             return decks.Count;
         }
 
-        static void BuildDeck(MeshSink sink, TerrainField t, Deck d, PropPlacer.Clearance below)
+        class Side { public OsmWay way; public float hw, y; public Rect bounds; public Deck deck; }
+        static long openedBy;
+        static readonly HashSet<(long, bool, long)> logged = new HashSet<(long, bool, long)>(); // last SideEdge: the deck that opened (+id) or moved (−id) the parapet (log)
+
+        /// <summary>
+        /// Where the parapet on one side of a deck piece stands (distance from the centre line): the outer edge, or – where
+        /// another deck at about the same height runs so close alongside that its road would reach under the parapet –
+        /// halfway to its centre line (opposite direction: the median wall of two carriageway decks), none for a deck in
+        /// the same direction (a ramp bridge merging/diverging, the parapet would stand in its lane).
+        /// </summary>
+        static float SideEdge(TerrainField t, Deck d, Vector2 m, Vector2 dir, float side, float surface, List<Side> roads)
+        {
+            float hw = d.width * 0.5f, ow = hw + Edge, edge = ow;
+            var n = new Vector2(-dir.y, dir.x) * side;
+            var q = m + n * ow; // where the parapet would stand
+            foreach (var r in roads)
+            {
+                // Only other decks: beside a deck end a ground road may lie at deck height at its centre line while the
+                // ground falls away towards the deck (an open parapet there let a car drop off the side).
+                if (r.way == d.way || r.deck == null) continue;
+                float reach = r.hw + 0.3f;
+                var b = r.bounds;
+                if (q.x < b.xMin - reach || q.x > b.xMax + reach || q.y < b.yMin - reach || q.y > b.yMax + reach) continue;
+                var pts = r.deck != null ? r.deck.pts : r.way.points;
+                float best = float.MaxValue, bu = 0f;
+                int bi = -1;
+                for (int i = 0; i < pts.Count - 1; i++)
+                {
+                    Vector2 a = pts[i], ab = pts[i + 1] - a;
+                    float len2 = ab.sqrMagnitude;
+                    if (len2 < 1e-4f) continue;
+                    float u = Mathf.Clamp01(Vector2.Dot(q - a, ab) / len2);
+                    float dd = Vector2.Distance(q, a + ab * u);
+                    if (dd < best) { best = dd; bi = i; bu = u; }
+                }
+                if (bi < 0 || best > reach) continue; // the parapet stays off that road
+                Vector2 sa = pts[bi], sab = pts[bi + 1] - sa;
+                var c = sa + sab * bu;
+                float cos = Vector2.Dot(sab.normalized, dir);
+                if (Mathf.Abs(cos) < 0.5f) continue; // crossing below or above
+                float h = r.deck != null ? r.deck.HeightAt(r.deck.along[bi] + bu * (r.deck.along[bi + 1] - r.deck.along[bi])) : t.Height(c.x, c.y) + r.y;
+                if (Mathf.Abs(h - surface) > 1.5f) continue; // the road below or a ramp further up
+                float lat = Vector2.Dot(c - m, n);
+                if (cos > 0f || lat < 1f)
+                {
+                    // Same direction: open only where the other deck's road carries on beyond the parapet line (else a car
+                    // slides off between the two slabs).
+                    var beyond = q + n * 2.5f;
+                    float db = float.MaxValue;
+                    for (int i = 0; i < pts.Count - 1; i++)
+                    {
+                        Vector2 a = pts[i], ab = pts[i + 1] - a;
+                        if (ab.sqrMagnitude < 1e-4f) continue;
+                        db = Mathf.Min(db, Vector2.Distance(beyond, a + ab * Mathf.Clamp01(Vector2.Dot(beyond - a, ab) / ab.sqrMagnitude)));
+                    }
+                    if (db <= r.hw) { edge = 0f; openedBy = r.way.id; }
+                }
+                else if (lat * 0.5f < edge) { edge = Mathf.Max(lat * 0.5f, 0.6f); openedBy = -r.way.id; }
+            }
+            return edge;
+        }
+
+        static void BuildDeck(MeshSink sink, TerrainField t, Deck d, PropPlacer.Clearance below, List<Side> roads)
         {
             var pts = d.pts;
             float hw = d.width * 0.5f, ow = hw + Edge;
@@ -376,30 +568,43 @@ namespace LeGamez.Editor.OsmImport
                 if (dir.sqrMagnitude < 1e-4f) continue;
                 dir.Normalize();
                 var n = new Vector2(-dir.y, dir.x); // left
-                // Straight segments in one piece; where the deck eases onto the road, pieces of ≤ 2 m.
+                // Pieces of ≤ 6 m (the parapets follow the roads alongside); where the deck eases onto the road ≤ 2 m.
                 float sa = d.along[i], sb = d.along[i + 1];
-                int pieces = d.Ramped(sa, sb) ? Mathf.Max(1, Mathf.CeilToInt((sb - sa) / 2f)) : 1;
+                int pieces = Mathf.Max(1, Mathf.CeilToInt((sb - sa) / (d.Ramped(sa, sb) ? 2f : 6f)));
                 for (int j = 0; j < pieces; j++)
                 {
                     Vector2 a = Vector2.Lerp(pts[i], pts[i + 1], (float)j / pieces), b = Vector2.Lerp(pts[i], pts[i + 1], (float)(j + 1) / pieces);
                     float ya = d.HeightAt(Mathf.Lerp(sa, sb, (float)j / pieces)), yb = d.HeightAt(Mathf.Lerp(sa, sb, (float)(j + 1) / pieces));
                     bool first = i == 0 && j == 0, last = i == pts.Count - 2 && j == pieces - 1;
                     var batch = sink.Get(WorldStyle.MatTerrain, (a + b) * 0.5f);
-                    // Road surface + kerb strips (slightly raised).
+                    // Road surface.
                     MeshSink.Quad(batch, P(a + n * hw, ya), P(b + n * hw, yb), P(b - n * hw, yb), P(a - n * hw, ya), road);
                     const float kerb = 0.15f;
-                    MeshSink.Quad(batch, P(a + n * ow, ya + kerb), P(b + n * ow, yb + kerb), P(b + n * hw, yb + kerb), P(a + n * hw, ya + kerb), Concrete);
-                    MeshSink.Quad(batch, P(a - n * hw, ya + kerb), P(b - n * hw, yb + kerb), P(b - n * ow, yb + kerb), P(a - n * ow, ya + kerb), Concrete);
-                    // Kerb faces towards the road.
-                    MeshSink.Quad(batch, P(a + n * hw, ya), P(a + n * hw, ya + kerb), P(b + n * hw, yb + kerb), P(b + n * hw, yb), ConcreteDark);
-                    MeshSink.Quad(batch, P(b - n * hw, yb), P(b - n * hw, yb + kerb), P(a - n * hw, ya + kerb), P(a - n * hw, ya), ConcreteDark);
-                    // Parapets (thin walls on the outer edge, both faces + top).
+                    var up = Vector3.up * Parapet;
+                    var low = Vector3.down * 0.4f;
+                    float[] edges = new float[2];
                     foreach (float side in new[] { 1f, -1f })
                     {
-                        var o = n * side * ow;
-                        var inner = n * side * (ow - 0.25f);
-                        Vector3 ao = P(a + o, ya + kerb), bo = P(b + o, yb + kerb), ai = P(a + inner, ya + kerb), bi = P(b + inner, yb + kerb);
-                        var up = Vector3.up * Parapet;
+                        openedBy = 0;
+                        float e = SideEdge(t, d, (a + b) * 0.5f, dir, side, (ya + yb) * 0.5f, roads);
+                        if (openedBy != 0 && logged.Add((d.way.id, side > 0f, openedBy)))
+                            Debug.Log($"[OSM] bridge {d.way.id}: parapet {(side > 0f ? "left" : "right")} {(openedBy > 0 ? "open towards" : "in the median with")} bridge {System.Math.Abs(openedBy)} at {(a + b) * 0.5f}");
+                        edges[side > 0f ? 0 : 1] = e;
+                        if (e <= 0.3f) continue; // open towards a merging carriageway
+                        float inner = Mathf.Min(hw, e - 0.25f); // the kerb strip runs from the road edge (or the wall) out
+                        // Kerb strip (slightly raised) and its face towards the road.
+                        if (e > inner + 0.25f || inner < hw)
+                        {
+                            Vector2 k0 = n * side * inner, k1 = n * side * e;
+                            if (side > 0f) MeshSink.Quad(batch, P(a + k1, ya + kerb), P(b + k1, yb + kerb), P(b + k0, yb + kerb), P(a + k0, ya + kerb), Concrete);
+                            else MeshSink.Quad(batch, P(a + k0, ya + kerb), P(b + k0, yb + kerb), P(b + k1, yb + kerb), P(a + k1, ya + kerb), Concrete);
+                            if (side > 0f) MeshSink.Quad(batch, P(a + k0, ya), P(a + k0, ya + kerb), P(b + k0, yb + kerb), P(b + k0, yb), ConcreteDark);
+                            else MeshSink.Quad(batch, P(b + k0, yb), P(b + k0, yb + kerb), P(a + k0, ya + kerb), P(a + k0, ya), ConcreteDark);
+                        }
+                        // Parapet (thin wall at the edge, both faces + top).
+                        var o = n * side * e;
+                        var ii = n * side * (e - 0.25f);
+                        Vector3 ao = P(a + o, ya + kerb), bo = P(b + o, yb + kerb), ai = P(a + ii, ya + kerb), bi = P(b + ii, yb + kerb);
                         if (side > 0)
                         {
                             MeshSink.Quad(batch, bo, bo + up, ao + up, ao, Concrete);          // outside (left)
@@ -413,7 +618,6 @@ namespace LeGamez.Editor.OsmImport
                             MeshSink.Quad(batch, ai + up, bi + up, bo + up, ao + up, ConcreteDark);
                         }
                         // Closed ends at both ends of the deck (a car sliding along the guard rail must not slip into the wall).
-                        var low = Vector3.down * 0.4f;
                         if (first)
                         {
                             MeshSink.Quad(batch, ai + low, ai + up, ao + up, ao + low, Concrete);
@@ -425,9 +629,10 @@ namespace LeGamez.Editor.OsmImport
                             MeshSink.Quad(batch, bo + low, bo + up, bi + up, bi + low, Concrete);
                         }
                     }
+                    float lw = Mathf.Max(edges[0], hw), rw = Mathf.Max(edges[1], hw);
                     // Slab: outer faces down to the underside, and the underside itself (seen from the road below).
                     var down = Vector3.down * Slab;
-                    Vector3 la = P(a + n * ow, ya + kerb), lb = P(b + n * ow, yb + kerb), ra = P(a - n * ow, ya + kerb), rb = P(b - n * ow, yb + kerb);
+                    Vector3 la = P(a + n * lw, ya + kerb), lb = P(b + n * lw, yb + kerb), ra = P(a - n * rw, ya + kerb), rb = P(b - n * rw, yb + kerb);
                     MeshSink.Quad(batch, lb + down, lb, la, la + down, ConcreteDark);
                     MeshSink.Quad(batch, ra + down, ra, rb, rb + down, ConcreteDark);
                     MeshSink.Quad(batch, la + down, ra + down, rb + down, lb + down, ConcreteDark);
@@ -447,6 +652,38 @@ namespace LeGamez.Editor.OsmImport
             }
             // Markings on the deck: MarkingBuilder (same lines as on the road, at deck height).
             Pillars(sink, t, d, below, ow);
+            if (!shared.Contains((d, true))) EndWedge(sink, t, d, true);
+            if (!shared.Contains((d, false))) EndWedge(sink, t, d, false);
+        }
+
+        const float WedgeLength = 2f;
+
+        /// <summary>
+        /// The approach's collider is the terrain (the draped ribbon sits its layer offset above it, drawn only), the deck's
+        /// is its road surface: without help the car meets a step of that offset (10 cm) at every free deck end. An
+        /// invisible ramp (<see cref="WorldStyle.MatBlockers"/>, collision only) runs from the ground 2 m out up to the deck
+        /// surface at the joint.
+        /// </summary>
+        static void EndWedge(MeshSink sink, TerrainField t, Deck d, bool start)
+        {
+            var pts = d.pts;
+            Vector2 e = start ? pts[0] : pts[pts.Count - 1];
+            Vector2 o = start ? (pts[0] - pts[1]).normalized : (pts[pts.Count - 1] - pts[pts.Count - 2]).normalized;
+            var n = new Vector2(-o.y, o.x);
+            float hw = d.width * 0.5f, top = d.HeightAt(start ? 0f : d.Length);
+            const int across = 4;
+            var batch = sink.Get(WorldStyle.MatBlockers, e);
+            for (int k = 0; k < across; k++)
+            {
+                Vector2 a0 = e + n * Mathf.Lerp(-hw, hw, (float)k / across), a1 = e + n * Mathf.Lerp(-hw, hw, (float)(k + 1) / across);
+                Vector2 b0 = a0 + o * WedgeLength, b1 = a1 + o * WedgeLength;
+                // Vertices relative to the ground (the bucket is lifted): at the joint up to the deck, outside just under it.
+                Vector3 A0 = new Vector3(a0.x, top - t.Height(a0.x, a0.y), a0.y), A1 = new Vector3(a1.x, top - t.Height(a1.x, a1.y), a1.y);
+                Vector3 B0 = new Vector3(b0.x, -0.02f, b0.y), B1 = new Vector3(b1.x, -0.02f, b1.y);
+                // Facing up (colliders are one-sided for queries).
+                if (Vector3.Cross(B0 - A0, B1 - A0).y > 0f) MeshSink.Quad(batch, A0, B0, B1, A1, Concrete);
+                else MeshSink.Quad(batch, A0, A1, B1, B0, Concrete);
+            }
         }
 
         /// <summary>A marking line on the deck at <paramref name="offset"/> (left of the way's direction), dashed when gap &gt; 0.</summary>
@@ -502,6 +739,29 @@ namespace LeGamez.Editor.OsmImport
                         new Vector3(0.9f, h, 0.9f), Mathf.Atan2(dir.x, dir.y) * Mathf.Rad2Deg, Concrete);
                 }
             }
+        }
+
+        /// <summary>The deck whose built end lies at <paramref name="end"/>: its surface abeam of <paramref name="q"/> (projected
+        /// onto its centre line, also beside it) – the abutment under and beside a deck end never rises above it.</summary>
+        public static bool SurfaceAbeam(Vector2 end, Vector2 q, out float surface)
+        {
+            surface = 0f;
+            foreach (var d in decks.Values)
+            {
+                var pts = d.pts;
+                if ((pts[0] - end).sqrMagnitude > 0.25f && (pts[pts.Count - 1] - end).sqrMagnitude > 0.25f) continue;
+                float best = float.MaxValue;
+                for (int i = 0; i < pts.Count - 1; i++)
+                {
+                    Vector2 a = pts[i], ab = pts[i + 1] - a;
+                    if (ab.sqrMagnitude < 1e-4f) continue;
+                    float tt = Mathf.Clamp01(Vector2.Dot(q - a, ab) / ab.sqrMagnitude);
+                    float dd = (a + ab * tt - q).sqrMagnitude;
+                    if (dd < best) { best = dd; surface = d.HeightAt(d.along[i] + tt * (d.along[i + 1] - d.along[i])); }
+                }
+                return best < float.MaxValue;
+            }
+            return false;
         }
 
         /// <summary>Highest deck surface above the point (deck incl. kerbs/parapets + margin); false if there is none.</summary>
