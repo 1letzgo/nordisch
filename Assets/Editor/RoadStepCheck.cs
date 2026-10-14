@@ -36,11 +36,9 @@ namespace LeGamez.Editor
             bool visual = System.Array.IndexOf(args, "-visual") >= 0;
             string outPath = Arg("-out", Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Builds", "RoadSteps", id + ".csv")));
 
-            // Decks/terrain as imported (for the cause guess).
-            var field = OsmAreaImporter.PrepareTerrain(id);
-            string dataDir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Data"));
-            var data = OsmData.Load(Path.Combine(dataDir, id + ".osm.json"));
-            AreaMask.Load(dataDir, id)?.Filter(data);
+            // Decks/terrain as imported (for the cause guess) – and the very way objects the decks were prepared from.
+            var field = OsmAreaImporter.PrepareTerrain(id, out var data);
+            bool fresh = System.Array.IndexOf(args, "-fresh") >= 0;
 
             var ways = new List<(OsmWay w, float hw, float y)>();
             foreach (var w in data.ways)
@@ -72,7 +70,7 @@ namespace LeGamez.Editor
                 if (t == null) continue;
                 foreach (var part in t.parts)
                 {
-                    bool phys = part.group == WorldStyle.MatTerrain || part.group == WorldStyle.MatBlockers; // what the car drives on
+                    bool phys = part.group == WorldStyle.MatTerrain || part.group == WorldStyle.MatBlockers && !fresh; // what the car drives on
                     bool vis = visual && part.group == WorldStyle.MatGround;
                     if (!phys && !vis || part.mesh == null) continue;
                     if (!part.mesh.isReadable) { unreadable++; continue; }
@@ -80,6 +78,33 @@ namespace LeGamez.Editor
                     go.AddComponent<MeshCollider>().sharedMesh = part.mesh;
                     parts++;
                 }
+            }
+            // Rails from the current code: map ends (MotorwayBuilder.DeadEnds) for telling barriers from walls in lanes.
+            var rails = new MeshSink();
+            MotorwayBuilder.DebugAt.Clear();
+            string dbg = Arg("-railDebug", null);
+            if (dbg != null)
+                foreach (var spec in dbg.Split(';'))
+                {
+                    var xz = System.Array.ConvertAll(spec.Split(','), v => float.Parse(v, CultureInfo.InvariantCulture));
+                    MotorwayBuilder.DebugAt.Add(new Vector2(xz[0], xz[1]));
+                }
+            MotorwayBuilder.Build(data, rails, data.meta.bounds, field);
+            if (fresh)
+            {
+                // Collision walls built anew from the current code (no re-import needed): rails/barriers and deck walls
+                // wedges in separate colliders, so a wall in a lane names its builder.
+                var decks = new MeshSink();
+                BridgeBuilder.Build(data, decks, field);
+                foreach (var (sink, name) in new[] { (rails, "rail"), (decks, "deck") })
+                    foreach (var kv in sink.Batches)
+                    {
+                        if (kv.Key.mat != WorldStyle.MatBlockers || kv.Value.vertices.Count == 0) continue;
+                        TerrainDrape.Lift(kv.Value, field);
+                        var go = new GameObject(WorldStyle.MatBlockers + " " + name) { layer = PhysLayer };
+                        go.AddComponent<MeshCollider>().sharedMesh = MeshSink.ToMesh(kv.Value, name, false);
+                        parts++;
+                    }
             }
             Physics.SyncTransforms();
             Debug.Log($"[Steps] {ways.Count} ways, {keys.Count} tiles, {parts} collider meshes ({unreadable} unreadable skipped)");
@@ -117,6 +142,8 @@ namespace LeGamez.Editor
                 }
                 return;
             }
+            string walkAt = Arg("-walkAt", null);
+            if (walkAt != null) { var xz = System.Array.ConvertAll(walkAt.Split(','), v => float.Parse(v, CultureInfo.InvariantCulture)); TraceAt = new Vector2(xz[0], xz[1]); }
             var found = new List<Hit>();
             int lines = 0; double metres = 0;
             foreach (var (w, hw, y) in ways)
@@ -145,13 +172,14 @@ namespace LeGamez.Editor
                 else { var s = spots[at]; s.n++; s.ways.Add(h.way); s.phys |= !h.visual; s.vis |= h.visual; spots[at] = s; }
             }
             var csv = new StringBuilder("x,z,jump,kind,surface,way,highway,offset,cause,count\n");
-            int holes = 0, physSpots = 0, walls = 0;
+            int holes = 0, physSpots = 0, walls = 0, ends = 0;
             foreach (var s in spots)
             {
                 var h = s.top;
-                string cause = Cause(h.p, field);
+                string cause = Cause(h.p, field) + (h.wall ? " " + h.what : "");
                 if (h.hole) holes++;
                 if (h.wall) walls++;
+                if (h.wall && h.what == "map-end") ends++;
                 if (s.phys) physSpots++;
                 csv.Append(F(h.p.x)).Append(',').Append(F(h.p.y)).Append(',').Append(F(h.jump)).Append(',').Append(h.wall ? "wall" : h.hole ? "hole" : h.drop ? "drop" : "step").Append(',')
                    .Append(s.phys && s.vis ? "both" : s.phys ? "collider" : "ribbon").Append(',').Append(h.way).Append(',').Append(h.highway).Append(',')
@@ -159,7 +187,7 @@ namespace LeGamez.Editor
             }
             Directory.CreateDirectory(Path.GetDirectoryName(outPath));
             File.WriteAllText(outPath, csv.ToString());
-            Debug.Log($"[Steps] {lines} lines, {metres / 1000.0:F1} km walked: {found.Count} steps > {minStep * 100f:0} cm, {spots.Count - walls} surface spots ({physSpots - walls} in the collider surface, {holes} holes), {walls} collision walls standing in a lane → {outPath}");
+            Debug.Log($"[Steps] {lines} lines, {metres / 1000.0:F1} km walked: {found.Count} steps > {minStep * 100f:0} cm, {spots.Count - walls} surface spots ({physSpots - walls} in the collider surface, {holes} holes), {walls - ends} collision walls standing in a lane (+ {ends} map-end barriers) → {outPath}");
             int shown = 0;
             var views = new StringBuilder();
             for (int i = 0; i < Mathf.Min(spots.Count, 24); i++)
@@ -174,12 +202,12 @@ namespace LeGamez.Editor
             {
                 if (shown++ >= 40) break;
                 var h = s.top;
-                Debug.Log($"[Steps] ({h.p.x:F1}, {h.p.y:F1}) {(h.wall ? "WALL in lane" : h.hole ? "HOLE" : h.drop ? "drop" : "step")} {h.jump:F2} m {(s.phys ? "collider" : "ribbon")} way {h.way} {h.highway} off {h.offset:F1} ×{s.n} – {Cause(h.p, field)}");
+                Debug.Log($"[Steps] ({h.p.x:F1}, {h.p.y:F1}) {(h.wall ? "WALL in lane" : h.hole ? "HOLE" : h.drop ? "drop" : "step")} {h.jump:F2} m {(s.phys ? "collider" : "ribbon")} way {h.way} {h.highway} off {h.offset:F1} ×{s.n} – {Cause(h.p, field)}{(h.wall ? " " + h.what : "")}");
                 if (shown <= 12 && System.Array.IndexOf(args, "-detail") >= 0) Detail(h.p, field);
             }
         }
 
-        class Hit { public Vector2 p; public float jump; public bool hole, visual; public long way; public string highway; public float offset; public Vector2 dir; public bool drop, wall; }
+        class Hit { public Vector2 p; public float jump; public bool hole, visual; public long way; public string highway; public float offset; public Vector2 dir; public bool drop, wall; public string what; }
 
         static float Walk(OsmWay w, float off, TerrainField field, float y, int mask, bool visual, float minStep, List<Hit> found)
         {
@@ -208,7 +236,7 @@ namespace LeGamez.Editor
                 {
                     var p = Vector2.Lerp(a, b, s / len);
                     float? h = Surface(p, prev ?? (BridgeBuilder.Above(p, 0f, out float deck) ? deck : field.Height(p.x, p.y) + y), mask);
-                    if (wallHit && !inWall) found.Add(new Hit { p = p, jump = 0f, wall = true, visual = visual, way = w.id, highway = w.tags.Get("highway"), offset = off, dir = (b - a) / len });
+                    if (wallHit && !inWall) found.Add(new Hit { p = p, jump = 0f, wall = true, what = WallWhat(p), visual = visual, way = w.id, highway = w.tags.Get("highway"), offset = off, dir = (b - a) / len });
                     inWall = wallHit;
                     if (!h.HasValue)
                     {
@@ -241,6 +269,8 @@ namespace LeGamez.Editor
                     else inStep = false;
                     prev = h; prevP = p;
                     samples.Add((p, h.Value, (b - a) / len));
+                    if (TraceAt.HasValue && (p - TraceAt.Value).sqrMagnitude < 100f)
+                        Debug.Log($"[Walk] way {w.id} off {off:F1} ({p.x:F1}, {p.y:F1}) surface {h.Value:F2} field {field.Height(p.x, p.y) + y:F2} hits {(Surface(p, h.Value, mask).HasValue ? HitList() : "")}");
                 }
             }
             // Drops: the surface leaves its grade over a short stretch (a steep facet instead of a vertical face) – the
@@ -266,12 +296,31 @@ namespace LeGamez.Editor
         }
 
         static readonly RaycastHit[] hits = new RaycastHit[16];
+        static int hitCount;
+        static Vector2? TraceAt; // -walkAt x,z: every walk sample within 10 m is logged ("[Walk]")
+        static string HitList()
+        {
+            var sb = new StringBuilder();
+            for (int i = 0; i < hitCount; i++) sb.Append(hits[i].collider.name).Append('@').Append(hits[i].point.y.ToString("F2", CultureInfo.InvariantCulture)).Append(' ');
+            return sb.ToString();
+        }
         static bool wallHit;
+        static string wallName;
+
+        /// <summary>What the wall is: its collider (fresh: rail/wedge) and "map-end" next to a closure of the last
+        /// MotorwayBuilder run (a barrier there is meant to be in the lane).</summary>
+        static string WallWhat(Vector2 p)
+        {
+            foreach (var d in MotorwayBuilder.DeadEnds)
+                if ((d.point - p).sqrMagnitude < (d.half + 6f) * (d.half + 6f)) return "map-end";
+            return wallName;
+        }
 
         /// <summary>Top surface at p from 3 m below to 1.5 m above <paramref name="near"/>.</summary>
         static float? Surface(Vector2 p, float near, int mask)
         {
             int n = Physics.RaycastNonAlloc(new Vector3(p.x, near + 3f, p.y), Vector3.down, hits, 6f, mask);
+            hitCount = n;
             // The top surface (what the car rides on), unless it is far above (a wall, the deck seen from below).
             float? best = null;
             wallHit = false;
@@ -280,7 +329,7 @@ namespace LeGamez.Editor
                 float y = hits[i].point.y;
                 if (y > near + 1.5f) continue;
                 // Collision-only walls (guard rail walls, barriers) are no surface – but one standing in a lane is reported.
-                if (y > near + 0.3f && hits[i].collider.name.StartsWith(WorldStyle.MatBlockers)) { wallHit = true; continue; }
+                if (y > near + 0.3f && hits[i].collider.name.StartsWith(WorldStyle.MatBlockers)) { wallHit = true; wallName = hits[i].collider.name; continue; }
                 if (!best.HasValue || y > best.Value) best = y;
             }
             return best;

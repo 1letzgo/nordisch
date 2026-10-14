@@ -75,9 +75,13 @@ namespace LeGamez.Editor.OsmImport
         /// The final height field of an area as the importer builds it (coast, coarse terrain, bridge pits, road profiles),
         /// without building anything else – for checks and snapshot cameras. Logs the road roughness like an import.
         /// </summary>
-        public static TerrainField PrepareTerrain(string id)
+        public static TerrainField PrepareTerrain(string id) => PrepareTerrain(id, out _);
+
+        /// <summary>As <see cref="PrepareTerrain(string)"/>, also handing out the (mask-filtered) OSM data the bridge decks
+        /// were prepared from (<see cref="BridgeBuilder.IsDeck"/> knows these way objects only).</summary>
+        public static TerrainField PrepareTerrain(string id, out OsmData data)
         {
-            var data = OsmData.Load(Path.Combine(DataDir, id + ".osm.json"));
+            data = OsmData.Load(Path.Combine(DataDir, id + ".osm.json"));
             var area = data.meta.bounds;
             AreaMask.Load(DataDir, id)?.Filter(data);
             var terrain = TerrainField.Load(Path.Combine(DataDir, id + ".dgm.bin"));
@@ -309,7 +313,7 @@ namespace LeGamez.Editor.OsmImport
             if (preview) AreaPreview.Open(d);
             ImportProfile.Mark("save/preview");
 
-            Debug.Log($"[OSM] {meta.name}: motorway {motorway.carriageways} carriageway pieces/{motorway.ramps} ramps/{motorway.railKm:F1} km guard rail/{motorway.deadEnds} dead-end barriers/{traffic.motorway} exit signs, {bridges} bridge decks");
+            Debug.Log($"[OSM] {meta.name}: motorway {motorway.carriageways} carriageway pieces/{motorway.ramps} ramps/{motorway.railKm:F1} km guard rail/{motorway.deadEnds} dead-end barriers/{motorway.restAreas} rest-area access rails/{traffic.motorway} exit signs, {bridges} bridge decks");
             Debug.Log($"[OSM] {meta.name}: {buildings} buildings (+{osmExtra} OSM-only), {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, gardens {gardens.plots} plots/{gardens.measured} measured hedges/{gardens.hedges} hedges/{gardens.fences} fences/{gardens.walls} walls/{gardens.drawn} drawn, terrain {(terrain.IsFlat ? "flat" : "DGM1")}, aerial {(aerial != null ? "DOP20" : "-")}, trees {(lidarTrees != null ? "LiDAR" : "OSM")}, " +
                       $"furniture {furniture.mapped} mapped/{furniture.benches} benches/{furniture.planters} planters/{furniture.seating} café tables/{furniture.fountains} fountains, {edits} hand-placed/{EditsPlacer.ChangedCount} edited, " +
                       $"facade {FacadeRecords.Windows} windows/{FacadeRecords.Doors} doors/{FacadeRecords.Gutters} gutters/{FacadeRecords.Verges} verges/{FacadeRecords.Ridges} ridges, traffic {traffic.junctionSignals} signal junctions/{traffic.crossingSignals} signal crossings/{traffic.heads} heads/{traffic.zebras} zebras/{traffic.lanes} lanes/{traffic.stops} stop/{traffic.giveWays} give way/{traffic.priority} priority/{traffic.speed} speed/{traffic.oneway} one-way/{traffic.names} names/{traffic.mapped} mapped, {pois.Count} POIs, " +
