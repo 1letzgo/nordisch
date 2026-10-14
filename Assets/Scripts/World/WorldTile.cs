@@ -10,6 +10,9 @@ namespace LeGamez.World
     public class WorldTile : ScriptableObject
     {
         public const byte FlagCollider = 1, FlagShadows = 2;
+        /// <summary>Collision only (closed guard-rail walls, barriers): a MeshCollider without renderer. Apps before map
+        /// format 8 don't know the flag and would draw the part.</summary>
+        public const byte FlagNoRender = 4;
         /// <summary>Material indices (GameMaterials.worldMaterials), same order as the importer's material names.</summary>
         public const int MaterialBuildings = 0, MaterialGround = 1, MaterialWater = 2, MaterialTrees = 3;
         public static readonly string[] MaterialNames = { "Buildings", "Ground", "Water", "Trees" };

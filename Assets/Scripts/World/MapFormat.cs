@@ -25,6 +25,8 @@ namespace LeGamez.World
     /// Optional instance section after the parts ("INS1", int count, then column-wise: proto bytes, positions (3 floats),
     /// yaw (ushort, 360° = 65536), scale (3 ushorts, 1/1000), colours (RGBA32)) – trees, bushes and lamps drawn from the
     /// app's prototype meshes (<see cref="InstancePrototypes"/>). Tiles without it simply have no instances.
+    /// Part flags: 1 = collider, 2 = casts shadows, 4 = collider only, not drawn (<see cref="WorldTile.FlagNoRender"/>,
+    /// format 8 – older apps would draw such parts).
     /// (Format 5 had one file per region with the same tile blobs, without instances; formats 1–4 were AssetBundles.)
     /// </summary>
     public static class MapFormat

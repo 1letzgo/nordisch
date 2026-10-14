@@ -89,6 +89,36 @@ namespace LeGamez.Editor.OsmImport
                     count++;
                 }
             }
+            count += MapEndSigns(motorways, endsAt);
+            return count;
+        }
+
+        /// <summary>Where the motorway leaves the map (<see cref="MotorwayBuilder.DeadEnds"/>, closed by a barrier): a yellow
+        /// "Ende des Kartenbereichs" board above the barrier and, for the traffic, an advance board 400 m before.</summary>
+        static int MapEndSigns(List<Road> motorways, Dictionary<Vector2Int, Road> endsAt)
+        {
+            int count = 0;
+            void Panel(Plate s, string last)
+            {
+                s.Rect(0f, 0f, 3.4f, 1.5f, Black);
+                s.Rect(0f, 0f, 3.3f, 1.4f, Yellow);
+                s.Text("Ende des", last != null ? 0.38f : 0.25f, 0.3f, Black);
+                s.Text("Kartenbereichs", last != null ? 0.02f : -0.2f, 0.3f, Black);
+                if (last != null) s.Text(last, -0.42f, 0.26f, Black);
+            }
+            foreach (var d in MotorwayBuilder.DeadEnds)
+            {
+                var pos = d.point - d.dir * 1.6f; // just behind the barrier
+                if (!bounds.Contains(pos, 2f)) continue;
+                Board(pos, -d.dir, 3.4f, 1.5f, s => Panel(s, null));
+                count++;
+                if (d.entry || !endsAt.TryGetValue(Key(d.point), out var road) || road.oneway == -1) continue;
+                if (!BackAlong(road, road.way.points.Count - 1, 400f, endsAt, out var q, out var tan)) continue;
+                var at = q + Right(tan) * (road.Hw + 3.2f);
+                if (!bounds.Contains(at, 3f) || carriageways.IsBlocked(at, 1.6f)) continue;
+                Board(at, -tan, 3.4f, 1.5f, s => Panel(s, "400 m"));
+                count++;
+            }
             return count;
         }
 

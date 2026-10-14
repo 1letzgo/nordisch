@@ -15,13 +15,22 @@ namespace LeGamez.Editor.OsmImport
         public const string MatProps = "Props";             // lamps, hedges, walls, fences – MeshCollider
         public const string MatTerrain = "Terrain";         // faceted height field – MeshCollider, Ground material
         public const string MatDetails = "Details";         // window sills: Trees material (no facade data), no shadow/collider, culled near
+        public const string MatRails = "Rails";             // guard rail beams + posts: Trees material, no collider (MatBlockers holds the car)
+        public const string MatBlockers = "Blockers";       // collision only, never drawn (WorldTile.FlagNoRender): closed rail walls, barriers
 
         /// <summary>Which buckets get a MeshCollider.</summary>
-        public static bool HasCollider(string mat) => mat == MatBuildings || mat == MatTreeTrunks || mat == MatProps || mat == MatTerrain;
+        public static bool HasCollider(string mat) => mat == MatBuildings || mat == MatTreeTrunks || mat == MatProps || mat == MatTerrain || mat == MatBlockers;
+
+        /// <summary>Buckets that are drawn (all but the invisible colliders).</summary>
+        public static bool Renders(string mat) => mat != MatBlockers;
+
+        /// <summary>Buckets whose vertices are relative to the ground and get lifted onto the terrain (not draped).</summary>
+        public static bool Lifted(string mat) =>
+            mat == MatTrees || mat == MatTreeTrunks || mat == MatProps || mat == MatRails || mat == MatBlockers;
 
         /// <summary>Buckets that share another bucket's material.</summary>
         public static string MaterialOf(string mat) =>
-            mat == MatTreeTrunks ? MatTrees : (mat == MatProps || mat == MatTerrain) ? MatGround : mat == MatDetails ? MatTrees : mat;
+            mat == MatTreeTrunks || mat == MatRails ? MatTrees : (mat == MatProps || mat == MatTerrain || mat == MatBlockers) ? MatGround : mat == MatDetails ? MatTrees : mat;
 
         /// <summary>Render layer of <see cref="MatDetails"/>; the game camera culls it beyond a short distance.</summary>
         public const int DetailsLayer = 8;

@@ -69,7 +69,7 @@ namespace LeGamez.Editor
                 if (t == null) continue;
                 foreach (var part in t.parts)
                 {
-                    if ((part.flags & WorldTile.FlagCollider) == 0 || fresh && part.group == WorldStyle.MatProps) continue;
+                    if ((part.flags & WorldTile.FlagCollider) == 0 || fresh && (part.group == WorldStyle.MatProps || part.group == WorldStyle.MatBlockers)) continue;
                     var go = new GameObject(part.group) { layer = part.layer };
                     go.AddComponent<MeshCollider>().sharedMesh = part.mesh;
                     parts++;
@@ -84,9 +84,9 @@ namespace LeGamez.Editor
                 BridgeBuilder.Build(data, sink, terrain); // decks again (on top of the tiles' ones): changes to them count too
                 foreach (var kv in sink.Batches)
                 {
-                    if (kv.Key.mat != WorldStyle.MatProps && kv.Key.mat != WorldStyle.MatTerrain || kv.Value.vertices.Count == 0) continue;
-                    if (kv.Key.mat == WorldStyle.MatProps) TerrainDrape.Lift(kv.Value, terrain);
-                    var go = new GameObject("Rails") { layer = 2 };
+                    if (!WorldStyle.HasCollider(kv.Key.mat) || kv.Value.vertices.Count == 0) continue;
+                    if (WorldStyle.Lifted(kv.Key.mat)) TerrainDrape.Lift(kv.Value, terrain);
+                    var go = new GameObject("Fresh" + kv.Key.mat) { layer = 2 };
                     go.AddComponent<MeshCollider>().sharedMesh = MeshSink.ToMesh(kv.Value, "rails", false);
                     parts++;
                 }

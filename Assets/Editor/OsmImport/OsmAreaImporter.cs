@@ -174,7 +174,7 @@ namespace LeGamez.Editor.OsmImport
             {
                 string m = kv.Key.mat;
                 if (m == WorldStyle.MatGround || m == WorldStyle.MatWater) TerrainDrape.Drape(kv.Value, terrain);
-                else if (m == WorldStyle.MatTrees || m == WorldStyle.MatTreeTrunks || m == WorldStyle.MatProps) TerrainDrape.Lift(kv.Value, terrain);
+                else if (WorldStyle.Lifted(m)) TerrainDrape.Lift(kv.Value, terrain);
             }
             TerrainDrape.Lift(sink.instances, terrain); // instanced trees, bushes, lamps
             CoastBuilder.BuildSea(sink, area); // level sea surface, not draped
@@ -283,7 +283,7 @@ namespace LeGamez.Editor.OsmImport
                     var tile = TileAt(key);
 
                     string style = WorldStyle.MaterialOf(mat);
-                    bool facadeData = style == WorldStyle.MatBuildings || style == WorldStyle.MatGround;
+                    bool facadeData = (style == WorldStyle.MatBuildings || style == WorldStyle.MatGround) && WorldStyle.Renders(mat);
                     var mesh = MeshSink.ToMesh(kv.Value, $"{id}_{mat}_{chunk.x}_{chunk.y}", facadeData);
                     MeshUtility.Optimize(mesh);
                     Release(kv.Value); // large areas: the geometry now lives in the mesh only
@@ -297,16 +297,17 @@ namespace LeGamez.Editor.OsmImport
                     }
 
                     int mi = System.Array.IndexOf(WorldTile.MaterialNames, style); // = GameMaterials.worldMaterials index
-                    bool casts = mat != WorldStyle.MatGround && mat != WorldStyle.MatWater && mat != WorldStyle.MatDetails;
+                    bool casts = mat != WorldStyle.MatGround && mat != WorldStyle.MatWater && mat != WorldStyle.MatDetails && WorldStyle.Renders(mat);
                     // Thin props (lamps, trunks, fences) block the player but not the camera probe; water sits on
                     // the built-in "Water" layer so placement can detect it, the player walks through.
-                    int layer = mat == WorldStyle.MatProps || mat == WorldStyle.MatTreeTrunks ? 2
+                    int layer = mat == WorldStyle.MatProps || mat == WorldStyle.MatTreeTrunks || mat == WorldStyle.MatBlockers ? 2
                               : mat == WorldStyle.MatDetails ? WorldStyle.DetailsLayer
                               : mat == WorldStyle.MatWater ? 4 : 0;
                     tile.parts.Add(new WorldTile.Part
                     {
                         mesh = mesh, material = mi, layer = layer, group = mat,
-                        flags = (byte)((collider ? WorldTile.FlagCollider : 0) | (casts ? WorldTile.FlagShadows : 0)),
+                        flags = (byte)((collider ? WorldTile.FlagCollider : 0) | (casts ? WorldTile.FlagShadows : 0) |
+                                       (WorldStyle.Renders(mat) ? 0 : WorldTile.FlagNoRender)),
                     });
                 }
                 // Instanced trees/bushes/lamps go to the tile under their origin (crowns may overhang its edge a bit –

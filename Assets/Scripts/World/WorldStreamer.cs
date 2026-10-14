@@ -268,6 +268,11 @@ namespace LeGamez.World
                 // Name starts with the group: Placement recognises walkable ground by "Terrain…".
                 var go = new GameObject($"{part.group}_{i}") { hideFlags = hide, layer = part.layer };
                 go.transform.SetParent(root.transform, false);
+                if ((part.flags & WorldTile.FlagNoRender) != 0)
+                {
+                    go.AddComponent<MeshCollider>().sharedMesh = part.mesh; // invisible wall (guard rails, barriers)
+                    continue;
+                }
                 go.AddComponent<MeshFilter>().sharedMesh = part.mesh;
                 var mr = go.AddComponent<MeshRenderer>();
                 mr.sharedMaterial = part.material >= 0 && part.material < materials.Count ? materials[part.material] : null;
