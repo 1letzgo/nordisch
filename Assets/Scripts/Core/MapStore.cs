@@ -36,8 +36,9 @@ namespace LeGamez.Core
         /// PoiDatabase, StreetIndex …) or the package layout changes. Then re-publish all maps.
         /// 1 = scene bundle; 2 = scene + tiles bundle; 3 = AreaData + tiles bundle; 4 = AreaData + one bundle per 1 km region
         /// (all AssetBundles, per platform/engine); 5 = own MapFormat files, one per region; 6 = area.bin + one world pack
-        /// per area, entries fetched with HTTP Range requests; 7 = 6 + instanced trees/bushes/lamps in the tile blobs (INS1).</summary>
-        public const int Format = 7;
+        /// per area, entries fetched with HTTP Range requests; 7 = 6 + instanced trees/bushes/lamps in the tile blobs (INS1);
+        /// 8 = 7 + collider-only tile parts (WorldTile.FlagNoRender: invisible motorway barrier walls).</summary>
+        public const int Format = 8;
 
         public const string CatalogUrl = "https://github.com/1letzgo/nordisch/releases/download/maps/maps.json";
         /// <summary>Max. size of cached world pack entries on the device (area files don't count).</summary>

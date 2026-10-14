@@ -139,7 +139,7 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
 7. **Veröffentlichen**: `Tools/release/publish_maps.sh [<id> …]` – siehe „Karten-Downloads“.
 
 ### Karten-Downloads (App enthält keine Karten, lädt nie ganze Karten)
-- **Format 7** (= 6 + Instanzen in den Kacheln; `World/MapFormat`, dieselben Dateien für iOS und Android, unabhängig von der Unity-Version): je Gebiet
+- **Format 8** (= 6 + Instanzen in den Kacheln (7) + reine Kollisionsteile `WorldTile.FlagNoRender` (8); `World/MapFormat`, dieselben Dateien für iOS und Android, unabhängig von der Unity-Version): je Gebiet
   `area.bin` (AreaData-JSON + kleine Übersichtskarte + **Index des World-Packs**, ~0,2–1 MB) und `world.bin` (alle
   Einträge hintereinander: `t/<x>_<z>` = 200-m-Kachel (Deflate; Geometrie + Abschnitt „INS1“ mit Baum-/Busch-/Laternen-Instanzen), `f/<rx>_<rz>` = Fassaden-Records der 1-km-Region,
   `m/<rx>_<rz>` = Minimap-JPEG der Region). Die App holt **einzelne Einträge per HTTP-Range** (`Core/PackTileSource`,
