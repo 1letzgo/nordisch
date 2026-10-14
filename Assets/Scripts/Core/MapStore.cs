@@ -322,8 +322,9 @@ namespace LeGamez.Core
         public static string EntryPath(string id, string entry, ulong hash) =>
             Path.Combine(CacheDir(id), $"{entry.Replace('/', '_')}-{hash:x16}.bin");
 
-        /// <summary>URL of the area's world pack in the installed build (null for builds before format 6).</summary>
-        public static string PackUrl(Map m) => m?.installed?.File(PackFile)?.url;
+        /// <summary>URL of a pack file of the installed build: world.bin (null <paramref name="file"/>) or a chunk of a
+        /// chunked pack (World/MapFormat.ChunkFile); null for builds before format 6.</summary>
+        public static string PackUrl(Map m, string file = null) => m?.installed?.File(file ?? PackFile)?.url;
 
         internal static void TouchEntry(string id, string path) => usage[$"{id}/{Path.GetFileName(path)}"] = DateTime.UtcNow.Ticks;
 
@@ -385,7 +386,7 @@ namespace LeGamez.Core
             if (m.latest == null) return list;
             foreach (var f in m.latest.AllFiles)
             {
-                if (f.name == PackFile) continue; // never on the device as a whole
+                if (World.MapFormat.IsPackFile(f.name)) continue; // never on the device as a whole
                 bool area = string.IsNullOrEmpty(f.region);
                 FileEntry have = null;
                 if (m.info != null) foreach (var h in m.info.files) if (h.name == f.name) { have = h; break; }
@@ -586,7 +587,7 @@ namespace LeGamez.Core
             if (update) files.AddRange(ChangedFiles(m));
             else
                 foreach (var f in b.AllFiles)
-                    if (f.name != PackFile && string.IsNullOrEmpty(f.region)) files.Add(f);
+                    if (!World.MapFormat.IsPackFile(f.name) && string.IsNullOrEmpty(f.region)) files.Add(f);
             long total = 0, done = 0;
             foreach (var f in files) total += Math.Max(1, f.size);
 

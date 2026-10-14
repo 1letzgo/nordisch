@@ -47,3 +47,4 @@ mono_crash.*
 /Data/*.dop.png
 /Data/*.dgm.bin
 /Assets/Generated/*/regions~/
+/Assets/Generated/*/build~/

@@ -11,7 +11,8 @@ namespace LeGamez.Core
 {
     /// <summary>
     /// Tiles (and per-region facade records / minimap images) for the <see cref="WorldStreamer"/> on devices, fetched
-    /// entry by entry out of the area's world pack on GitHub with HTTP Range requests (format 6) – only what the streamer
+    /// entry by entry out of the area's world pack on GitHub with HTTP Range requests (format 6; from format 8 the pack is
+    /// split into chunk files, each entry knows its file – MapFormat.ChunkFile) – only what the streamer
     /// needs, plus tiles within <see cref="PrefetchRadius"/> in the background. Every entry is cached under its content
     /// hash (MapStore.EntryPath) and checked against it. Reading and decompressing run on a worker thread; only the mesh
     /// creation is on the main thread (the streamer spaces that out to one tile per frame).
@@ -26,7 +27,6 @@ namespace LeGamez.Core
 
         readonly MapStore.Map map;
         readonly Dictionary<string, MapFormat.PackEntry> pack;
-        readonly string url;
         readonly HashSet<Vector2Int> tiles = new HashSet<Vector2Int>();
         readonly Dictionary<string, float> failedAt = new Dictionary<string, float>();
         readonly HashSet<string> fetching = new HashSet<string>();
@@ -37,7 +37,6 @@ namespace LeGamez.Core
         {
             this.map = map;
             pack = area.pack ?? new Dictionary<string, MapFormat.PackEntry>();
-            url = MapStore.PackUrl(map);
             foreach (var k in area.tileKeys) tiles.Add(k);
             MapStore.PrepareCache(map.Id);
         }
@@ -63,6 +62,7 @@ namespace LeGamez.Core
                     yield break;
                 }
             }
+            string url = MapStore.PackUrl(map, e.file); // world.bin, or the entry's chunk of a chunked pack
             if (url == null || Failed(entry)) { done(null); yield break; }
 
             fetching.Add(entry);

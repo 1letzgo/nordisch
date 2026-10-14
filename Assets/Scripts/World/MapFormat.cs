@@ -26,6 +26,12 @@ namespace LeGamez.World
     /// yaw (ushort, 360° = 65536), scale (3 ushorts, 1/1000), colours (RGBA32)) – trees, bushes and lamps drawn from the
     /// app's prototype meshes (<see cref="InstancePrototypes"/>). Tiles without it simply have no instances.
     /// (Format 5 had one file per region with the same tile blobs, without instances; formats 1–4 were AssetBundles.)
+    ///
+    /// Chunked pack (from <see cref="ChunkedPackFormat"/>): instead of one world.bin the entries are spread over pack files
+    /// of <see cref="ChunkRegions"/>×<see cref="ChunkRegions"/> regions ("world-&lt;cx&gt;_&lt;cz&gt;.bin", <see cref="ChunkFile"/>),
+    /// so a change re-uploads only the chunks it touches – the others keep their content-addressed URL. The area file then
+    /// holds "pack2.idx" (deflate): int files, file names; int count, per entry [string name, ushort file, long offset,
+    /// int length, ulong hash]. Area files with "pack.idx" (format 6/7) still read: every entry is in world.bin.
     /// </summary>
     public static class MapFormat
     {
@@ -82,7 +88,12 @@ namespace LeGamez.World
                 w.Write(new[] { (byte)'N', (byte)'W', (byte)'A', (byte)'1' });
                 var entries = new List<(string, byte[])> { ("area.json", Deflate(System.Text.Encoding.UTF8.GetBytes(JsonUtility.ToJson(j)))) };
                 if (mapImage != null) entries.Add((IsJpeg(mapImage) ? "map.jpg" : "map.png", mapImage));
-                if (pack != null) entries.Add(("pack.idx", Deflate(WritePackIndex(pack))));
+                if (pack != null)
+                {
+                    bool chunked = false;
+                    foreach (var e in pack.Values) if (e.file != null) { chunked = true; break; }
+                    entries.Add(chunked ? ("pack2.idx", Deflate(WriteChunkedPackIndex(pack))) : ("pack.idx", Deflate(WritePackIndex(pack))));
+                }
                 w.Write(entries.Count);
                 foreach (var (name, bytes) in entries) { w.Write(name); w.Write(bytes.Length); w.Write(bytes); }
             }
@@ -117,7 +128,8 @@ namespace LeGamez.World
             d.streets = ScriptableObject.CreateInstance<StreetIndex>();
             d.streets.names = j.streetNames; d.streets.segments = j.streetSegments; d.streets.nameOf = j.streetNameOf;
             d.streets.fast = j.streetFast ?? new List<int>();
-            if (entries.TryGetValue("pack.idx", out var idx)) d.pack = ReadPackIndex(Inflate(idx));
+            if (entries.TryGetValue("pack2.idx", out var idx2)) d.pack = ReadChunkedPackIndex(Inflate(idx2));
+            else if (entries.TryGetValue("pack.idx", out var idx)) d.pack = ReadPackIndex(Inflate(idx));
             if (entries.TryGetValue("map.jpg", out var img) || entries.TryGetValue("map.png", out img))
             {
                 var tex = new Texture2D(2, 2, IsJpeg(img) ? TextureFormat.RGB24 : TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp };
@@ -143,7 +155,21 @@ namespace LeGamez.World
             public long offset;
             public int length;
             public ulong hash;
+            /// <summary>Pack file holding the entry (chunked packs); null = the single world pack (world.bin).</summary>
+            public string file;
         }
+
+        /// <summary>First MapStore.Format whose packs are chunked (pack2.idx); older formats get one world.bin.</summary>
+        public const int ChunkedPackFormat = 8;
+        /// <summary>Chunk edge in regions: 4 × 4 km per pack file.</summary>
+        public const int ChunkRegions = 4;
+
+        /// <summary>Pack file name of the chunk containing a region.</summary>
+        public static string ChunkFile(Vector2Int region) =>
+            $"world-{Mathf.FloorToInt(region.x / (float)ChunkRegions)}_{Mathf.FloorToInt(region.y / (float)ChunkRegions)}.bin";
+
+        /// <summary>A pack file (never downloaded as a whole): world.bin or a chunk.</summary>
+        public static bool IsPackFile(string name) => name == "world.bin" || (name != null && name.StartsWith("world-"));
 
         public static string TileEntry(Vector2Int k) => $"t/{k.x}_{k.y}";
         public static string FacadeEntry(Vector2Int r) => $"f/{r.x}_{r.y}";
@@ -177,8 +203,52 @@ namespace LeGamez.World
             return index;
         }
 
+        /// <summary>Index of a chunked pack: every entry names its pack file (see the class summary).</summary>
+        public static byte[] WriteChunkedPackIndex(Dictionary<string, PackEntry> index)
+        {
+            var files = new List<string>();
+            var fileIndex = new Dictionary<string, int>();
+            foreach (var e in index.Values)
+            {
+                string f = e.file ?? "world.bin";
+                if (!fileIndex.ContainsKey(f)) { fileIndex[f] = files.Count; files.Add(f); }
+            }
+            using var ms = new MemoryStream();
+            using (var w = new BinaryWriter(ms))
+            {
+                w.Write(files.Count);
+                foreach (var f in files) w.Write(f);
+                w.Write(index.Count);
+                foreach (var kv in index)
+                {
+                    w.Write(kv.Key); w.Write((ushort)fileIndex[kv.Value.file ?? "world.bin"]);
+                    w.Write(kv.Value.offset); w.Write(kv.Value.length); w.Write(kv.Value.hash);
+                }
+            }
+            return ms.ToArray();
+        }
+
+        public static Dictionary<string, PackEntry> ReadChunkedPackIndex(byte[] bytes)
+        {
+            using var r = new BinaryReader(new MemoryStream(bytes));
+            var files = new string[r.ReadInt32()];
+            for (int i = 0; i < files.Length; i++) files[i] = r.ReadString();
+            int n = r.ReadInt32();
+            var index = new Dictionary<string, PackEntry>(n);
+            for (int i = 0; i < n; i++)
+            {
+                string name = r.ReadString();
+                string file = files[r.ReadUInt16()];
+                index[name] = new PackEntry { file = file, offset = r.ReadInt64(), length = r.ReadInt32(), hash = r.ReadUInt64() };
+            }
+            return index;
+        }
+
         /// <summary>Tile geometry as stored in the pack (deflated tile blob).</summary>
         public static byte[] TileBlob(WorldTile t) => Deflate(EncodeTile(t));
+
+        /// <summary>Content hash of a tile (uncompressed blob) – the importer skips rewriting tiles whose hash is unchanged.</summary>
+        public static ulong TileHash(WorldTile t) => Hash64(EncodeTile(t));
 
         /// <summary>Thread-safe: region extras from pack entries (either may be null).</summary>
         public static RegionContent RegionContentFrom(Vector2Int region, byte[] facadeEntry, byte[] mapEntry) =>
