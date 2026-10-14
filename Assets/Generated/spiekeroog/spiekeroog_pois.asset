@@ -34,7 +34,7 @@ MonoBehaviour:
   - id: way/23007475
     name: Sankt Peter
     category: 2
-    position: {x: -557.39166, y: 16.037308, z: -103.2309}
+    position: {x: -557.39166, y: 16.036898, z: -103.2309}
     lat: 53.77206640888794
     lon: 7.68652752743958
   - id: node/867403534
@@ -46,7 +46,7 @@ MonoBehaviour:
   - id: node/6356149387
     name: Inselmuseum
     category: 1
-    position: {x: -73.30818, y: 7.6100206, z: -296.58157}
+    position: {x: -73.30818, y: 7.5284085, z: -296.58157}
     lat: 53.770317800084236
     lon: 7.69388569994832
   - id: node/11966298606
@@ -58,7 +58,7 @@ MonoBehaviour:
   - id: node/12050513930
     name: Historischer Rettungsschuppen
     category: 1
-    position: {x: -1524.0969, y: 7.672518, z: -1444.4171}
+    position: {x: -1524.0969, y: 7.674626, z: -1444.4171}
     lat: 53.75993709991266
     lon: 7.671833400581602
   - id: node/796187659
@@ -70,13 +70,13 @@ MonoBehaviour:
   - id: node/1842505445
     name: De Utkieker
     category: 4
-    position: {x: 307.28516, y: 18.317316, z: 412.60687}
+    position: {x: 307.28516, y: 18.3632, z: 412.60687}
     lat: 53.77673149992366
     lon: 7.699670800137949
   - id: node/2359302868
     name: Kleiner Utkieker
     category: 0
-    position: {x: -1534.531, y: 5.772952, z: -1594.5765}
+    position: {x: -1534.531, y: 5.772443, z: -1594.5765}
     lat: 53.75857910052919
     lon: 7.6716748003017
   - id: node/4634119884
@@ -106,30 +106,30 @@ MonoBehaviour:
   - id: node/12779869826
     name: Museumspferdebahn Station am Historischen Rettungsschuppen
     category: 0
-    position: {x: -1574.9647, y: 5.454591, z: -1424.0162}
+    position: {x: -1574.9647, y: 5.391283, z: -1424.0162}
     lat: 53.76012159969476
     lon: 7.6710601991679
   - id: node/2329941881
     name: Drinkeldodenkarkhof
     category: 3
-    position: {x: 358.12653, y: 6.8901725, z: -143.09381}
+    position: {x: 358.12653, y: 6.975472, z: -143.09381}
     lat: 53.77170590002139
     lon: 7.700443599837011
   - id: way/219044316
     name: "Dalbenspro\xDF 1,2 & 3"
     category: 5
-    position: {x: 16.423557, y: 7.9680142, z: -728.5345}
+    position: {x: 16.423557, y: 7.9682884, z: -728.5345}
     lat: 53.766411340054056
     lon: 7.69524964158553
   - id: node/13142485163
     name: Mut zum Wagnis
     category: 5
-    position: {x: 2016.6097, y: 6.947599, z: -516.071}
+    position: {x: 2016.6097, y: 7.0356736, z: -516.071}
     lat: 53.76833279989974
     lon: 7.725652899646652
   - id: node/11932591209
     name: Lautlos
     category: 5
-    position: {x: -371.06058, y: 17.344929, z: 520.98047}
+    position: {x: -371.06058, y: 17.316595, z: 520.98047}
     lat: 53.7777116000936
     lon: 7.689359799811929

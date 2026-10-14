@@ -175,6 +175,16 @@ namespace LeGamez.Editor.OsmImport
             return true;
         }
 
+        /// <summary>Any drawn road or path ribbon (highway=*, not area/tunnel): width and surface height.</summary>
+        public static bool RoadRibbon(Dictionary<string, string> t, out float width, out float y)
+        {
+            width = 0f; y = 0f;
+            if (t.Is("area", "yes") || t.Has("tunnel") && !t.Is("tunnel", "no") || t.Get("highway") == null) return false;
+            if (!TryLineStyle(t, out var s)) return false;
+            width = s.width; y = s.y;
+            return true;
+        }
+
         static bool TryLineStyle(Dictionary<string, string> t, out LineStyle s)
         {
             s = new LineStyle { mat = WorldStyle.MatGround, color = WorldStyle.Asphalt, y = WorldStyle.YRoadMinor };

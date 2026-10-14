@@ -41,6 +41,7 @@ namespace LeGamez.Editor.OsmImport
         public static void Build(MeshSink sink, AreaRect area, Color32 color, TerrainField t)
         {
             Blocks = Triangles = Trees = 0;
+            built = null;
             var mask = AreaMask.Current;
             if (mask == null) return;
             baseColor = color;
@@ -124,7 +125,25 @@ namespace LeGamez.Editor.OsmImport
             Blocks = blocks.Count + partial.Count;
             ForestTrees(sink);
             nodeClass = null;
+            built = fine;
             fine = null;
+        }
+
+        static bool[] built; // fine flags of the last Build (null: no mask, nothing coarse)
+
+        /// <summary>
+        /// The height sample at (x, z) belongs to a coarse block (inside or on its border): its mesh is already built, so
+        /// later edits of the field (<see cref="RoadProfile"/>) must leave it alone, or the detailed ground next to it cracks.
+        /// </summary>
+        public static bool Owns(float x, float z)
+        {
+            if (built == null) return false;
+            float size = Fine * TerrainField.CellSize;
+            float fx = (x - startX) / size, fz = (z - startZ) / size;
+            for (int bz = Mathf.FloorToInt(fz - 1e-3f); bz <= Mathf.FloorToInt(fz + 1e-3f); bz++)
+            for (int bx = Mathf.FloorToInt(fx - 1e-3f); bx <= Mathf.FloorToInt(fx + 1e-3f); bx++)
+                if (bx >= 0 && bz >= 0 && bx < nbx && bz < nbz && !built[bz * nbx + bx]) return true;
+            return false;
         }
 
         // ------------------------------------------------------------------ classes

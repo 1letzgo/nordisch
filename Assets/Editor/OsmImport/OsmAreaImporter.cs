@@ -71,6 +71,33 @@ namespace LeGamez.Editor.OsmImport
             Debug.Log($"[Import] {args[i + 1]} thumbnails/region maps: {sw.ElapsedMilliseconds} ms (rss {Process.GetCurrentProcess().WorkingSet64 >> 20} MB)");
         }
 
+        /// <summary>
+        /// The final height field of an area as the importer builds it (coast, coarse terrain, bridge pits, road profiles),
+        /// without building anything else – for checks and snapshot cameras. Logs the road roughness like an import.
+        /// </summary>
+        public static TerrainField PrepareTerrain(string id)
+        {
+            var data = OsmData.Load(Path.Combine(DataDir, id + ".osm.json"));
+            var area = data.meta.bounds;
+            AreaMask.Load(DataDir, id)?.Filter(data);
+            var terrain = TerrainField.Load(Path.Combine(DataDir, id + ".dgm.bin"));
+            var aerial = AerialImage.Load(DataDir, id);
+            CoastBuilder.Prepare(data, area, terrain, aerial);
+            CoarseTerrain.Build(new MeshSink(), area, WorldStyle.GroundColor(data.meta.ground), terrain);
+            BridgeBuilder.Prepare(data, area, terrain);
+            RoadProfile.Apply(data, area, terrain, id);
+            BridgeBuilder.EaseEnds(terrain);
+            return terrain;
+        }
+
+        /// <summary>Batch: -executeMethod LeGamez.Editor.OsmImport.OsmAreaImporter.RoadProfileBatch -area &lt;id&gt; (log only).</summary>
+        public static void RoadProfileBatch()
+        {
+            var args = System.Environment.GetCommandLineArgs();
+            int i = System.Array.IndexOf(args, "-area");
+            PrepareTerrain(i >= 0 && i + 1 < args.Length ? args[i + 1] : "westerstede");
+        }
+
         const string MenuScenePath = "Assets/Scenes/MainMenu.unity";
         public const string WorldScenePath = "Assets/Scenes/World.unity";
 
@@ -154,6 +181,9 @@ namespace LeGamez.Editor.OsmImport
             ImportProfile.Mark("coarse terrain");
             // Decks instead of draped ribbons where there is a gap below; fills the pits at bridge ends (before BuildBase).
             int bridges = BridgeBuilder.Prepare(data, area, terrain);
+            RoadProfile.Apply(data, area, terrain, meta.id); // smooth road surfaces, written into the field
+            BridgeBuilder.EaseEnds(terrain);
+            ImportProfile.Mark("bridges/road profiles");
             GroundBuilder.BuildBase(sink, area, WorldStyle.GroundColor(meta.ground), terrain);
             ImportProfile.Mark("ground base");
             int terrainTris = CoarseTerrain.TerrainTriangles(sink);

@@ -31,7 +31,7 @@ namespace LeGamez.Editor
             OsmImport.OsmAreaImporter.AddLighting(OsmImport.OsmAreaImporter.EnsureSkyMaterial());
             AreaLoader.Build(data, null, allTiles: false);
             var world = Object.FindAnyObjectByType<WorldStreamer>();
-            field = TerrainField.Load(Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Data", id + ".dgm.bin")));
+            field = OsmImport.OsmAreaImporter.PrepareTerrain(id); // as imported: road profiles, bridge pits, coarse terrain
             string outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Builds", "Snapshots"));
             Directory.CreateDirectory(outDir);
 
@@ -74,7 +74,7 @@ namespace LeGamez.Editor
 
         static TerrainField field;
 
-        /// <summary>DGM height (outside the mask the coarse mesh differs by a few dm – fine for a camera).</summary>
+        /// <summary>Ground height of the imported terrain field (bridge decks are not in it).</summary>
         static float GroundHeight(Vector3 p) => field.Height(p.x, p.z);
     }
 }

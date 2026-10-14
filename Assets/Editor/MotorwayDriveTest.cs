@@ -12,7 +12,7 @@ namespace LeGamez.Editor
     /// Guard rail check: a car-sized CharacterController (as VehicleManager sets it up) starts on every motorway
     /// carriageway every <c>-spacing</c> metres and "drives" straight ahead at 130 km/h, a few degrees off the lane,
     /// without steering. It must end against a rail or on another carriageway (ramp), never in the field.
-    /// Batch: -executeMethod LeGamez.Editor.MotorwayDriveTest.Run -area westerstede [-spacing 150]
+    /// Batch: -executeMethod LeGamez.Editor.MotorwayDriveTest.Run -area westerstede [-spacing 150] [-trace x,z[,every n frames]]
     /// Escapes are logged with position ("[DriveTest] ESCAPE …"); trees are not loaded (only rails may hold the car).
     /// -fresh: the tiles' props are skipped and the rails are built anew by MotorwayBuilder from the current code (no
     /// re-import needed to try a change; bridge decks still come from the tiles).
@@ -33,6 +33,7 @@ namespace LeGamez.Editor
             bool trace = tr != null;
             var traceAt = trace ? new Vector2(float.Parse(tr.Split(',')[0], System.Globalization.CultureInfo.InvariantCulture),
                 float.Parse(tr.Split(',')[1], System.Globalization.CultureInfo.InvariantCulture)) : Vector2.zero;
+            int traceEvery = trace && tr.Split(',').Length > 2 ? int.Parse(tr.Split(',')[2]) : 10; // -trace x,z[,frames]
 
             // Every drivable carriageway (to accept ending on a ramp or the other carriageway), motorways as start lines.
             var roads = new List<(List<Vector2> pts, float hw)>();
@@ -79,6 +80,7 @@ namespace LeGamez.Editor
             {
                 var terrain = TerrainField.Load(Path.Combine(dataDir, id + ".dgm.bin"));
                 BridgeBuilder.Prepare(data, data.meta.bounds, terrain);
+                BridgeBuilder.EaseEnds(terrain); // without RoadProfile – rails/decks only
                 var sink = new MeshSink();
                 var st = MotorwayBuilder.Build(data, sink, data.meta.bounds, terrain);
                 BridgeBuilder.Build(data, sink, terrain); // decks again (on top of the tiles' ones): changes to them count too
@@ -117,7 +119,7 @@ namespace LeGamez.Editor
                     vy = cc.isGrounded ? -2f / 60f : vy - 20f / 3600f;
                     var flags = cc.Move(d3 * step + Vector3.up * vy);
                     if ((flags & CollisionFlags.Sides) != 0) blocked = true;
-                    if (trace && (p - traceAt).sqrMagnitude < 4f && i % 10 == 0)
+                    if (trace && (p - traceAt).sqrMagnitude < 4f && i % traceEvery == 0)
                     {
                         var hits = Physics.OverlapSphere(player.transform.position + Vector3.up * 0.6f, 1.3f);
                         string names = "";

@@ -92,7 +92,7 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    unverändert), `fetch_dgm.py/fetch_dop.py <id> --reuse` (vorhandene Raster übernehmen, nur fehlende Kacheln laden);
    LoD2/Bäume/Flurstücke/Hecken über ein temporäres Gebiet `<id>_add` mit Maske = nur neue Teile holen und hinten anhängen
    (Reihenfolge der alten Einträge bleibt → gleiche Zufallszüge). Importer: `BridgeBuilder` (Brücken mit Lücke darunter
-   ≥ 1,8 m: Fahrbahnplatte zwischen den Endhöhen, Kappen, Brüstung, Pfeiler wo unten nichts fährt; Kollider, nicht
+   ≥ 1,8 m, über Straßen/Wegen/Bahn ≥ 1 m: Fahrbahnplatte zwischen den Endhöhen, Kappen, Brüstung, Pfeiler wo unten nichts fährt; Kollider, nicht
    drapiert – das DGM hat keine Brücken), `MotorwayBuilder` (Rand-/Leitlinien, Standstreifen, Schutzplanken beidseitig mit
    Lücken an Rampen), `TrafficBuilder.Motorway` (blaue Vorwegweiser 500 m vor jeder Ausfahrt mit Nummer/Name/`destination`
    der Rampe, „Ausfahrt“-Schild; `motorway_junction` aus traffic.json). Rampen haben Rang 3 (Vorfahrt achten am Ende),
@@ -119,6 +119,19 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    neu ohne Re-Import). Westerstede: 1448 von 1452 Fahrten an der Planke, 3 über Rastplatz-Ausfahrten, 1 auf Fahrbahn (vorher 1439, die meisten „Ausfahrtslücken“ waren übersprungene 1,05-m-Wände). `"key_size"` (areas.json) hält `AreaData.sizeMeters` und damit
    `AreaInfo.MemoryKey` beim Vergrößern um denselben Mittelpunkt stabil (gespeicherte Positionen/eigene Startpunkte
    bleiben gültig). HUD-Titel = nächster Startpunkt (Westerstede/Oldenburg), Fahrradplätze bis 80.
+   **Glatte Fahrbahnen** (`RoadProfile`, nach `BridgeBuilder.Prepare`, vor `EaseEnds`/`BuildBase`): drapierte Straßen
+   folgten jeder DGM-Delle (Gräben, Rauschen, Gruben an Brückenenden – auf der A28 „Schlaglöcher“). Jetzt bekommt jede
+   Straße ein Längsprofil (Ways zu Ketten, Median → 2× gleitendes Mittel; Fenster Autobahn 100 m, Bundes-/Landstraße
+   30–50 m, Wohnstraße 20 m, Wege 10 m mit max. ±0,5 m – Dünenwege bleiben natürlich; Autobahn ≤ 5 % Steigung), das ins
+   Höhenfeld geschrieben wird: quer eben (mind. 5 m ab Mitte), seitlich weich auslaufend; große Unterschiede neben der
+   Fahrbahn (Rampen kreuzender Brücken, Gräben, Höfe) bleiben. Anker: gemeinsame Knoten mit schon profilierten Straßen
+   (Rang: Autobahn → … → Fußweg) und freie Brückenenden (Fahrbahn trifft die Platte; dahinter eine Zelle Widerlager).
+   Läuft ein Weg dicht unter einem Brückenende durch (OSM-Brücken oft zu kurz), verlängert `BridgeBuilder` die Platte
+   um ≤ 8 m über die Zufahrt. Unter Brücken schreibt nur die Straße darunter; Meer/Hafen, CoarseTerrain-Blöcke tabu.
+   Log „road roughness“ (Abweichung von der 5-m-Sehne je Klasse vorher → nachher), Profile in
+   `Builds/RoadProfile/<id>_roads.csv`, Plot `python3 Tools/dgm/plot_road_profile.py <id>`; nur das Gelände prüfen
+   (ohne Import, ~1 min): `-executeMethod LeGamez.Editor.OsmImport.OsmAreaImporter.RoadProfileBatch -area <id>`.
+   `AreaViewSnapshot` setzt die Kamera auf dieses fertige Gelände (`OsmAreaImporter.PrepareTerrain`).
 4. **In Unity importieren** (baut alle Gebiete, Menü-Vorschaubilder, Minimap-Karten, Hauptmenü-Szene):
    ```bash
    /Applications/Unity/Hub/Editor/6000.3.26f1/Unity.app/Contents/MacOS/Unity -batchmode -quit -projectPath . -buildTarget iOS \

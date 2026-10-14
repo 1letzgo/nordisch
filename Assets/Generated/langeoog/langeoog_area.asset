@@ -25,49 +25,54 @@ MonoBehaviour:
   - carriage
   attribution: "\xA9 OpenStreetMap-Mitwirkende (ODbL) \xB7 3D-Geb\xE4ude, Gel\xE4nde,
     Luftbilder \xA9 LGLN (CC BY 4.0)"
-  spawn: {x: -0.52005756, y: 5.8725085, z: -0.7629606}
-  spawnBikeSpot: {x: 1.2799424, y: 5.6658707, z: -0.7629606}
+  spawn: {x: -0.52005756, y: 5.952079, z: -0.7629606}
+  spawnBikeSpot: {x: 1.2799424, y: 5.732706, z: -0.7629606}
+  starts:
+  - name: Langeoog
+    position: {x: -0.52005756, y: 5.952079, z: -0.7629606}
+    yaw: 0
+    bikeSpot: {x: 1.2799424, y: 5.732706, z: -0.7629606}
   bikeSpots:
-  - {x: 3350.907, y: 5.687584, z: 860.36523}
-  - {x: 653.12463, y: 7.2506156, z: 892.9956}
+  - {x: 3350.907, y: 5.7038717, z: 860.36523}
+  - {x: 653.12463, y: 7.2673154, z: 892.9956}
   - {x: -193.18678, y: 10.031235, z: 370.67722}
-  - {x: -142.73462, y: 6.042582, z: 142.87267}
-  - {x: -160.11942, y: 6.198698, z: 102.26948}
-  - {x: -196.71527, y: 6.1586485, z: 56.293224}
-  - {x: -103.95448, y: 6.0544195, z: 204.98933}
-  - {x: -156.8815, y: 8.718498, z: 328.39374}
-  - {x: -6.0977163, y: 6.698062, z: 483.6175}
-  - {x: 207.32997, y: 5.1740513, z: 394.8487}
-  - {x: 205.06541, y: 4.721593, z: 352.55414}
-  - {x: 244.12425, y: 5.2644954, z: 423.4134}
-  - {x: 249.5073, y: 4.7727923, z: 250.4501}
-  - {x: 525.1312, y: 6.2009373, z: 443.11426}
+  - {x: -142.73462, y: 6.064022, z: 142.87267}
+  - {x: -160.11942, y: 6.134671, z: 102.26948}
+  - {x: -196.71527, y: 6.2042074, z: 56.293224}
+  - {x: -103.95448, y: 6.0145125, z: 204.98933}
+  - {x: -156.8815, y: 8.747621, z: 328.39374}
+  - {x: -6.0977163, y: 6.686701, z: 483.6175}
+  - {x: 207.32997, y: 5.1736016, z: 394.8487}
+  - {x: 205.06541, y: 4.721789, z: 352.55414}
+  - {x: 244.12425, y: 5.3605094, z: 423.4134}
+  - {x: 249.5073, y: 4.7704463, z: 250.4501}
+  - {x: 525.1312, y: 6.156869, z: 443.11426}
   - {x: 1807.9751, y: 5.6116295, z: 354.9757}
   - {x: 3697.4102, y: 5.3493905, z: 406.96762}
-  - {x: 645.6134, y: 5.396542, z: -1306.5756}
-  - {x: 148.52396, y: 4.903529, z: 196.08087}
-  - {x: -726.38403, y: 7.367224, z: -314.2071}
-  - {x: -265.1259, y: 6.8389106, z: 56.82398}
-  - {x: -703.8438, y: 6.0010715, z: -477.84555}
-  - {x: 66.961426, y: 6.72575, z: 549.4307}
-  - {x: 59.587532, y: 5.0042677, z: 298.22913}
-  - {x: -92.55801, y: 5.913869, z: 48.607918}
-  - {x: 436.6622, y: 4.97508, z: -246.75694}
-  - {x: 754.4437, y: 6.5712523, z: -2274.308}
-  - {x: -177.76187, y: 8.295783, z: 501.71805}
-  - {x: 106.840355, y: 5.3651214, z: -206.09888}
-  - {x: -70.400536, y: 6.0941005, z: 238.38649}
-  - {x: -90.08095, y: 6.6969233, z: -11.898175}
-  - {x: -115.90886, y: 7.5403757, z: -61.766636}
-  - {x: -287.9426, y: 9.732205, z: 480.38873}
+  - {x: 645.6134, y: 6.2307053, z: -1306.5756}
+  - {x: 148.52396, y: 4.8944235, z: 196.08087}
+  - {x: -726.38403, y: 7.259266, z: -314.2071}
+  - {x: -265.1259, y: 6.799252, z: 56.82398}
+  - {x: -703.8438, y: 5.8680983, z: -477.84555}
+  - {x: 66.961426, y: 6.7307596, z: 549.4307}
+  - {x: 59.587532, y: 5.0009637, z: 298.22913}
+  - {x: -92.55801, y: 5.8460627, z: 48.607918}
+  - {x: 436.6622, y: 4.9941564, z: -246.75694}
+  - {x: 754.4437, y: 6.58077, z: -2274.308}
+  - {x: -177.76187, y: 8.1207485, z: 501.71805}
+  - {x: 106.840355, y: 5.341368, z: -206.09888}
+  - {x: -70.400536, y: 6.0631404, z: 238.38649}
+  - {x: -90.08095, y: 6.6790776, z: -11.898175}
+  - {x: -115.90886, y: 7.5030503, z: -61.766636}
+  - {x: -287.9426, y: 9.73222, z: 480.38873}
   - {x: -97.10121, y: 6.6949544, z: -207.24886}
-  - {x: 550.2981, y: 4.4017315, z: -794.2088}
-  - {x: -19.586298, y: 6.0751595, z: -1.0615104}
-  - {x: 299.45917, y: 4.623782, z: 355.89346}
-  - {x: 884.47784, y: 7.5420084, z: -2039.659}
-  - {x: 983.97345, y: 7.3341885, z: -1967.1003}
-  - {x: 318.54987, y: 9.148459, z: 829.89105}
-  - {x: 110.243774, y: 6.02584, z: 0.7629606}
+  - {x: 550.2981, y: 4.390148, z: -794.2088}
+  - {x: -19.586298, y: 6.074559, z: -1.0615104}
+  - {x: 299.45917, y: 4.595212, z: 355.89346}
+  - {x: 884.47784, y: 7.5429196, z: -2039.659}
+  - {x: 983.97345, y: 7.3308873, z: -1967.1003}
+  - {x: 318.54987, y: 9.152548, z: 829.89105}
+  - {x: 110.243774, y: 5.9952517, z: 0.7629606}
   carSpots: []
   pois: {fileID: 11400000, guid: 91887a9d8c8ee4bbb92aaba9c8006f1e, type: 2}
   streets: {fileID: 11400000, guid: bb10bc050b91f4f93bba6af37a2f31bf, type: 2}
@@ -2217,2443 +2222,2443 @@ MonoBehaviour:
   trafficSignals: []
   signTexts:
   - text: "Hafendeichstra\xDFe"
-    position: {x: 750.1999, y: 10.117388, z: -2205.9824}
+    position: {x: 750.1999, y: 10.096811, z: -2205.9824}
     facing: {x: -0.69426113, y: 0.7197232}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hafendeichstra\xDFe"
-    position: {x: 750.2359, y: 10.11712, z: -2206.0195}
+    position: {x: 750.2359, y: 10.0967655, z: -2206.0195}
     facing: {x: 0.69426113, y: -0.7197232}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "St\xF6rtebekerstra\xDFe"
-    position: {x: 749.20123, y: 9.814262, z: -2205.9785}
+    position: {x: 749.20123, y: 9.797098, z: -2205.9785}
     facing: {x: -0.7100863, y: -0.7041146}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "St\xF6rtebekerstra\xDFe"
-    position: {x: 749.2382, y: 9.814625, z: -2205.942}
+    position: {x: 749.2382, y: 9.797115, z: -2205.942}
     facing: {x: 0.7100863, y: 0.7041146}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kirchstra\xDFe"
-    position: {x: -121.48128, y: 9.916872, z: -98.7245}
+    position: {x: -121.48128, y: 9.913207, z: -98.7245}
     facing: {x: -0.9759439, y: 0.21802154}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kirchstra\xDFe"
-    position: {x: -121.43053, y: 9.9173355, z: -98.73584}
+    position: {x: -121.43053, y: 9.913595, z: -98.73584}
     facing: {x: 0.9759439, y: -0.21802154}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Mittelstra\xDFe"
-    position: {x: -122.06081, y: 9.607552, z: -99.098114}
+    position: {x: -122.06081, y: 9.60196, z: -99.098114}
     facing: {x: -0.22285207, y: -0.97485226}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Mittelstra\xDFe"
-    position: {x: -122.04921, y: 9.608084, z: -99.047424}
+    position: {x: -122.04921, y: 9.60277, z: -99.047424}
     facing: {x: 0.22285207, y: 0.97485226}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kirchstra\xDFe"
-    position: {x: -107.190765, y: 10.125368, z: -42.021076}
+    position: {x: -107.190765, y: 10.051941, z: -42.021076}
     facing: {x: 0.96107256, y: -0.27629608}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kirchstra\xDFe"
-    position: {x: -107.24075, y: 10.126063, z: -42.00671}
+    position: {x: -107.24075, y: 10.051802, z: -42.00671}
     facing: {x: -0.96107256, y: 0.27629608}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Brandd\xFCnenweg"
-    position: {x: -107.6215, y: 9.816588, z: -41.42386}
+    position: {x: -107.6215, y: 9.74124, z: -41.42386}
     facing: {x: -0.29961386, y: -0.95406055}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Brandd\xFCnenweg"
-    position: {x: -107.60592, y: 9.814685, z: -41.374252}
+    position: {x: -107.60592, y: 9.740196, z: -41.374252}
     facing: {x: 0.29961386, y: 0.95406055}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wald
-    position: {x: -514.63293, y: 7.8943777, z: -599.51886}
+    position: {x: -514.63293, y: 7.909743, z: -599.51886}
     facing: {x: 0.87018734, y: -0.49272096}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wald
-    position: {x: -514.6782, y: 7.8943834, z: -599.4932}
+    position: {x: -514.6782, y: 7.909669, z: -599.4932}
     facing: {x: -0.87018734, y: 0.49272096}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kinderkurstra\xDFe"
-    position: {x: -515.07227, y: 7.5950947, z: -598.9475}
+    position: {x: -515.07227, y: 7.609008, z: -598.9475}
     facing: {x: -0.50525016, y: -0.8629729}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kinderkurstra\xDFe"
-    position: {x: -515.046, y: 7.59468, z: -598.9026}
+    position: {x: -515.046, y: 7.6087646, z: -598.9026}
     facing: {x: 0.50525016, y: 0.8629729}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wald
-    position: {x: -765.6381, y: 7.5734587, z: -1372.9635}
+    position: {x: -765.6381, y: 7.473138, z: -1372.9635}
     facing: {x: -0.9737996, y: 0.22740775}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wald
-    position: {x: -765.5876, y: 7.5723224, z: -1372.9752}
+    position: {x: -765.5876, y: 7.4730163, z: -1372.9752}
     facing: {x: 0.9737996, y: -0.22740775}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Flinth\xF6rndeich"
-    position: {x: -766.23126, y: 7.265671, z: -1373.4856}
+    position: {x: -766.23126, y: 7.17581, z: -1373.4856}
     facing: {x: 0.33966273, y: -0.94054735}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Flinth\xF6rndeich"
-    position: {x: -766.24896, y: 7.267501, z: -1373.4368}
+    position: {x: -766.24896, y: 7.175769, z: -1373.4368}
     facing: {x: -0.33966273, y: 0.94054735}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderd\xFCnenring"
-    position: {x: -177.97075, y: 8.641256, z: -386.02106}
+    position: {x: -177.97075, y: 8.629904, z: -386.02106}
     facing: {x: -0.2875007, y: -0.9577804}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderd\xFCnenring"
-    position: {x: -177.9558, y: 8.641865, z: -385.97125}
+    position: {x: -177.9558, y: 8.630096, z: -385.97125}
     facing: {x: 0.2875007, y: 0.9577804}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kirchstra\xDFe"
-    position: {x: -177.2563, y: 8.349226, z: -385.7195}
+    position: {x: -177.2563, y: 8.337977, z: -385.7195}
     facing: {x: -0.9384477, y: 0.34542143}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kirchstra\xDFe"
-    position: {x: -177.2075, y: 8.349379, z: -385.73746}
+    position: {x: -177.2075, y: 8.338508, z: -385.73746}
     facing: {x: 0.9384477, y: -0.34542143}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderd\xFCnenring"
-    position: {x: -323.79037, y: 8.477997, z: -355.8408}
+    position: {x: -323.79037, y: 8.548817, z: -355.8408}
     facing: {x: 0.21452896, y: 0.97671765}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderd\xFCnenring"
-    position: {x: -323.80148, y: 8.477057, z: -355.89157}
+    position: {x: -323.80148, y: 8.548435, z: -355.89157}
     facing: {x: -0.21452896, y: -0.97671765}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kiefernweg
-    position: {x: -324.4189, y: 8.172447, z: -356.16226}
+    position: {x: -324.4189, y: 8.247297, z: -356.16226}
     facing: {x: 0.987302, y: -0.15885456}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kiefernweg
-    position: {x: -324.47025, y: 8.172638, z: -356.15402}
+    position: {x: -324.47025, y: 8.247445, z: -356.15402}
     facing: {x: -0.987302, y: 0.15885456}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderd\xFCnenring"
-    position: {x: -554.32007, y: 8.70661, z: -345.87576}
+    position: {x: -554.32007, y: 8.633298, z: -345.87576}
     facing: {x: -0.18817124, y: 0.98213625}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderd\xFCnenring"
-    position: {x: -554.3103, y: 8.7082815, z: -345.92685}
+    position: {x: -554.3103, y: 8.633039, z: -345.92685}
     facing: {x: 0.18817124, y: -0.98213625}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kinderkurstra\xDFe"
-    position: {x: -554.8282, y: 8.419656, z: -346.64728}
+    position: {x: -554.8282, y: 8.327488, z: -346.64728}
     facing: {x: 0.9974579, y: 0.07125862}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kinderkurstra\xDFe"
-    position: {x: -554.88007, y: 8.418798, z: -346.651}
+    position: {x: -554.88007, y: 8.327316, z: -346.651}
     facing: {x: -0.9974579, y: -0.07125862}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Strandjepad
-    position: {x: -616.89716, y: 10.833801, z: -228.5619}
+    position: {x: -616.89716, y: 10.735523, z: -228.5619}
     facing: {x: 0.5273254, y: -0.84966344}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Strandjepad
-    position: {x: -616.9246, y: 10.836927, z: -228.51772}
+    position: {x: -616.9246, y: 10.736106, z: -228.51772}
     facing: {x: -0.5273254, y: 0.84966344}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Hunpad
-    position: {x: -616.72205, y: 10.526906, z: -228.14401}
+    position: {x: -616.72205, y: 10.442115, z: -228.14401}
     facing: {x: -0.66186863, y: -0.7496199}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Hunpad
-    position: {x: -616.6876, y: 10.524746, z: -228.10501}
+    position: {x: -616.6876, y: 10.442775, z: -228.10501}
     facing: {x: 0.66186863, y: 0.7496199}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Strandjepad
-    position: {x: -591.66626, y: 10.819867, z: -219.67369}
+    position: {x: -591.66626, y: 10.84209, z: -219.67369}
     facing: {x: 0.49338868, y: -0.869809}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Strandjepad
-    position: {x: -591.6919, y: 10.819451, z: -219.62846}
+    position: {x: -591.6919, y: 10.841892, z: -219.62846}
     facing: {x: -0.49338868, y: 0.869809}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Hunpad
-    position: {x: -591.086, y: 10.529722, z: -219.5963}
+    position: {x: -591.086, y: 10.546848, z: -219.5963}
     facing: {x: 0.75637287, y: 0.6541408}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Hunpad
-    position: {x: -591.1253, y: 10.529042, z: -219.6303}
+    position: {x: -591.1253, y: 10.546518, z: -219.6303}
     facing: {x: -0.75637287, y: -0.6541408}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Strandjepad
-    position: {x: -565.6534, y: 10.750357, z: -193.02898}
+    position: {x: -565.6534, y: 10.747875, z: -193.02898}
     facing: {x: 0.41719687, y: -0.90881616}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Strandjepad
-    position: {x: -565.6751, y: 10.748802, z: -192.9817}
+    position: {x: -565.6751, y: 10.747936, z: -192.9817}
     facing: {x: -0.41719687, y: 0.90881616}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Hunpad
-    position: {x: -565.1983, y: 10.456095, z: -193.0633}
+    position: {x: -565.1983, y: 10.446863, z: -193.0633}
     facing: {x: 0.99823016, y: 0.059468597}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Hunpad
-    position: {x: -565.2502, y: 10.455638, z: -193.0664}
+    position: {x: -565.2502, y: 10.446977, z: -193.0664}
     facing: {x: -0.99823016, y: -0.059468597}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Strandjepad
-    position: {x: -469.6264, y: 10.801517, z: -168.23604}
+    position: {x: -469.6264, y: 10.796098, z: -168.23604}
     facing: {x: 0.13852972, y: -0.99035823}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Strandjepad
-    position: {x: -469.6336, y: 10.800565, z: -168.18452}
+    position: {x: -469.6336, y: 10.796127, z: -168.18452}
     facing: {x: -0.13852972, y: 0.99035823}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Friesenstra\xDFe"
-    position: {x: -468.65735, y: 10.507226, z: -168.36044}
+    position: {x: -468.65735, y: 10.492467, z: -168.36044}
     facing: {x: 0.4314526, y: 0.90213555}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Friesenstra\xDFe"
-    position: {x: -468.6798, y: 10.507988, z: -168.40735}
+    position: {x: -468.6798, y: 10.492549, z: -168.40735}
     facing: {x: -0.4314526, y: -0.90213555}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Friesenstra\xDFe"
-    position: {x: -401.8404, y: 10.696682, z: -189.37622}
+    position: {x: -401.8404, y: 10.859463, z: -189.37622}
     facing: {x: 0.34570524, y: 0.9383431}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Friesenstra\xDFe"
-    position: {x: -401.8584, y: 10.694796, z: -189.42502}
+    position: {x: -401.8584, y: 10.859693, z: -189.42502}
     facing: {x: -0.34570524, y: -0.9383431}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Blumental
-    position: {x: -402.19092, y: 10.420091, z: -188.73056}
+    position: {x: -402.19092, y: 10.5573, z: -188.73056}
     facing: {x: -0.9192295, y: 0.39372227}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Blumental
-    position: {x: -402.14313, y: 10.419444, z: -188.75104}
+    position: {x: -402.14313, y: 10.557314, z: -188.75104}
     facing: {x: 0.9192295, y: -0.39372227}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Friesenstra\xDFe"
-    position: {x: -453.65878, y: 10.732052, z: -174.97975}
+    position: {x: -453.65878, y: 10.758294, z: -174.97975}
     facing: {x: -0.43067667, y: -0.9025063}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Friesenstra\xDFe"
-    position: {x: -453.63638, y: 10.732683, z: -174.93282}
+    position: {x: -453.63638, y: 10.75826, z: -174.93282}
     facing: {x: 0.43067667, y: 0.9025063}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Just-Scheu-Stra\xDFe"
-    position: {x: -453.4026, y: 10.391493, z: -175.87125}
+    position: {x: -453.4026, y: 10.458299, z: -175.87125}
     facing: {x: 0.92321455, y: -0.38428497}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Just-Scheu-Stra\xDFe"
-    position: {x: -453.45062, y: 10.393161, z: -175.85126}
+    position: {x: -453.45062, y: 10.458068, z: -175.85126}
     facing: {x: -0.92321455, y: 0.38428497}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Abke-Jansen-Weg
-    position: {x: -169.88626, y: 8.959923, z: -363.92703}
+    position: {x: -169.88626, y: 9.028381, z: -363.92703}
     facing: {x: -0.2967378, y: -0.954959}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Abke-Jansen-Weg
-    position: {x: -169.87085, y: 8.960684, z: -363.87735}
+    position: {x: -169.87085, y: 9.029072, z: -363.87735}
     facing: {x: 0.2967378, y: 0.954959}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kirchstra\xDFe"
-    position: {x: -169.40686, y: 8.649715, z: -364.53906}
+    position: {x: -169.40686, y: 8.71163, z: -364.53906}
     facing: {x: 0.9384477, y: -0.34542143}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kirchstra\xDFe"
-    position: {x: -169.45566, y: 8.649337, z: -364.52112}
+    position: {x: -169.45566, y: 8.712155, z: -364.52112}
     facing: {x: -0.9384477, y: 0.34542143}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hafenstra\xDFe"
-    position: {x: 215.0378, y: 7.813599, z: -101.14708}
+    position: {x: 215.0378, y: 7.6941133, z: -101.14708}
     facing: {x: -0.8427845, y: -0.53825104}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hafenstra\xDFe"
-    position: {x: 215.08162, y: 7.811836, z: -101.11908}
+    position: {x: 215.08162, y: 7.6940584, z: -101.11908}
     facing: {x: 0.8427845, y: 0.53825104}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: An den Birken
-    position: {x: 214.79639, y: 7.5125265, z: -101.72901}
+    position: {x: 214.79639, y: 7.3927116, z: -101.72901}
     facing: {x: 0.3209099, y: -0.94710976}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: An den Birken
-    position: {x: 214.77972, y: 7.5126, z: -101.679756}
+    position: {x: 214.77972, y: 7.3930254, z: -101.679756}
     facing: {x: -0.3209099, y: 0.94710976}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hafenstra\xDFe"
-    position: {x: 260.74118, y: 7.809434, z: -161.1247}
+    position: {x: 260.74118, y: 7.766022, z: -161.1247}
     facing: {x: -0.4340737, y: -0.9008774}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hafenstra\xDFe"
-    position: {x: 260.76376, y: 7.809589, z: -161.07785}
+    position: {x: 260.76376, y: 7.7659297, z: -161.07785}
     facing: {x: 0.4340737, y: 0.9008774}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Jakob-Pauls-Weg
-    position: {x: 261.00882, y: 7.503746, z: -161.92058}
+    position: {x: 261.00882, y: 7.470808, z: -161.92058}
     facing: {x: 0.9547343, y: -0.29745978}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Jakob-Pauls-Weg
-    position: {x: 260.9592, y: 7.5040646, z: -161.9051}
+    position: {x: 260.9592, y: 7.470496, z: -161.9051}
     facing: {x: -0.9547343, y: 0.29745978}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hafenstra\xDFe"
-    position: {x: 304.01703, y: 7.895654, z: -214.97392}
+    position: {x: 304.01703, y: 7.9919825, z: -214.97392}
     facing: {x: -0.9037382, y: -0.4280857}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hafenstra\xDFe"
-    position: {x: 304.06403, y: 7.896724, z: -214.95164}
+    position: {x: 304.06403, y: 7.992688, z: -214.95164}
     facing: {x: 0.9037382, y: 0.4280857}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "L\xFCbbe-Janssen-Pad"
-    position: {x: 303.57642, y: 7.5814285, z: -215.67072}
+    position: {x: 303.57642, y: 7.678397, z: -215.67072}
     facing: {x: 0.36152393, y: -0.9323628}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "L\xFCbbe-Janssen-Pad"
-    position: {x: 303.55762, y: 7.581298, z: -215.62225}
+    position: {x: 303.55762, y: 7.678482, z: -215.62225}
     facing: {x: -0.36152393, y: 0.9323628}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hafenstra\xDFe"
-    position: {x: 330.81897, y: 8.832344, z: -271.21838}
+    position: {x: 330.81897, y: 8.84029, z: -271.21838}
     facing: {x: -0.90523547, y: -0.4249104}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hafenstra\xDFe"
-    position: {x: 330.86603, y: 8.832342, z: -271.1963}
+    position: {x: 330.86603, y: 8.840254, z: -271.1963}
     facing: {x: 0.90523547, y: 0.4249104}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Um S\xFCd"
-    position: {x: 330.82074, y: 8.534944, z: -271.76138}
+    position: {x: 330.82074, y: 8.545444, z: -271.76138}
     facing: {x: 0.42068923, y: -0.90720475}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Um S\xFCd"
-    position: {x: 330.7989, y: 8.53467, z: -271.7142}
+    position: {x: 330.7989, y: 8.544916, z: -271.7142}
     facing: {x: -0.42068923, y: 0.90720475}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Um S\xFCd"
-    position: {x: 141.93811, y: 8.961455, z: -362.68533}
+    position: {x: 141.93811, y: 8.938528, z: -362.68533}
     facing: {x: 0.2732597, y: 0.9619402}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Um S\xFCd"
-    position: {x: 141.92389, y: 8.96194, z: -362.73532}
+    position: {x: 141.92389, y: 8.938932, z: -362.73532}
     facing: {x: -0.2732597, y: -0.9619402}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Rettungsspoor
-    position: {x: 141.49448, y: 8.667541, z: -363.15967}
+    position: {x: 141.49448, y: 8.643358, z: -363.15967}
     facing: {x: 0.92105526, y: -0.3894319}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Rettungsspoor
-    position: {x: 141.4466, y: 8.667603, z: -363.1394}
+    position: {x: 141.4466, y: 8.643367, z: -363.1394}
     facing: {x: -0.92105526, y: 0.3894319}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Um S\xFCd"
-    position: {x: 97.30299, y: 8.638965, z: -331.5964}
+    position: {x: 97.30299, y: 8.649233, z: -331.5964}
     facing: {x: 0.5202283, y: 0.8540272}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Um S\xFCd"
-    position: {x: 97.27594, y: 8.638704, z: -331.64084}
+    position: {x: 97.27594, y: 8.649177, z: -331.64084}
     facing: {x: -0.5202283, y: -0.8540272}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: An den Hecken
-    position: {x: 97.50612, y: 8.340617, z: -331.14362}
+    position: {x: 97.50612, y: 8.349265, z: -331.14362}
     facing: {x: -0.5813539, y: 0.8136508}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: An den Hecken
-    position: {x: 97.53635, y: 8.341139, z: -331.1859}
+    position: {x: 97.53635, y: 8.349629, z: -331.1859}
     facing: {x: 0.5813539, y: -0.8136508}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Um S\xFCd"
-    position: {x: 67.39396, y: 8.582636, z: -319.57025}
+    position: {x: 67.39396, y: 8.606218, z: -319.57025}
     facing: {x: 0.538361, y: 0.84271437}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Um S\xFCd"
-    position: {x: 67.36596, y: 8.582484, z: -319.61407}
+    position: {x: 67.36596, y: 8.606307, z: -319.61407}
     facing: {x: -0.538361, y: -0.84271437}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Flinth\xF6rnweg"
-    position: {x: 66.8734, y: 8.282495, z: -319.87408}
+    position: {x: 66.8734, y: 8.308251, z: -319.87408}
     facing: {x: 0.7906919, y: -0.6122143}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Flinth\xF6rnweg"
-    position: {x: 66.832275, y: 8.282775, z: -319.84222}
+    position: {x: 66.832275, y: 8.308453, z: -319.84222}
     facing: {x: -0.7906919, y: 0.6122143}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Um S\xFCd"
-    position: {x: 29.741468, y: 9.112503, z: -260.56158}
+    position: {x: 29.741468, y: 9.142193, z: -260.56158}
     facing: {x: 0.9339559, y: 0.35738826}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Um S\xFCd"
-    position: {x: 29.692904, y: 9.112892, z: -260.5802}
+    position: {x: 29.692904, y: 9.1422, z: -260.5802}
     facing: {x: -0.9339559, y: -0.35738826}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Otto-Leu\xDF-Weg"
-    position: {x: 30.103529, y: 8.812756, z: -260.05356}
+    position: {x: 30.103529, y: 8.843452, z: -260.05356}
     facing: {x: -0.46363312, y: 0.8860273}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Otto-Leu\xDF-Weg"
-    position: {x: 30.127638, y: 8.81364, z: -260.09958}
+    position: {x: 30.127638, y: 8.843576, z: -260.09958}
     facing: {x: 0.46363312, y: -0.8860273}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Otto-Leu\xDF-Weg"
-    position: {x: 49.751244, y: 8.729219, z: -206.12155}
+    position: {x: 49.751244, y: 8.779912, z: -206.12155}
     facing: {x: 0.9999992, y: 0.0012868235}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Otto-Leu\xDF-Weg"
-    position: {x: 49.69924, y: 8.7291565, z: -206.12161}
+    position: {x: 49.69924, y: 8.779913, z: -206.12161}
     facing: {x: -0.9999992, y: -0.0012868235}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Jakob-Pauls-Weg
-    position: {x: 50.360577, y: 8.408493, z: -205.51877}
+    position: {x: 50.360577, y: 8.469166, z: -205.51877}
     facing: {x: -0.038149517, y: 0.99927205}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Jakob-Pauls-Weg
-    position: {x: 50.36256, y: 8.409726, z: -205.57074}
+    position: {x: 50.36256, y: 8.469613, z: -205.57074}
     facing: {x: 0.038149517, y: -0.99927205}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Otto-Leu\xDF-Weg"
-    position: {x: 40.43135, y: 9.310642, z: -143.29532}
+    position: {x: 40.43135, y: 9.243883, z: -143.29532}
     facing: {x: 0.986946, y: -0.16105165}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Otto-Leu\xDF-Weg"
-    position: {x: 40.380028, y: 9.310852, z: -143.28693}
+    position: {x: 40.380028, y: 9.24412, z: -143.28693}
     facing: {x: -0.986946, y: 0.16105165}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Mittelstra\xDFe"
-    position: {x: 39.990173, y: 9.010719, z: -142.66673}
+    position: {x: 39.990173, y: 8.953619, z: -142.66673}
     facing: {x: -0.20499156, y: -0.97876376}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Mittelstra\xDFe"
-    position: {x: 40.00083, y: 9.010221, z: -142.61583}
+    position: {x: 40.00083, y: 8.954056, z: -142.61583}
     facing: {x: 0.20499156, y: 0.97876376}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Mittelstra\xDFe"
-    position: {x: -198.49771, y: 8.990782, z: -81.88056}
+    position: {x: -198.49771, y: 9.008859, z: -81.88056}
     facing: {x: 0.22312543, y: 0.9747898}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Mittelstra\xDFe"
-    position: {x: -198.50931, y: 8.991291, z: -81.93125}
+    position: {x: -198.50931, y: 9.008905, z: -81.93125}
     facing: {x: -0.22312543, y: -0.9747898}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Rudolf-Eucken-Weg
-    position: {x: -199.14816, y: 8.687561, z: -81.08436}
+    position: {x: -199.14816, y: 8.703393, z: -81.08436}
     facing: {x: -0.9856672, y: -0.16870119}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Rudolf-Eucken-Weg
-    position: {x: -199.09692, y: 8.687189, z: -81.075584}
+    position: {x: -199.09692, y: 8.703665, z: -81.075584}
     facing: {x: 0.9856672, y: 0.16870119}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Mittelstra\xDFe"
-    position: {x: -277.80942, y: 9.711369, z: -64.22565}
+    position: {x: -277.80942, y: 9.769806, z: -64.22565}
     facing: {x: 0.21335359, y: 0.976975}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Mittelstra\xDFe"
-    position: {x: -277.82053, y: 9.709135, z: -64.27646}
+    position: {x: -277.82053, y: 9.766489, z: -64.27646}
     facing: {x: -0.21335359, y: -0.976975}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Casper-D\xF6ring-Pad"
-    position: {x: -278.16223, y: 9.454847, z: -63.43522}
+    position: {x: -278.16223, y: 9.538795, z: -63.43522}
     facing: {x: -0.96980506, y: 0.2438813}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Casper-D\xF6ring-Pad"
-    position: {x: -278.11182, y: 9.453405, z: -63.4479}
+    position: {x: -278.11182, y: 9.536209, z: -63.4479}
     facing: {x: 0.96980506, y: -0.2438813}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Mittelstra\xDFe"
-    position: {x: -360.86633, y: 11.735704, z: -54.32114}
+    position: {x: -360.86633, y: 11.692975, z: -54.32114}
     facing: {x: 0.21029703, y: 0.9776376}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Mittelstra\xDFe"
-    position: {x: -360.87726, y: 11.736035, z: -54.371975}
+    position: {x: -360.87726, y: 11.69288, z: -54.371975}
     facing: {x: -0.21029703, y: -0.9776376}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Blumental
-    position: {x: -361.457, y: 11.427504, z: -54.74257}
+    position: {x: -361.457, y: 11.391436, z: -54.74257}
     facing: {x: 0.975589, y: -0.21960446}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Blumental
-    position: {x: -361.50778, y: 11.426264, z: -54.731148}
+    position: {x: -361.50778, y: 11.391377, z: -54.731148}
     facing: {x: -0.975589, y: 0.21960446}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Mittelstra\xDFe"
-    position: {x: -376.84464, y: 12.076662, z: -42.533466}
+    position: {x: -376.84464, y: 11.862983, z: -42.533466}
     facing: {x: 0.23431593, y: 0.97216046}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Mittelstra\xDFe"
-    position: {x: -376.85678, y: 12.068858, z: -42.58402}
+    position: {x: -376.85678, y: 11.859476, z: -42.58402}
     facing: {x: -0.23431593, y: -0.97216046}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "An der Kaapd\xFCne"
-    position: {x: -377.22446, y: 11.8322525, z: -41.812992}
+    position: {x: -377.22446, y: 11.590329, z: -41.812992}
     facing: {x: -0.9729241, y: 0.23112477}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "An der Kaapd\xFCne"
-    position: {x: -377.17386, y: 11.838737, z: -41.82501}
+    position: {x: -377.17386, y: 11.592915, z: -41.82501}
     facing: {x: 0.9729241, y: -0.23112477}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Rettungsspoor
-    position: {x: 127.08529, y: 10.45918, z: -446.1617}
+    position: {x: 127.08529, y: 10.574755, z: -446.1617}
     facing: {x: -0.9609731, y: 0.27664185}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Rettungsspoor
-    position: {x: 127.13525, y: 10.458714, z: -446.17612}
+    position: {x: 127.13525, y: 10.573765, z: -446.17612}
     facing: {x: 0.9609731, y: -0.27664185}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Johann-Tongers-Pad
-    position: {x: 126.25271, y: 10.173299, z: -446.40106}
+    position: {x: 126.25271, y: 10.2969055, z: -446.40106}
     facing: {x: -0.4214173, y: -0.90686685}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Johann-Tongers-Pad
-    position: {x: 126.27462, y: 10.172386, z: -446.35388}
+    position: {x: 126.27462, y: 10.295841, z: -446.35388}
     facing: {x: 0.4214173, y: 0.90686685}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Rettungsspoor
-    position: {x: 104.59664, y: 8.668878, z: -505.94937}
+    position: {x: 104.59664, y: 8.667576, z: -505.94937}
     facing: {x: -0.93358916, y: 0.35834524}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Rettungsspoor
-    position: {x: 104.64518, y: 8.668433, z: -505.968}
+    position: {x: 104.64518, y: 8.66758, z: -505.968}
     facing: {x: 0.93358916, y: -0.35834524}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderd\xFCnenring"
-    position: {x: 103.87151, y: 8.365752, z: -506.24945}
+    position: {x: 103.87151, y: 8.361732, z: -506.24945}
     facing: {x: -0.41790265, y: -0.90849185}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderd\xFCnenring"
-    position: {x: 103.89324, y: 8.366491, z: -506.2022}
+    position: {x: 103.89324, y: 8.362289, z: -506.2022}
     facing: {x: 0.41790265, y: 0.90849185}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kiefernweg
-    position: {x: -339.42767, y: 8.314985, z: -393.7644}
+    position: {x: -339.42767, y: 8.295116, z: -393.7644}
     facing: {x: -0.987302, y: 0.15885456}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kiefernweg
-    position: {x: -339.37634, y: 8.315401, z: -393.77264}
+    position: {x: -339.37634, y: 8.295158, z: -393.77264}
     facing: {x: 0.987302, y: -0.15885456}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Sanddornweg
-    position: {x: -339.93512, y: 8.018691, z: -394.13876}
+    position: {x: -339.93512, y: 7.9931765, z: -394.13876}
     facing: {x: -0.16050713, y: -0.9870346}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Sanddornweg
-    position: {x: -339.92676, y: 8.017856, z: -394.08743}
+    position: {x: -339.92676, y: 7.9933596, z: -394.08743}
     facing: {x: 0.16050713, y: 0.9870346}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kiefernweg
-    position: {x: -323.74078, y: 8.223387, z: -471.62173}
+    position: {x: -323.74078, y: 8.216044, z: -471.62173}
     facing: {x: -0.9811401, y: -0.19329832}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kiefernweg
-    position: {x: -323.68976, y: 8.223677, z: -471.61166}
+    position: {x: -323.68976, y: 8.2163105, z: -471.61166}
     facing: {x: 0.9811401, y: 0.19329832}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wald
-    position: {x: -323.34836, y: 7.925391, z: -471.9437}
+    position: {x: -323.34836, y: 7.918707, z: -471.9437}
     facing: {x: -0.2171631, y: 0.9761353}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wald
-    position: {x: -323.33707, y: 7.9254255, z: -471.99448}
+    position: {x: -323.33707, y: 7.918847, z: -471.99448}
     facing: {x: 0.2171631, y: -0.9761353}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Jakob-Pauls-Weg
-    position: {x: 169.35622, y: 7.635435, z: -201.67964}
+    position: {x: 169.35622, y: 7.618057, z: -201.67964}
     facing: {x: -0.10644782, y: 0.9943183}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Jakob-Pauls-Weg
-    position: {x: 169.36177, y: 7.6380715, z: -201.73134}
+    position: {x: 169.36177, y: 7.6180425, z: -201.73134}
     facing: {x: 0.10644782, y: -0.9943183}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: An den Hecken
-    position: {x: 168.84622, y: 7.3608456, z: -202.31303}
+    position: {x: 168.84622, y: 7.3181267, z: -202.31303}
     facing: {x: 0.98495275, y: 0.17282367}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: An den Hecken
-    position: {x: 168.79498, y: 7.3606825, z: -202.32204}
+    position: {x: 168.79498, y: 7.3181458, z: -202.32204}
     facing: {x: -0.98495275, y: -0.17282367}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Just-Scheu-Stra\xDFe"
-    position: {x: -463.39435, y: 10.516184, z: -266.25064}
+    position: {x: -463.39435, y: 10.490118, z: -266.25064}
     facing: {x: -0.99999666, y: -0.0025838262}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Just-Scheu-Stra\xDFe"
-    position: {x: -463.34235, y: 10.515565, z: -266.25052}
+    position: {x: -463.34235, y: 10.490062, z: -266.25052}
     facing: {x: 0.99999666, y: 0.0025838262}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Weststrand
-    position: {x: -463.91562, y: 10.218676, z: -267.0393}
+    position: {x: -463.91562, y: 10.191497, z: -267.0393}
     facing: {x: 0.07293714, y: -0.99733657}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Weststrand
-    position: {x: -463.9194, y: 10.218966, z: -266.98743}
+    position: {x: -463.9194, y: 10.191447, z: -266.98743}
     facing: {x: -0.07293714, y: 0.99733657}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Willrath-Dreesen-Stra\xDFe"
-    position: {x: 95.55744, y: 9.138082, z: 446.52914}
+    position: {x: 95.55744, y: 9.059053, z: 446.52914}
     facing: {x: 0.4352522, y: -0.9003086}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Willrath-Dreesen-Stra\xDFe"
-    position: {x: 95.5348, y: 9.139402, z: 446.57596}
+    position: {x: 95.5348, y: 9.0604315, z: 446.57596}
     facing: {x: -0.4352522, y: 0.9003086}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kavalierpad
-    position: {x: 96.287506, y: 8.856191, z: 447.42523}
+    position: {x: 96.287506, y: 8.774207, z: 447.42523}
     facing: {x: -0.97011375, y: -0.24265051}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kavalierpad
-    position: {x: 96.33795, y: 8.856197, z: 447.4378}
+    position: {x: 96.33795, y: 8.774033, z: 447.4378}
     facing: {x: 0.97011375, y: 0.24265051}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Willrath-Dreesen-Stra\xDFe"
-    position: {x: 139.5226, y: 8.972313, z: 451.25507}
+    position: {x: 139.5226, y: 9.08982, z: 451.25507}
     facing: {x: 0.2079923, y: -0.97813046}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Willrath-Dreesen-Stra\xDFe"
-    position: {x: 139.51176, y: 8.974892, z: 451.30597}
+    position: {x: 139.51176, y: 9.090346, z: 451.30597}
     facing: {x: -0.2079923, y: 0.97813046}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Fritz-Reuter-Stra\xDFe"
-    position: {x: 140.8579, y: 8.631571, z: 450.77332}
+    position: {x: 140.8579, y: 8.783951, z: 450.77332}
     facing: {x: 0.89429283, y: 0.4474821}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Fritz-Reuter-Stra\xDFe"
-    position: {x: 140.81139, y: 8.630513, z: 450.75006}
+    position: {x: 140.81139, y: 8.783934, z: 450.75006}
     facing: {x: -0.89429283, y: -0.4474821}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Willrath-Dreesen-Stra\xDFe"
-    position: {x: 172.37614, y: 9.239264, z: 462.10596}
+    position: {x: 172.37614, y: 9.202232, z: 462.10596}
     facing: {x: 0.028366074, y: -0.9995976}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Willrath-Dreesen-Stra\xDFe"
-    position: {x: 172.37468, y: 9.240107, z: 462.15796}
+    position: {x: 172.37468, y: 9.202736, z: 462.15796}
     facing: {x: -0.028366074, y: 0.9995976}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Teich
-    position: {x: 173.32678, y: 8.946345, z: 462.4997}
+    position: {x: 173.32678, y: 8.905902, z: 462.4997}
     facing: {x: -0.9999997, y: 0.000757853}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Teich
-    position: {x: 173.37878, y: 8.946383, z: 462.4997}
+    position: {x: 173.37878, y: 8.905894, z: 462.4997}
     facing: {x: 0.9999997, y: -0.000757853}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Willrath-Dreesen-Stra\xDFe"
-    position: {x: 248.12872, y: 9.056083, z: 450.05682}
+    position: {x: 248.12872, y: 8.993649, z: 450.05682}
     facing: {x: -0.06998695, y: -0.9975479}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Willrath-Dreesen-Stra\xDFe"
-    position: {x: 248.13235, y: 9.057074, z: 450.1087}
+    position: {x: 248.13235, y: 8.994675, z: 450.1087}
     facing: {x: 0.06998695, y: 0.9975479}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kiebitzweg
-    position: {x: 249.03986, y: 8.647175, z: 449.5937}
+    position: {x: 249.03986, y: 8.633875, z: 449.5937}
     facing: {x: 0.97672224, y: -0.21450794}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kiebitzweg
-    position: {x: 248.98907, y: 8.651748, z: 449.6048}
+    position: {x: 248.98907, y: 8.636203, z: 449.6048}
     facing: {x: -0.97672224, y: 0.21450794}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Willrath-Dreesen-Stra\xDFe"
-    position: {x: 402.86353, y: 8.616816, z: 439.23492}
+    position: {x: 402.86353, y: 8.623817, z: 439.23492}
     facing: {x: -0.06877661, y: -0.9976321}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Willrath-Dreesen-Stra\xDFe"
-    position: {x: 402.86713, y: 8.615364, z: 439.2868}
+    position: {x: 402.86713, y: 8.623321, z: 439.2868}
     facing: {x: 0.06877661, y: 0.9976321}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 403.82693, y: 8.326863, z: 438.8105}
+    position: {x: 403.82693, y: 8.326066, z: 438.8105}
     facing: {x: 0.99467325, y: -0.10307806}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 403.77524, y: 8.327422, z: 438.81586}
+    position: {x: 403.77524, y: 8.326502, z: 438.81586}
     facing: {x: -0.99467325, y: 0.10307806}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Gartenstra\xDFe"
-    position: {x: -53.315544, y: 8.6953125, z: 267.9287}
+    position: {x: -53.315544, y: 8.6988735, z: 267.9287}
     facing: {x: 0.49765518, y: 0.867375}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Gartenstra\xDFe"
-    position: {x: -53.341415, y: 8.696285, z: 267.8836}
+    position: {x: -53.341415, y: 8.698965, z: 267.8836}
     facing: {x: -0.49765518, y: -0.867375}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Barkhausenstra\xDFe"
-    position: {x: -54.101997, y: 8.411973, z: 267.56552}
+    position: {x: -54.101997, y: 8.401713, z: 267.56552}
     facing: {x: 0.8543679, y: -0.51966864}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Barkhausenstra\xDFe"
-    position: {x: -54.14643, y: 8.412308, z: 267.5925}
+    position: {x: -54.14643, y: 8.401877, z: 267.5925}
     facing: {x: -0.8543679, y: 0.51966864}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Gartenstra\xDFe"
-    position: {x: 39.69738, y: 7.615515, z: 223.30635}
+    position: {x: 39.69738, y: 7.5707994, z: 223.30635}
     facing: {x: -0.46386737, y: -0.88590467}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Gartenstra\xDFe"
-    position: {x: 39.721497, y: 7.6159163, z: 223.35243}
+    position: {x: 39.721497, y: 7.5704827, z: 223.35243}
     facing: {x: 0.46386737, y: 0.88590467}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Vogtpad
-    position: {x: 40.269653, y: 7.3112316, z: 223.37108}
+    position: {x: 40.269653, y: 7.268491, z: 223.37108}
     facing: {x: -0.89664644, y: 0.4427474}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Vogtpad
-    position: {x: 40.316284, y: 7.3102837, z: 223.34807}
+    position: {x: 40.316284, y: 7.268588, z: 223.34807}
     facing: {x: 0.89664644, y: -0.4427474}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Gerk-sin-Spoor
-    position: {x: 420.7036, y: 8.969597, z: 518.5081}
+    position: {x: 420.7036, y: 8.969549, z: 518.5081}
     facing: {x: 0.9962375, y: -0.08666495}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Gerk-sin-Spoor
-    position: {x: 420.6518, y: 8.9683275, z: 518.51263}
+    position: {x: 420.6518, y: 8.969204, z: 518.51263}
     facing: {x: -0.9962375, y: 0.08666495}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Otzumer Weg
-    position: {x: 421.19345, y: 8.675047, z: 519.1646}
+    position: {x: 421.19345, y: 8.679198, z: 519.1646}
     facing: {x: -0.07595397, y: 0.9971113}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Otzumer Weg
-    position: {x: 421.19742, y: 8.675627, z: 519.11273}
+    position: {x: 421.19742, y: 8.678755, z: 519.11273}
     facing: {x: 0.07595397, y: -0.9971113}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Gerk-sin-Spoor
-    position: {x: 413.31345, y: 9.404573, z: 587.56415}
+    position: {x: 413.31345, y: 9.39929, z: 587.56415}
     facing: {x: 0.999994, y: -0.0034841045}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Gerk-sin-Spoor
-    position: {x: 413.26144, y: 9.406904, z: 587.5644}
+    position: {x: 413.26144, y: 9.400444, z: 587.5644}
     facing: {x: -0.999994, y: 0.0034841045}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Heerenhusstra\xDFe"
-    position: {x: 412.652, y: 9.11394, z: 588.1339}
+    position: {x: 412.652, y: 9.11414, z: 588.1339}
     facing: {x: -0.001017252, y: -0.99999946}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Heerenhusstra\xDFe"
-    position: {x: 412.652, y: 9.111565, z: 588.1859}
+    position: {x: 412.652, y: 9.1140175, z: 588.1859}
     facing: {x: 0.001017252, y: 0.99999946}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Fritz-Reuter-Stra\xDFe"
-    position: {x: 274.22717, y: 7.474274, z: 168.48204}
+    position: {x: 274.22717, y: 7.4759054, z: 168.48204}
     facing: {x: -0.99949783, y: -0.031687383}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Fritz-Reuter-Stra\xDFe"
-    position: {x: 274.27917, y: 7.4743085, z: 168.48369}
+    position: {x: 274.27917, y: 7.475894, z: 168.48369}
     facing: {x: 0.99949783, y: 0.031687383}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Gartenstra\xDFe"
-    position: {x: 274.7891, y: 7.165004, z: 167.69444}
+    position: {x: 274.7891, y: 7.1739607, z: 167.69444}
     facing: {x: 0.014325666, y: 0.9998974}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Gartenstra\xDFe"
-    position: {x: 274.7883, y: 7.164381, z: 167.64247}
+    position: {x: 274.7883, y: 7.1738434, z: 167.64247}
     facing: {x: -0.014325666, y: -0.9998974}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Fritz-Reuter-Stra\xDFe"
-    position: {x: 257.13837, y: 7.4778085, z: 269.27472}
+    position: {x: 257.13837, y: 7.43562, z: 269.27472}
     facing: {x: 0.9623127, y: 0.2719452}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Fritz-Reuter-Stra\xDFe"
-    position: {x: 257.08838, y: 7.477222, z: 269.26056}
+    position: {x: 257.08838, y: 7.4355845, z: 269.26056}
     facing: {x: -0.9623127, y: -0.2719452}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Theodor-Storm-Stra\xDFe"
-    position: {x: 257.67822, y: 7.184162, z: 270.373}
+    position: {x: 257.67822, y: 7.1362934, z: 270.373}
     facing: {x: -0.35766652, y: 0.9338494}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Theodor-Storm-Stra\xDFe"
-    position: {x: 257.69684, y: 7.184988, z: 270.32446}
+    position: {x: 257.69684, y: 7.1362934, z: 270.32446}
     facing: {x: 0.35766652, y: -0.9338494}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Fritz-Reuter-Stra\xDFe"
-    position: {x: 234.1305, y: 7.406795, z: 331.71936}
+    position: {x: 234.1305, y: 7.4106536, z: 331.71936}
     facing: {x: 0.9057983, y: 0.42370906}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Fritz-Reuter-Stra\xDFe"
-    position: {x: 234.0834, y: 7.4062195, z: 331.69733}
+    position: {x: 234.0834, y: 7.4106493, z: 331.69733}
     facing: {x: -0.9057983, y: -0.42370906}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hermann-L\xF6ns-Stra\xDFe"
-    position: {x: 234.4964, y: 7.117795, z: 332.78256}
+    position: {x: 234.4964, y: 7.1119604, z: 332.78256}
     facing: {x: -0.39492288, y: 0.9187143}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hermann-L\xF6ns-Stra\xDFe"
-    position: {x: 234.51694, y: 7.117626, z: 332.73483}
+    position: {x: 234.51694, y: 7.1118813, z: 332.73483}
     facing: {x: 0.39492288, y: -0.9187143}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Fritz-Reuter-Stra\xDFe"
-    position: {x: 183.90666, y: 7.8728113, z: 398.81015}
+    position: {x: 183.90666, y: 7.862125, z: 398.81015}
     facing: {x: 0.7842426, y: 0.6204544}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Fritz-Reuter-Stra\xDFe"
-    position: {x: 183.86586, y: 7.872799, z: 398.77786}
+    position: {x: 183.86586, y: 7.862138, z: 398.77786}
     facing: {x: -0.7842426, y: -0.6204544}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kiebitzweg
-    position: {x: 183.00261, y: 7.564845, z: 399.24045}
+    position: {x: 183.00261, y: 7.564762, z: 399.24045}
     facing: {x: 0.38305175, y: -0.9237269}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kiebitzweg
-    position: {x: 182.98271, y: 7.5644217, z: 399.28848}
+    position: {x: 182.98271, y: 7.564904, z: 399.28848}
     facing: {x: -0.38305175, y: 0.9237269}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Theodor-Storm-Stra\xDFe"
-    position: {x: 395.37003, y: 7.615612, z: 295.5091}
+    position: {x: 395.37003, y: 7.493864, z: 295.5091}
     facing: {x: 0.05275478, y: -0.99860746}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Theodor-Storm-Stra\xDFe"
-    position: {x: 395.36728, y: 7.613928, z: 295.56104}
+    position: {x: 395.36728, y: 7.4938655, z: 295.56104}
     facing: {x: -0.05275478, y: 0.99860746}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 396.2653, y: 7.292762, z: 295.1995}
+    position: {x: 396.2653, y: 7.194475, z: 295.1995}
     facing: {x: 0.9983651, y: 0.057159297}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 396.21335, y: 7.2942324, z: 295.19656}
+    position: {x: 396.21335, y: 7.1944065, z: 295.19656}
     facing: {x: -0.9983651, y: -0.057159297}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Schniederdamm
-    position: {x: 1263.335, y: 8.405956, z: 390.87305}
+    position: {x: 1263.335, y: 8.511076, z: 390.87305}
     facing: {x: 0.9934089, y: -0.114624105}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Schniederdamm
-    position: {x: 1263.2832, y: 8.405397, z: 390.87903}
+    position: {x: 1263.2832, y: 8.510942, z: 390.87903}
     facing: {x: -0.9934089, y: 0.114624105}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Willrath-Dreesen-Stra\xDFe"
-    position: {x: 1262.4009, y: 8.117366, z: 391.5358}
+    position: {x: 1262.4009, y: 8.216515, z: 391.5358}
     facing: {x: -0.13978693, y: -0.9901816}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Willrath-Dreesen-Stra\xDFe"
-    position: {x: 1262.4082, y: 8.119472, z: 391.58725}
+    position: {x: 1262.4082, y: 8.217273, z: 391.58725}
     facing: {x: 0.13978693, y: 0.9901816}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melksett
-    position: {x: 578.1702, y: 7.3884816, z: -59.87598}
+    position: {x: 578.1702, y: 7.3633804, z: -59.87598}
     facing: {x: -0.9999581, y: 0.009155274}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melksett
-    position: {x: 578.2222, y: 7.3883076, z: -59.87646}
+    position: {x: 578.2222, y: 7.3633647, z: -59.87646}
     facing: {x: 0.9999581, y: -0.009155274}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melkerpad
-    position: {x: 577.8149, y: 7.086089, z: -60.278774}
+    position: {x: 577.8149, y: 7.0628633, z: -60.278774}
     facing: {x: 0.09592407, y: -0.9953887}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melkerpad
-    position: {x: 577.8099, y: 7.086632, z: -60.227016}
+    position: {x: 577.8099, y: 7.062854, z: -60.227016}
     facing: {x: -0.09592407, y: 0.9953887}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wall
-    position: {x: 334.1983, y: 7.3493633, z: 40.58502}
+    position: {x: 334.1983, y: 7.5009027, z: 40.58502}
     facing: {x: 0.08171126, y: -0.996656}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wall
-    position: {x: 334.1941, y: 7.351701, z: 40.636845}
+    position: {x: 334.1941, y: 7.500993, z: 40.636845}
     facing: {x: -0.08171126, y: 0.996656}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Meedenweg
-    position: {x: 334.557, y: 7.045683, z: 40.25729}
+    position: {x: 334.557, y: 7.200802, z: 40.25729}
     facing: {x: 0.99493295, y: 0.100540176}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Meedenweg
-    position: {x: 334.5053, y: 7.043704, z: 40.252064}
+    position: {x: 334.5053, y: 7.200719, z: 40.252064}
     facing: {x: -0.99493295, y: -0.100540176}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wall
-    position: {x: 410.41498, y: 7.609926, z: 52.10643}
+    position: {x: 410.41498, y: 7.5709877, z: 52.10643}
     facing: {x: 0.06659556, y: -0.9977801}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wall
-    position: {x: 410.4115, y: 7.610045, z: 52.158318}
+    position: {x: 410.4115, y: 7.5706706, z: 52.158318}
     facing: {x: -0.06659556, y: 0.9977801}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 410.66635, y: 7.305007, z: 52.53307}
+    position: {x: 410.66635, y: 7.2683764, z: 52.53307}
     facing: {x: -0.9989219, y: -0.04642233}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 410.7183, y: 7.303915, z: 52.53548}
+    position: {x: 410.7183, y: 7.26836, z: 52.53548}
     facing: {x: 0.9989219, y: 0.04642233}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Pan's Pad
-    position: {x: 413.58264, y: 7.30183, z: 143.33716}
+    position: {x: 413.58264, y: 7.335994, z: 143.33716}
     facing: {x: -0.07092029, y: 0.997482}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Pan's Pad
-    position: {x: 413.58636, y: 7.3047886, z: 143.28531}
+    position: {x: 413.58636, y: 7.335997, z: 143.28531}
     facing: {x: 0.07092029, y: -0.997482}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 413.25168, y: 7.007784, z: 142.90384}
+    position: {x: 413.25168, y: 7.0350027, z: 142.90384}
     facing: {x: 0.99823326, y: 0.059417766}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 413.19974, y: 7.0052567, z: 142.90073}
+    position: {x: 413.19974, y: 7.034857, z: 142.90073}
     facing: {x: -0.99823326, y: -0.059417766}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Lerchenweg
-    position: {x: 496.6364, y: 7.492743, z: 49.80884}
+    position: {x: 496.6364, y: 7.430751, z: 49.80884}
     facing: {x: 0.9999037, y: -0.013880416}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Lerchenweg
-    position: {x: 496.5844, y: 7.493392, z: 49.809566}
+    position: {x: 496.5844, y: 7.4307117, z: 49.809566}
     facing: {x: -0.9999037, y: 0.013880416}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wall
-    position: {x: 496.32153, y: 7.192277, z: 50.186493}
+    position: {x: 496.32153, y: 7.1281195, z: 50.186493}
     facing: {x: 0.07307764, y: -0.9973263}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wall
-    position: {x: 496.3177, y: 7.191903, z: 50.23835}
+    position: {x: 496.3177, y: 7.127987, z: 50.23835}
     facing: {x: -0.07307764, y: 0.9973263}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Lerchenweg
-    position: {x: 504.71698, y: 7.4810014, z: -66.73137}
+    position: {x: 504.71698, y: 7.4620576, z: -66.73137}
     facing: {x: -0.99999124, y: -0.0041758227}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Lerchenweg
-    position: {x: 504.76898, y: 7.4807696, z: -66.73114}
+    position: {x: 504.76898, y: 7.4618855, z: -66.73114}
     facing: {x: 0.99999124, y: 0.0041758227}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melkerpad
-    position: {x: 505.1236, y: 7.1747437, z: -67.09749}
+    position: {x: 505.1236, y: 7.158758, z: -67.09749}
     facing: {x: -0.08589948, y: 0.9963038}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melkerpad
-    position: {x: 505.12805, y: 7.173997, z: -67.14929}
+    position: {x: 505.12805, y: 7.1584816, z: -67.14929}
     facing: {x: 0.08589948, y: -0.9963038}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Meedenweg
-    position: {x: 353.7778, y: 7.4660244, z: -82.830635}
+    position: {x: 353.7778, y: 7.447404, z: -82.830635}
     facing: {x: -0.99493504, y: -0.100519784}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Meedenweg
-    position: {x: 353.8295, y: 7.465766, z: -82.82542}
+    position: {x: 353.8295, y: 7.447338, z: -82.82542}
     facing: {x: 0.99493504, y: 0.100519784}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melkerpad
-    position: {x: 354.2164, y: 7.1581554, z: -83.12576}
+    position: {x: 354.2164, y: 7.146472, z: -83.12576}
     facing: {x: -0.14933176, y: 0.9887872}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melkerpad
-    position: {x: 354.2242, y: 7.1572437, z: -83.17717}
+    position: {x: 354.2242, y: 7.146405, z: -83.17717}
     facing: {x: 0.14933176, y: -0.9887872}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Rosenweg
-    position: {x: 30.365944, y: 8.491985, z: 67.902306}
+    position: {x: 30.365944, y: 8.524654, z: 67.902306}
     facing: {x: 0.9899345, y: -0.14152625}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Rosenweg
-    position: {x: 30.314468, y: 8.491964, z: 67.909676}
+    position: {x: 30.314468, y: 8.524738, z: 67.909676}
     facing: {x: -0.9899345, y: 0.14152625}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Vormann-Otten-Weg
-    position: {x: 31.110933, y: 8.194332, z: 68.21973}
+    position: {x: 31.110933, y: 8.230328, z: 68.21973}
     facing: {x: 0.06751379, y: 0.99771833}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Vormann-Otten-Weg
-    position: {x: 31.10742, y: 8.1940775, z: 68.16785}
+    position: {x: 31.10742, y: 8.229484, z: 68.16785}
     facing: {x: -0.06751379, y: -0.99771833}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Rosenweg
-    position: {x: 14.655434, y: 8.430193, z: 5.5424657}
+    position: {x: 14.655434, y: 8.459003, z: 5.5424657}
     facing: {x: -0.97308606, y: 0.23044205}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Rosenweg
-    position: {x: 14.706034, y: 8.430468, z: 5.530483}
+    position: {x: 14.706034, y: 8.459288, z: 5.530483}
     facing: {x: 0.97308606, y: -0.23044205}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hauptstra\xDFe"
-    position: {x: 14.145942, y: 8.134326, z: 5.309998}
+    position: {x: 14.145942, y: 8.158535, z: 5.309998}
     facing: {x: -0.2767007, y: -0.96095616}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hauptstra\xDFe"
-    position: {x: 14.160331, y: 8.133361, z: 5.3599677}
+    position: {x: 14.160331, y: 8.158255, z: 5.3599677}
     facing: {x: 0.2767007, y: 0.96095616}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Vormann-Otten-Weg
-    position: {x: -20.295038, y: 9.12076, z: 84.3627}
+    position: {x: -20.295038, y: 9.057405, z: 84.3627}
     facing: {x: 0.097715996, y: 0.9952143}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Vormann-Otten-Weg
-    position: {x: -20.30012, y: 9.119972, z: 84.31096}
+    position: {x: -20.30012, y: 9.057293, z: 84.31096}
     facing: {x: -0.097715996, y: -0.9952143}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "M\xF6wenweg"
-    position: {x: -20.968044, y: 8.826177, z: 84.74495}
+    position: {x: -20.968044, y: 8.758723, z: 84.74495}
     facing: {x: -0.9760584, y: 0.21750851}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "M\xF6wenweg"
-    position: {x: -20.91729, y: 8.826023, z: 84.73364}
+    position: {x: -20.91729, y: 8.758668, z: 84.73364}
     facing: {x: 0.9760584, y: -0.21750851}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melkerpad
-    position: {x: 747.36707, y: 8.336232, z: -153.87885}
+    position: {x: 747.36707, y: 8.332723, z: -153.87885}
     facing: {x: -0.9559192, y: -0.29362977}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melkerpad
-    position: {x: 747.41675, y: 8.336178, z: -153.86359}
+    position: {x: 747.41675, y: 8.333122, z: -153.86359}
     facing: {x: 0.9559192, y: 0.29362977}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Schniederdamm
-    position: {x: 746.96106, y: 8.052923, z: -154.34111}
+    position: {x: 746.96106, y: 8.041864, z: -154.34111}
     facing: {x: 0.1421181, y: -0.9898497}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Schniederdamm
-    position: {x: 746.9536, y: 8.050344, z: -154.28966}
+    position: {x: 746.9536, y: 8.039829, z: -154.28966}
     facing: {x: -0.1421181, y: 0.9898497}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melkerpad
-    position: {x: 753.66895, y: 8.305054, z: -152.67671}
+    position: {x: 753.66895, y: 8.353671, z: -152.67671}
     facing: {x: 0.9559192, y: 0.29362977}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melkerpad
-    position: {x: 753.61926, y: 8.305673, z: -152.69197}
+    position: {x: 753.61926, y: 8.353817, z: -152.69197}
     facing: {x: -0.9559192, y: -0.29362977}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Schniederdamm
-    position: {x: 754.07446, y: 7.9785433, z: -152.21196}
+    position: {x: 754.07446, y: 8.035293, z: -152.21196}
     facing: {x: -0.14663005, y: 0.9891914}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Schniederdamm
-    position: {x: 754.08215, y: 7.981841, z: -152.26341}
+    position: {x: 754.08215, y: 8.03799, z: -152.26341}
     facing: {x: 0.14663005, y: -0.9891914}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melkerpad
-    position: {x: 522.7191, y: 7.5028477, z: -71.93464}
+    position: {x: 522.7191, y: 7.4811883, z: -71.93464}
     facing: {x: -0.09592407, y: 0.9953887}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melkerpad
-    position: {x: 522.7241, y: 7.504021, z: -71.98641}
+    position: {x: 522.7241, y: 7.481361, z: -71.98641}
     facing: {x: 0.09592407, y: -0.9953887}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "An den Bauh\xF6fen"
-    position: {x: 522.37024, y: 7.2154284, z: -72.63457}
+    position: {x: 522.37024, y: 7.1815863, z: -72.63457}
     facing: {x: 0.9999864, y: 0.0052185077}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "An den Bauh\xF6fen"
-    position: {x: 522.31824, y: 7.2150927, z: -72.63484}
+    position: {x: 522.31824, y: 7.181345, z: -72.63484}
     facing: {x: -0.9999864, y: -0.0052185077}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melkerpad
-    position: {x: 434.0309, y: 7.5026245, z: -80.92363}
+    position: {x: 434.0309, y: 7.531516, z: -80.92363}
     facing: {x: -0.10438659, y: 0.9945368}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melkerpad
-    position: {x: 434.03635, y: 7.5028076, z: -80.97534}
+    position: {x: 434.03635, y: 7.531728, z: -80.97534}
     facing: {x: 0.10438659, y: -0.9945368}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 433.69058, y: 7.2031326, z: -81.370964}
+    position: {x: 433.69058, y: 7.2336254, z: -81.370964}
     facing: {x: 0.99955875, y: 0.029703815}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 433.63858, y: 7.2019434, z: -81.37252}
+    position: {x: 433.63858, y: 7.2336006, z: -81.37252}
     facing: {x: -0.99955875, y: -0.029703815}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 435.26746, y: 7.6524935, z: -144.05182}
+    position: {x: 435.26746, y: 7.6738825, z: -144.05182}
     facing: {x: -0.9996712, y: -0.025639834}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 435.31946, y: 7.6545134, z: -144.05048}
+    position: {x: 435.31946, y: 7.6760225, z: -144.05048}
     facing: {x: 0.9996712, y: 0.025639834}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "An den Bauh\xF6fen"
-    position: {x: 435.94058, y: 7.364599, z: -144.40382}
+    position: {x: 435.94058, y: 7.38503, z: -144.40382}
     facing: {x: -0.00580498, y: 0.9999832}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "An den Bauh\xF6fen"
-    position: {x: 435.9409, y: 7.3625717, z: -144.4558}
+    position: {x: 435.9409, y: 7.3825426, z: -144.4558}
     facing: {x: 0.00580498, y: -0.9999832}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 430.99634, y: 7.840163, z: -221.597}
+    position: {x: 430.99634, y: 7.9162717, z: -221.597}
     facing: {x: -0.8488128, y: 0.52869344}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 431.04047, y: 7.842171, z: -221.6245}
+    position: {x: 431.04047, y: 7.91743, z: -221.6245}
     facing: {x: 0.8488128, y: -0.52869344}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Schniederdamm
-    position: {x: 431.3634, y: 7.561983, z: -222.0158}
+    position: {x: 431.3634, y: 7.6293116, z: -222.0158}
     facing: {x: 0.1916377, y: 0.98146576}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Schniederdamm
-    position: {x: 431.35345, y: 7.5630713, z: -222.06682}
+    position: {x: 431.35345, y: 7.6300764, z: -222.06682}
     facing: {x: -0.1916377, y: -0.98146576}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wall
-    position: {x: 150.51022, y: 7.6152773, z: 122.96293}
+    position: {x: 150.51022, y: 7.6104846, z: 122.96293}
     facing: {x: 0.99949974, y: 0.031628948}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wall
-    position: {x: 150.45825, y: 7.6156063, z: 122.96128}
+    position: {x: 150.45825, y: 7.610445, z: 122.96128}
     facing: {x: -0.99949974, y: -0.031628948}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Karkpolder
-    position: {x: 150.04904, y: 7.3206043, z: 123.25679}
+    position: {x: 150.04904, y: 7.3092146, z: 123.25679}
     facing: {x: -0.054805756, y: -0.998497}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Karkpolder
-    position: {x: 150.05188, y: 7.3209906, z: 123.3087}
+    position: {x: 150.05188, y: 7.309063, z: 123.3087}
     facing: {x: 0.054805756, y: 0.998497}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wall
-    position: {x: 156.5632, y: 7.4797087, z: 173.2834}
+    position: {x: 156.5632, y: 7.4497085, z: 173.2834}
     facing: {x: 0.98874223, y: -0.14962856}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wall
-    position: {x: 156.51178, y: 7.479524, z: 173.29118}
+    position: {x: 156.51178, y: 7.449703, z: 173.29118}
     facing: {x: -0.98874223, y: 0.14962856}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Gartenstra\xDFe"
-    position: {x: 157.08759, y: 7.1702576, z: 173.50964}
+    position: {x: 157.08759, y: 7.1462755, z: 173.50964}
     facing: {x: 0.19083923, y: 0.9816213}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Gartenstra\xDFe"
-    position: {x: 157.07767, y: 7.1721706, z: 173.45859}
+    position: {x: 157.07767, y: 7.1468735, z: 173.45859}
     facing: {x: -0.19083923, y: -0.9816213}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "St\xF6rtebekerstra\xDFe"
-    position: {x: -221.64368, y: 8.3724575, z: -529.7843}
+    position: {x: -221.64368, y: 8.367059, z: -529.7843}
     facing: {x: -0.9985613, y: 0.053621694}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "St\xF6rtebekerstra\xDFe"
-    position: {x: -221.59177, y: 8.371761, z: -529.7871}
+    position: {x: -221.59177, y: 8.366869, z: -529.7871}
     facing: {x: 0.9985613, y: -0.053621694}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wald
-    position: {x: -221.95477, y: 8.070952, z: -530.52106}
+    position: {x: -221.95477, y: 8.066823, z: -530.52106}
     facing: {x: -0.040405262, y: -0.99918336}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wald
-    position: {x: -221.95267, y: 8.071192, z: -530.4692}
+    position: {x: -221.95267, y: 8.066825, z: -530.4692}
     facing: {x: 0.040405262, y: 0.99918336}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "St\xF6rtebekerstra\xDFe"
-    position: {x: -218.8406, y: 8.289188, z: -478.5607}
+    position: {x: -218.8406, y: 8.262606, z: -478.5607}
     facing: {x: 0.9985613, y: -0.053621966}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "St\xF6rtebekerstra\xDFe"
-    position: {x: -218.89252, y: 8.289129, z: -478.5579}
+    position: {x: -218.89252, y: 8.262533, z: -478.5579}
     facing: {x: -0.9985613, y: 0.053621966}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wald
-    position: {x: -219.12607, y: 7.984372, z: -477.85318}
+    position: {x: -219.12607, y: 7.95753, z: -477.85318}
     facing: {x: -0.03571575, y: -0.999362}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wald
-    position: {x: -219.1242, y: 7.9840364, z: -477.80124}
+    position: {x: -219.1242, y: 7.957181, z: -477.80124}
     facing: {x: 0.03571575, y: 0.999362}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kiebitzweg
-    position: {x: 155.37672, y: 7.6289682, z: 387.74496}
+    position: {x: 155.37672, y: 7.7077, z: 387.74496}
     facing: {x: -0.38305175, y: 0.9237269}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kiebitzweg
-    position: {x: 155.39662, y: 7.6289287, z: 387.69693}
+    position: {x: 155.39662, y: 7.707723, z: 387.69693}
     facing: {x: 0.38305175, y: -0.9237269}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Hasenpad
-    position: {x: 155.09976, y: 7.318303, z: 387.23395}
+    position: {x: 155.09976, y: 7.407528, z: 387.23395}
     facing: {x: 0.97162336, y: 0.2365333}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Hasenpad
-    position: {x: 155.04926, y: 7.317127, z: 387.22162}
+    position: {x: 155.04926, y: 7.407486, z: 387.22162}
     facing: {x: -0.97162336, y: -0.2365333}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kiebitzweg
-    position: {x: 66.5574, y: 8.041008, z: 351.82727}
+    position: {x: 66.5574, y: 8.008142, z: 351.82727}
     facing: {x: -0.6699466, y: 0.7424092}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kiebitzweg
-    position: {x: 66.59224, y: 8.042007, z: 351.78864}
+    position: {x: 66.59224, y: 8.008026, z: 351.78864}
     facing: {x: 0.6699466, y: -0.7424092}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Vogtpad
-    position: {x: 66.314156, y: 7.7375975, z: 351.22968}
+    position: {x: 66.314156, y: 7.7061844, z: 351.22968}
     facing: {x: 0.9952429, y: 0.097424686}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Vogtpad
-    position: {x: 66.26241, y: 7.736841, z: 351.2246}
+    position: {x: 66.26241, y: 7.7057695, z: 351.2246}
     facing: {x: -0.9952429, y: -0.097424686}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Erlenweg
-    position: {x: 175.9668, y: 8.501638, z: -527.1094}
+    position: {x: 175.9668, y: 8.537262, z: -527.1094}
     facing: {x: 0.9803209, y: -0.19741066}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Erlenweg
-    position: {x: 175.91583, y: 8.50191, z: -527.0991}
+    position: {x: 175.91583, y: 8.537615, z: -527.0991}
     facing: {x: -0.9803209, y: 0.19741066}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderd\xFCnenring"
-    position: {x: 175.41306, y: 8.209983, z: -526.7858}
+    position: {x: 175.41306, y: 8.24649, z: -526.7858}
     facing: {x: -0.018646222, y: -0.99982613}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderd\xFCnenring"
-    position: {x: 175.41403, y: 8.211305, z: -526.7338}
+    position: {x: 175.41403, y: 8.247807, z: -526.7338}
     facing: {x: 0.018646222, y: 0.99982613}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Vangerowpad
-    position: {x: 36.164623, y: 8.302116, z: -9.615959}
+    position: {x: 36.164623, y: 8.393284, z: -9.615959}
     facing: {x: 0.95768905, y: -0.28780493}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Vangerowpad
-    position: {x: 36.11482, y: 8.301966, z: -9.600994}
+    position: {x: 36.11482, y: 8.393373, z: -9.600994}
     facing: {x: -0.95768905, y: 0.28780493}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hauptstra\xDFe"
-    position: {x: 35.81791, y: 8.009708, z: -9.056034}
+    position: {x: 35.81791, y: 8.094687, z: -9.056034}
     facing: {x: -0.27743888, y: -0.96074325}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hauptstra\xDFe"
-    position: {x: 35.832336, y: 8.01109, z: -9.006075}
+    position: {x: 35.832336, y: 8.094834, z: -9.006075}
     facing: {x: 0.27743888, y: 0.96074325}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Hospizplatz
-    position: {x: 10.410678, y: 8.889164, z: 378.3416}
+    position: {x: 10.410678, y: 8.872568, z: 378.3416}
     facing: {x: -0.7405777, y: -0.67197067}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Hospizplatz
-    position: {x: 10.449189, y: 8.889099, z: 378.37653}
+    position: {x: 10.449189, y: 8.872513, z: 378.37653}
     facing: {x: 0.7405777, y: 0.67197067}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Barkhausenstra\xDFe"
-    position: {x: 11.2203045, y: 8.570319, z: 378.47568}
+    position: {x: 11.2203045, y: 8.557257, z: 378.47568}
     facing: {x: -0.79638755, y: 0.6047867}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Barkhausenstra\xDFe"
-    position: {x: 11.261717, y: 8.56824, z: 378.44424}
+    position: {x: 11.261717, y: 8.555571, z: 378.44424}
     facing: {x: 0.79638755, y: -0.6047867}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Vogtpad
-    position: {x: 57.316444, y: 8.000715, z: 348.2588}
+    position: {x: 57.316444, y: 8.041029, z: 348.2588}
     facing: {x: 0.89715683, y: 0.4417121}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Vogtpad
-    position: {x: 57.26979, y: 8.00082, z: 348.23578}
+    position: {x: 57.26979, y: 8.041524, z: 348.23578}
     facing: {x: -0.89715683, y: -0.4417121}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kiebitzweg
-    position: {x: 57.41254, y: 7.708068, z: 348.85828}
+    position: {x: 57.41254, y: 7.7484713, z: 348.85828}
     facing: {x: -0.77058804, y: 0.6373335}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Kiebitzweg
-    position: {x: 57.45261, y: 7.7072525, z: 348.82513}
+    position: {x: 57.45261, y: 7.7472343, z: 348.82513}
     facing: {x: 0.77058804, y: -0.6373335}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 418.19815, y: 7.568876, z: -75.51918}
+    position: {x: 418.19815, y: 7.544271, z: -75.51918}
     facing: {x: -0.9998757, y: -0.01576742}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 418.25015, y: 7.5683303, z: -75.51836}
+    position: {x: 418.25015, y: 7.54413, z: -75.51836}
     facing: {x: 0.9998757, y: 0.01576742}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melkerpad
-    position: {x: 418.61057, y: 7.26017, z: -75.8532}
+    position: {x: 418.61057, y: 7.243431, z: -75.8532}
     facing: {x: -0.057683405, y: 0.9983349}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melkerpad
-    position: {x: 418.61356, y: 7.25947, z: -75.90511}
+    position: {x: 418.61356, y: 7.2434664, z: -75.90511}
     facing: {x: 0.057683405, y: -0.9983349}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderpad"
-    position: {x: 220.01076, y: 8.682004, z: -507.5814}
+    position: {x: 220.01076, y: 8.643218, z: -507.5814}
     facing: {x: -0.93872947, y: -0.34465483}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderpad"
-    position: {x: 220.05956, y: 8.681738, z: -507.56345}
+    position: {x: 220.05956, y: 8.643302, z: -507.56345}
     facing: {x: 0.93872947, y: 0.34465483}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderd\xFCnenring"
-    position: {x: 220.69148, y: 8.369265, z: -507.63855}
+    position: {x: 220.69148, y: 8.346142, z: -507.63855}
     facing: {x: -0.3849487, y: 0.9229379}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderd\xFCnenring"
-    position: {x: 220.7115, y: 8.367531, z: -507.68652}
+    position: {x: 220.7115, y: 8.346492, z: -507.68652}
     facing: {x: 0.3849487, y: -0.9229379}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Flughafenstra\xDFe"
-    position: {x: 381.93256, y: 8.508629, z: -256.39044}
+    position: {x: 381.93256, y: 8.528394, z: -256.39044}
     facing: {x: 0.7651484, y: 0.6438539}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Flughafenstra\xDFe"
-    position: {x: 381.89276, y: 8.50828, z: -256.4239}
+    position: {x: 381.89276, y: 8.528703, z: -256.4239}
     facing: {x: -0.7651484, y: -0.6438539}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Schniederdamm
-    position: {x: 381.97397, y: 8.215608, z: -255.63066}
+    position: {x: 381.97397, y: 8.230589, z: -255.63066}
     facing: {x: -0.48136202, y: 0.8765219}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Schniederdamm
-    position: {x: 381.999, y: 8.215219, z: -255.67622}
+    position: {x: 381.999, y: 8.230164, z: -255.67622}
     facing: {x: 0.48136202, y: -0.8765219}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Friesenstra\xDFe"
-    position: {x: -121.469925, y: 8.979927, z: -212.24646}
+    position: {x: -121.469925, y: 8.982914, z: -212.24646}
     facing: {x: 0.19946532, y: 0.9799049}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Friesenstra\xDFe"
-    position: {x: -121.4803, y: 8.979469, z: -212.29742}
+    position: {x: -121.4803, y: 8.982944, z: -212.29742}
     facing: {x: -0.19946532, y: -0.9799049}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kirchstra\xDFe"
-    position: {x: -122.0114, y: 8.684631, z: -211.69356}
+    position: {x: -122.0114, y: 8.681614, z: -211.69356}
     facing: {x: -0.99779123, y: 0.066427946}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kirchstra\xDFe"
-    position: {x: -121.95952, y: 8.684966, z: -211.697}
+    position: {x: -121.95952, y: 8.681635, z: -211.697}
     facing: {x: 0.99779123, y: -0.066427946}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hauptstra\xDFe"
-    position: {x: -89.76518, y: 8.635591, z: 22.812384}
+    position: {x: -89.76518, y: 8.648186, z: 22.812384}
     facing: {x: -0.23730703, y: -0.9714347}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hauptstra\xDFe"
-    position: {x: -89.75285, y: 8.634825, z: 22.862898}
+    position: {x: -89.75285, y: 8.647366, z: 22.862898}
     facing: {x: 0.23730703, y: 0.9714347}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kirchstra\xDFe"
-    position: {x: -89.40411, y: 8.346852, z: 22.269115}
+    position: {x: -89.40411, y: 8.359498, z: 22.269115}
     facing: {x: 0.9640017, y: -0.26589587}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kirchstra\xDFe"
-    position: {x: -89.45424, y: 8.346315, z: 22.282944}
+    position: {x: -89.45424, y: 8.359003, z: 22.282944}
     facing: {x: -0.9640017, y: 0.26589587}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hauptstra\xDFe"
-    position: {x: 104.59919, y: 8.202958, z: -32.028366}
+    position: {x: 104.59919, y: 8.216311, z: -32.028366}
     facing: {x: -0.37475404, y: -0.92712426}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hauptstra\xDFe"
-    position: {x: 104.618675, y: 8.200667, z: -31.980156}
+    position: {x: 104.618675, y: 8.214916, z: -31.980156}
     facing: {x: 0.37475404, y: 0.92712426}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Otto-Leu\xDF-Weg"
-    position: {x: 104.932014, y: 7.8746033, z: -32.721447}
+    position: {x: 104.932014, y: 7.913068, z: -32.721447}
     facing: {x: 0.9694336, y: -0.24535374}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Otto-Leu\xDF-Weg"
-    position: {x: 104.8816, y: 7.879554, z: -32.70869}
+    position: {x: 104.8816, y: 7.914811, z: -32.70869}
     facing: {x: -0.9694336, y: 0.24535374}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: An den Birken
-    position: {x: 62.482033, y: 9.495703, z: -115.587395}
+    position: {x: 62.482033, y: 9.337818, z: -115.587395}
     facing: {x: 0.38300332, y: 0.92374694}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: An den Birken
-    position: {x: 62.462112, y: 9.495031, z: -115.63543}
+    position: {x: 62.462112, y: 9.337918, z: -115.63543}
     facing: {x: -0.38300332, y: -0.92374694}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Otto-Leu\xDF-Weg"
-    position: {x: 62.17605, y: 9.1745, z: -114.88991}
+    position: {x: 62.17605, y: 9.048337, z: -114.88991}
     facing: {x: -0.9026258, y: 0.43042618}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Otto-Leu\xDF-Weg"
-    position: {x: 62.222984, y: 9.177475, z: -114.91229}
+    position: {x: 62.222984, y: 9.0471325, z: -114.91229}
     facing: {x: 0.9026258, y: -0.43042618}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hafenstra\xDFe"
-    position: {x: 406.41742, y: 9.898312, z: -436.55725}
+    position: {x: 406.41742, y: 9.939819, z: -436.55725}
     facing: {x: 0.91626644, y: 0.40056935}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Hafenstra\xDFe"
-    position: {x: 406.3698, y: 9.897031, z: -436.57812}
+    position: {x: 406.3698, y: 9.939501, z: -436.57812}
     facing: {x: -0.91626644, y: -0.40056935}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderd\xFCnenring"
-    position: {x: 405.66962, y: 9.590826, z: -436.3974}
+    position: {x: 405.66962, y: 9.644094, z: -436.3974}
     facing: {x: 0.39355037, y: -0.9193031}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderd\xFCnenring"
-    position: {x: 405.6491, y: 9.591744, z: -436.3496}
+    position: {x: 405.6491, y: 9.645038, z: -436.3496}
     facing: {x: -0.39355037, y: 0.9193031}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Sanddornweg
-    position: {x: -426.49966, y: 8.146936, z: -512.7625}
+    position: {x: -426.49966, y: 8.153406, z: -512.7625}
     facing: {x: -0.848672, y: -0.5289195}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Sanddornweg
-    position: {x: -426.45554, y: 8.14673, z: -512.73505}
+    position: {x: -426.45554, y: 8.153401, z: -512.73505}
     facing: {x: 0.848672, y: 0.5289195}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wald
-    position: {x: -425.98212, y: 7.8437862, z: -512.97943}
+    position: {x: -425.98212, y: 7.8534164, z: -512.97943}
     facing: {x: -0.48177096, y: 0.87629724}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Wald
-    position: {x: -425.9571, y: 7.843586, z: -513.02496}
+    position: {x: -425.9571, y: 7.853421, z: -513.02496}
     facing: {x: 0.48177096, y: -0.87629724}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Gartenstra\xDFe"
-    position: {x: 403.06686, y: 7.3126864, z: 174.24356}
+    position: {x: 403.06686, y: 7.3271904, z: 174.24356}
     facing: {x: 0.06168353, y: -0.99809575}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Gartenstra\xDFe"
-    position: {x: 403.0637, y: 7.313683, z: 174.29547}
+    position: {x: 403.0637, y: 7.3272686, z: 174.29547}
     facing: {x: -0.06168353, y: 0.99809575}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 403.525, y: 7.012827, z: 174.68118}
+    position: {x: 403.525, y: 7.0288076, z: 174.68118}
     facing: {x: -0.9981285, y: -0.061152156}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Polderweg
-    position: {x: 403.57687, y: 7.012, z: 174.68436}
+    position: {x: 403.57687, y: 7.0289154, z: 174.68436}
     facing: {x: 0.9981285, y: 0.061152156}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "L\xFCtje Pad"
-    position: {x: 113.47205, y: 8.713421, z: -8.216402}
+    position: {x: 113.47205, y: 8.507878, z: -8.216402}
     facing: {x: -0.8580557, y: -0.5135566}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "L\xFCtje Pad"
-    position: {x: 113.516685, y: 8.715729, z: -8.189697}
+    position: {x: 113.516685, y: 8.508446, z: -8.189697}
     facing: {x: 0.8580557, y: 0.5135566}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "F\xE4hrhusweg"
-    position: {x: 113.95671, y: 8.41037, z: -8.198701}
+    position: {x: 113.95671, y: 8.209754, z: -8.198701}
     facing: {x: -0.74143136, y: 0.67102873}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "F\xE4hrhusweg"
-    position: {x: 113.99527, y: 8.406379, z: -8.233594}
+    position: {x: 113.99527, y: 8.209331, z: -8.233594}
     facing: {x: 0.74143136, y: -0.67102873}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Markt
-    position: {x: -129.91412, y: 10.96585, z: 29.489204}
+    position: {x: -129.91412, y: 10.911198, z: 29.489204}
     facing: {x: 0.24441053, y: 0.96967185}
     height: 0.8059998
     color:
