@@ -2,16 +2,15 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using LeGamez.World;
 using UnityEngine;
 
 namespace LeGamez.Editor.OsmImport
 {
     /// <summary>
     /// What the last import wrote, in Assets/Generated/&lt;id&gt;/build~/ (Unity ignores "~" folders, not in the repo):
-    /// - tiles.txt: content hash (<see cref="MapFormat.TileHash"/>) of every tile asset ("x z hash" per line). The importer
-    ///   rebuilds everything in memory, but writes only tiles whose hash changed – writing assets is most of the import time.
-    ///   Without the file (first import, tiles deleted by hand) all tiles are written.
+    /// - tiles.txt: signature (<see cref="TileBuild"/>) of every tile asset ("x z hash" per line). The builders always run
+    ///   for the whole area, but only tiles whose signature changed are draped, meshed and written. Without the file (first
+    ///   import, tiles deleted by hand) all tiles are written. MapExport uses the signatures to reuse unchanged pack entries.
     /// - maps-dirty.txt: tiles changed since the region images were rendered ("all" = everything) – SceneSnapshot renders
     ///   only the regions they touch and clears the list.
     /// </summary>

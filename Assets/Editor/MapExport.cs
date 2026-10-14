@@ -13,9 +13,10 @@ namespace LeGamez.Editor
     /// of the Unity version) to Builds/Maps/&lt;id&gt;/: area.bin (AreaData + small overview map + index of the world pack) and
     /// world.bin (every tile, the facade records and minimap image per 1 km region as separate entries – the app fetches
     /// single entries with HTTP Range requests), plus index.json for Tools/release/publish_maps.py.
-    /// From <see cref="MapFormat.ChunkedPackFormat"/> on the pack is split into 4 × 4 km chunk files (world-&lt;cx&gt;_&lt;cz&gt;.bin),
-    /// so a small change touches only one chunk – the publisher uploads only files whose SHA-256 changed.
-    /// Incremental: export.json next to the files remembers each entry's source (tile hash from the importer's
+    /// From <see cref="MapFormat.ChunkedPackFormat"/> on the pack is split into 4 × 4 km chunk files (world-&lt;cx&gt;_&lt;cz&gt;.bin,
+    /// region images in world-&lt;cx&gt;_&lt;cz&gt;-maps.bin), so a small change touches only one geometry chunk – the publisher
+    /// uploads only files whose SHA-256 changed.
+    /// Incremental: export.json next to the files remembers each entry's source (tile signature from the importer's
     /// TileManifest, hash of the facade records / region image) and where its bytes went; unchanged entries are copied
     /// from the previous files instead of loading and compressing the tile again. Entry order is fixed (regions west to
     /// east, south to north), so unchanged chunks come out byte for byte the same.
@@ -152,7 +153,7 @@ namespace LeGamez.Editor
                     }
                     void Put(Vector2Int region, string name, string source, byte[] bytes)
                     {
-                        string file = Chunked ? MapFormat.ChunkFile(region) : MapStore.PackFile;
+                        string file = Chunked ? MapFormat.ChunkFile(region, maps: name.StartsWith("m/")) : MapStore.PackFile;
                         if (!streams.TryGetValue(file, out var fs))
                             streams[file] = fs = new FileStream(Path.Combine(newDir, file), FileMode.Create, FileAccess.Write);
                         ulong hash = MapFormat.Hash64(bytes);

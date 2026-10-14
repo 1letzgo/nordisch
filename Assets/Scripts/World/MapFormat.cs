@@ -28,8 +28,11 @@ namespace LeGamez.World
     /// (Format 5 had one file per region with the same tile blobs, without instances; formats 1–4 were AssetBundles.)
     ///
     /// Chunked pack (from <see cref="ChunkedPackFormat"/>): instead of one world.bin the entries are spread over pack files
-    /// of <see cref="ChunkRegions"/>×<see cref="ChunkRegions"/> regions ("world-&lt;cx&gt;_&lt;cz&gt;.bin", <see cref="ChunkFile"/>),
-    /// so a change re-uploads only the chunks it touches – the others keep their content-addressed URL. The area file then
+    /// of <see cref="ChunkRegions"/>×<see cref="ChunkRegions"/> regions ("world-&lt;cx&gt;_&lt;cz&gt;.bin" = tiles + facade records,
+    /// "world-&lt;cx&gt;_&lt;cz&gt;-maps.bin" = the region images, <see cref="ChunkFile"/>), so a change re-uploads only the chunks
+    /// it touches – the others keep their content-addressed URL. Region images are rendered again around every changed
+    /// tile and never come out byte-identical, so they have files of their own (small) – a changed tile then costs one
+    /// geometry chunk, not also its neighbours. The area file then
     /// holds "pack2.idx" (deflate): int files, file names; int count, per entry [string name, ushort file, long offset,
     /// int length, ulong hash]. Area files with "pack.idx" (format 6/7) still read: every entry is in world.bin.
     /// </summary>
@@ -164,9 +167,9 @@ namespace LeGamez.World
         /// <summary>Chunk edge in regions: 4 × 4 km per pack file.</summary>
         public const int ChunkRegions = 4;
 
-        /// <summary>Pack file name of the chunk containing a region.</summary>
-        public static string ChunkFile(Vector2Int region) =>
-            $"world-{Mathf.FloorToInt(region.x / (float)ChunkRegions)}_{Mathf.FloorToInt(region.y / (float)ChunkRegions)}.bin";
+        /// <summary>Pack file name of the chunk containing a region; <paramref name="maps"/>: the one for its region images.</summary>
+        public static string ChunkFile(Vector2Int region, bool maps = false) =>
+            $"world-{Mathf.FloorToInt(region.x / (float)ChunkRegions)}_{Mathf.FloorToInt(region.y / (float)ChunkRegions)}{(maps ? "-maps" : "")}.bin";
 
         /// <summary>A pack file (never downloaded as a whole): world.bin or a chunk.</summary>
         public static bool IsPackFile(string name) => name == "world.bin" || (name != null && name.StartsWith("world-"));
