@@ -19182,7 +19182,7 @@ MonoBehaviour:
     yaw: -24.612837
     signal: 51
     group: 0
-  - position: {x: -497.96646, y: 26.05506, z: 237.92448}
+  - position: {x: -497.96646, y: 26.211952, z: 237.92448}
     yaw: 49.20601
     signal: 52
     group: 1
@@ -19350,7 +19350,7 @@ MonoBehaviour:
     yaw: 4.2639923
     signal: 70
     group: 0
-  - position: {x: 17816.842, y: 23.746004, z: -12652.693}
+  - position: {x: 17816.842, y: 23.848263, z: -12652.693}
     yaw: -55.258152
     signal: 71
     group: 0
@@ -19799,14 +19799,14 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4293981428
   - text: STOP
-    position: {x: 18531.55, y: 22.385801, z: -12804.018}
+    position: {x: 18531.55, y: 22.977428, z: -12804.018}
     facing: {x: 0.1036562, y: 0.9946132}
     height: 0.14
     color:
       serializedVersion: 2
       rgba: 4293981428
   - text: STOP
-    position: {x: 18274.014, y: 21.839117, z: -12779.664}
+    position: {x: 18274.014, y: 22.869762, z: -12779.664}
     facing: {x: 0.09147223, y: 0.99580765}
     height: 0.14
     color:
@@ -19827,7 +19827,7 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4293981428
   - text: STOP
-    position: {x: 17991.176, y: 22.49599, z: -12750.212}
+    position: {x: 17991.176, y: 23.102646, z: -12750.212}
     facing: {x: 0.3174324, y: 0.94828093}
     height: 0.14
     color:
@@ -20051,14 +20051,14 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4287136896
   - text: 50
-    position: {x: 18538.486, y: 22.991598, z: -12789.72}
+    position: {x: 18538.486, y: 23.00513, z: -12789.72}
     facing: {x: -0.09267016, y: -0.9956969}
     height: 0.26
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: 30
-    position: {x: 18531.398, y: 21.215174, z: -12800.968}
+    position: {x: 18531.398, y: 23.052193, z: -12800.968}
     facing: {x: 0.097542934, y: 0.99523133}
     height: 0.26
     color:
@@ -20471,7 +20471,7 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4287136896
   - text: 80
-    position: {x: 17948.195, y: 30.336975, z: -10997.043}
+    position: {x: 17948.195, y: 31.14346, z: -10997.043}
     facing: {x: 0.71780664, y: 0.6962426}
     height: 0.26
     color:
@@ -20849,7 +20849,7 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: 30
-    position: {x: 18274.312, y: 21.132895, z: -12776.177}
+    position: {x: 18274.312, y: 23.003046, z: -12776.177}
     facing: {x: 0.08558919, y: 0.9963305}
     height: 0.26
     color:
@@ -21269,21 +21269,21 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4287136896
   - text: 30
-    position: {x: 17992.14, y: 21.401503, z: -12746.507}
+    position: {x: 17992.14, y: 22.591478, z: -12746.507}
     facing: {x: 0.23997933, y: 0.970778}
     height: 0.26
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: 30
-    position: {x: 17999.635, y: 20.920856, z: -12745.765}
+    position: {x: 17999.635, y: 23.297066, z: -12745.765}
     facing: {x: -0.23997933, y: -0.970778}
     height: 0.26
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: 50
-    position: {x: 17989.783, y: 23.011068, z: -12753.88}
+    position: {x: 17989.783, y: 23.105679, z: -12753.88}
     facing: {x: 0.3174324, y: 0.94828093}
     height: 0.26
     color:
@@ -21318,7 +21318,7 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4287136896
   - text: 30
-    position: {x: 18619.07, y: 21.04286, z: -12808.434}
+    position: {x: 18619.07, y: 22.757595, z: -12808.434}
     facing: {x: 0.111984216, y: 0.99371}
     height: 0.26
     color:
@@ -22088,7 +22088,7 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: 80
-    position: {x: 17706.676, y: 30.283184, z: -11521.928}
+    position: {x: 17706.676, y: 30.422867, z: -11521.928}
     facing: {x: -0.41841966, y: 0.9082538}
     height: 0.26
     color:
@@ -23740,14 +23740,14 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: Lindenallee
-    position: {x: 18531.562, y: 23.313313, z: -12789.387}
+    position: {x: 18531.562, y: 23.321798, z: -12789.387}
     facing: {x: 0.9958074, y: -0.09147495}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Lindenallee
-    position: {x: 18531.512, y: 23.313148, z: -12789.383}
+    position: {x: 18531.512, y: 23.321146, z: -12789.383}
     facing: {x: -0.9958074, y: 0.09147495}
     height: 0.13
     color:
@@ -25294,28 +25294,28 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: Haarenufer
-    position: {x: 18617.283, y: 23.431992, z: -12814.574}
+    position: {x: 18617.283, y: 23.601336, z: -12814.574}
     facing: {x: -0.10642969, y: -0.9943202}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Haarenufer
-    position: {x: 18617.291, y: 23.411032, z: -12814.523}
+    position: {x: 18617.291, y: 23.600573, z: -12814.523}
     facing: {x: 0.10642969, y: 0.9943202}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Herbartstra\xDFe"
-    position: {x: 18617.72, y: 22.914343, z: -12814.04}
+    position: {x: 18617.72, y: 23.296143, z: -12814.04}
     facing: {x: -0.9978146, y: 0.06607612}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Herbartstra\xDFe"
-    position: {x: 18617.771, y: 22.916367, z: -12814.044}
+    position: {x: 18617.771, y: 23.296612, z: -12814.044}
     facing: {x: 0.9978146, y: -0.06607612}
     height: 0.13
     color:
@@ -26386,28 +26386,28 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Ofener Stra\xDFe"
-    position: {x: 18283.143, y: 23.602186, z: -12765.413}
+    position: {x: 18283.143, y: 23.705729, z: -12765.413}
     facing: {x: 0.1012441, y: 0.99486166}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Ofener Stra\xDFe"
-    position: {x: 18283.135, y: 23.589375, z: -12765.464}
+    position: {x: 18283.135, y: 23.705643, z: -12765.464}
     facing: {x: -0.1012441, y: -0.99486166}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Ratsherr-Schulze-Stra\xDFe"
-    position: {x: 18282.549, y: 23.062288, z: -12766.36}
+    position: {x: 18282.549, y: 23.403265, z: -12766.36}
     facing: {x: 0.99774903, y: -0.06705915}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Ratsherr-Schulze-Stra\xDFe"
-    position: {x: 18282.498, y: 23.063171, z: -12766.356}
+    position: {x: 18282.498, y: 23.403168, z: -12766.356}
     facing: {x: -0.99774903, y: 0.06705915}
     height: 0.13
     color:
@@ -27758,28 +27758,28 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: Rummelweg
-    position: {x: 17989.55, y: 23.431547, z: -12752.406}
+    position: {x: 17989.55, y: 23.650625, z: -12752.406}
     facing: {x: -0.9482919, y: 0.31739947}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Rummelweg
-    position: {x: 17989.602, y: 23.433668, z: -12752.424}
+    position: {x: 17989.602, y: 23.65126, z: -12752.424}
     facing: {x: 0.9482919, y: -0.31739947}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Haarenufer
-    position: {x: 17989.035, y: 23.151983, z: -12752.716}
+    position: {x: 17989.035, y: 23.344913, z: -12752.716}
     facing: {x: -0.20427924, y: -0.97891265}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Haarenufer
-    position: {x: 17989.043, y: 23.147709, z: -12752.665}
+    position: {x: 17989.043, y: 23.344929, z: -12752.665}
     facing: {x: 0.20427924, y: 0.97891265}
     height: 0.13
     color:
@@ -37600,14 +37600,14 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Kanal
-    position: {x: -7974.3325, y: 25.322298, z: 466.77124}
+    position: {x: -7974.3325, y: 25.333101, z: 466.77124}
     facing: {x: 0.68844086, y: 0.72529244}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Am Kanal
-    position: {x: -7974.3687, y: 25.320984, z: 466.73352}
+    position: {x: -7974.3687, y: 25.331203, z: 466.73352}
     facing: {x: -0.68844086, y: -0.72529244}
     height: 0.13
     color:
@@ -43046,28 +43046,28 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Lange Stra\xDFe"
-    position: {x: -501.86804, y: 25.948368, z: 236.29472}
+    position: {x: -501.86804, y: 26.176367, z: 236.29472}
     facing: {x: -0.7424173, y: -0.66993773}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Lange Stra\xDFe"
-    position: {x: -501.8294, y: 25.943886, z: 236.32957}
+    position: {x: -501.8294, y: 26.178022, z: 236.32957}
     facing: {x: 0.7424173, y: 0.66993773}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "An der Norderb\xE4ke"
-    position: {x: -501.00262, y: 25.662807, z: 236.45142}
+    position: {x: -501.00262, y: 25.9184, z: 236.45142}
     facing: {x: -0.69078887, y: 0.7230565}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "An der Norderb\xE4ke"
-    position: {x: -500.96667, y: 25.671524, z: 236.41382}
+    position: {x: -500.96667, y: 25.920494, z: 236.41382}
     facing: {x: 0.69078887, y: -0.7230565}
     height: 0.13
     color:
@@ -47239,7 +47239,7 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: 100
-    position: {x: 17501.996, y: 22.882635, z: -12683.472}
+    position: {x: 17501.996, y: 22.909761, z: -12683.472}
     facing: {x: 0.17371765, y: 0.9847955}
     height: 0.26
     color:
@@ -47358,7 +47358,7 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: 80
-    position: {x: 16076.8125, y: 30.862293, z: -10988.268}
+    position: {x: 16076.8125, y: 30.870237, z: -10988.268}
     facing: {x: 1, y: 0.00000004371139}
     height: 0.26
     color:
@@ -48443,21 +48443,21 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4293981428
   - text: "Haltsteder B\xE4ke"
-    position: {x: 10075.525, y: 30.67497, z: -5651.0474}
+    position: {x: 10075.524, y: 30.674978, z: -5651.047}
     facing: {x: 0.84117264, y: -0.5407667}
     height: 0.34
     color:
       serializedVersion: 2
       rgba: 4293981428
   - text: 500 m
-    position: {x: 10076.147, y: 29.37136, z: -5650.08}
+    position: {x: 10076.146, y: 29.371368, z: -5650.0796}
     facing: {x: 0.84117264, y: -0.5407667}
     height: 0.24
     color:
       serializedVersion: 2
       rgba: 4293981428
   - text: Ausfahrt
-    position: {x: 9593.139, y: 29.235106, z: -5384.5264}
+    position: {x: 9593.14, y: 29.234934, z: -5384.5244}
     facing: {x: 0.72727495, y: -0.6863463}
     height: 0.2
     color:
@@ -48515,6 +48515,41 @@ MonoBehaviour:
   - text: Ausfahrt 10
     position: {x: 15832.894, y: 30.109339, z: -10962.111}
     facing: {x: -0.89417875, y: 0.44771016}
+    height: 0.2
+    color:
+      serializedVersion: 2
+      rgba: 4293981428
+  - text: 9
+    position: {x: 11918.772, y: 30.167862, z: -7866.7456}
+    facing: {x: 0.4627392, y: -0.8864945}
+    height: 0.34
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: Neuenkruge
+    position: {x: 11920.368, y: 30.14744, z: -7865.9126}
+    facing: {x: 0.4627392, y: -0.8864945}
+    height: 0.34
+    color:
+      serializedVersion: 2
+      rgba: 4293981428
+  - text: "Neuenkruge \xB7 Edewecht"
+    position: {x: 11920.058, y: 29.564795, z: -7866.0747}
+    facing: {x: 0.4627392, y: -0.8864945}
+    height: 0.26
+    color:
+      serializedVersion: 2
+      rgba: 4293981428
+  - text: 500 m
+    position: {x: 11921.077, y: 28.933477, z: -7865.5425}
+    facing: {x: 0.4627392, y: -0.8864945}
+    height: 0.24
+    color:
+      serializedVersion: 2
+      rgba: 4293981428
+  - text: Ausfahrt 9
+    position: {x: 11664.926, y: 29.875988, z: -7377.919}
+    facing: {x: -0.0021727965, y: -0.9999976}
     height: 0.2
     color:
       serializedVersion: 2
@@ -48814,28 +48849,28 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4293981428
   - text: 10
-    position: {x: 17439, y: 32.908195, z: -11438.605}
+    position: {x: 17439, y: 33.031506, z: -11438.605}
     facing: {x: 0.98554, y: -0.169443}
     height: 0.34
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Oldenburg-Wechloy
-    position: {x: 17439.305, y: 32.60482, z: -11436.832}
+    position: {x: 17439.305, y: 32.667103, z: -11436.832}
     facing: {x: 0.98554, y: -0.169443}
     height: 0.27807486
     color:
       serializedVersion: 2
       rgba: 4293981428
   - text: "Wehnen \xB7 Ofen"
-    position: {x: 17439.246, y: 32.087677, z: -11437.177}
+    position: {x: 17439.246, y: 32.161823, z: -11437.177}
     facing: {x: 0.98554, y: -0.169443}
     height: 0.26
     color:
       serializedVersion: 2
       rgba: 4293981428
   - text: 500 m
-    position: {x: 17439.441, y: 31.240936, z: -11436.043}
+    position: {x: 17439.441, y: 31.27607, z: -11436.043}
     facing: {x: 0.98554, y: -0.169443}
     height: 0.24
     color:

@@ -98,8 +98,17 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    der Rampe, „Ausfahrt“-Schild; `motorway_junction` aus traffic.json). Rampen haben Rang 3 (Vorfahrt achten am Ende),
    an Autobahn-Ein-/Ausfädelungen keine Schilder. Straßenindex: Autobahn heißt nach `ref` („A 28“), Rampen
    „Anschlussstelle“; `StreetIndex.fast` markiert sie → Auto bis 130 km/h (`Car.MotorwaySpeed`, sonst 90).
-   Schutzplanken halten die Höhe des Fahrbahnrands (Dämme: längere Pfosten), im Fahrzeug ist `stepOffset` ≤ 0,25 m –
-   sonst steigt die breite Auto-Kapsel über die Planke. `"key_size"` (areas.json) hält `AreaData.sizeMeters` und damit
+   Schutzplanken: durchgehender, geschlossener Streifen (Holm 0,6–1,05 m über Unterfahrschutz bis zum Boden, 20 cm dick,
+   Props-Kollider) entlang verketteter Fahrbahnen/Rampen (Gehrung, keine Keillücken), Höhe = höchster Punkt zwischen
+   Mittellinie und Planke + 1,05 m (Dämme, Widerlager bis 12 m tiefer). Lücken nur, wo eine *anschließende* Fahrbahn
+   (gemeinsamer Punkt, Rampen-Ketten) nahe kommt – nie für die Gegenfahrbahn (Mittelplanke), Parallelstraßen oder
+   Brücken darüber. Sackgassen (Autobahn verlässt den gebauten Teil) bekommen eine Sperre quer. Höhe > Radius der
+   Auto-Kapsel (0,95 m), sonst klettert der CharacterController darüber; im Auto `stepOffset` ≤ 0,25 m, `slopeLimit` 35°.
+   `BridgeBuilder` nimmt als Endhöhe den höchsten Boden ≤ 25 m vor dem Brückenende (das DGM hat dort oft eine Grube)
+   und füllt die Grube im Fahrbahnstreifen auf (vor `BuildBase`, nicht auf anderen Fahrbahnen); Brüstungen mit
+   geschlossenen Enden. Prüfen: `-executeMethod LeGamez.Editor.MotorwayDriveTest.Run -area <id> [-fresh] [-trace x,z]`
+   (Auto-Kapsel fährt von jedem 150. m jeder Autobahn-Fahrbahn 180 m geradeaus mit ±10/25°; `-fresh` baut Planken
+   neu ohne Re-Import). Westerstede: 1439 von 1452 Fahrten an der Planke, 12 durch Ausfahrtslücken, 1 auf Fahrbahn. `"key_size"` (areas.json) hält `AreaData.sizeMeters` und damit
    `AreaInfo.MemoryKey` beim Vergrößern um denselben Mittelpunkt stabil (gespeicherte Positionen/eigene Startpunkte
    bleiben gültig). HUD-Titel = nächster Startpunkt (Westerstede/Oldenburg), Fahrradplätze bis 80.
 4. **In Unity importieren** (baut alle Gebiete, Menü-Vorschaubilder, Minimap-Karten, Hauptmenü-Szene):

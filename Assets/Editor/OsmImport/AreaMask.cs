@@ -67,6 +67,8 @@ namespace LeGamez.Editor.OsmImport
         public static bool Allows(float x, float z) => Current == null || Current.Inside(x, z);
         /// <summary>No mask, or houses are built here (settlements and road corridors).</summary>
         public static bool AllowsDetail(float x, float z) => Current == null || Current.Detail(x, z);
+        /// <summary>No mask, or detailed terrain here (motorway corridor and up).</summary>
+        public static bool AllowsFine(Vector2 p) => Current == null || Current.Value(p.x, p.y) >= FineLevel;
 
         /// <summary>Generated street lamps: in settlements only – the country roads between the villages are unlit.</summary>
         public static bool LitStreet(Vector2 p) => Current == null || Current.Value(p.x, p.y) == 255;

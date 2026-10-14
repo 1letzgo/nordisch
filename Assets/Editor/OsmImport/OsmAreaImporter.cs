@@ -138,10 +138,11 @@ namespace LeGamez.Editor.OsmImport
             aerial?.SetBuiltUp(data); // open country: smoothed fields/meadows instead of per-pixel cover
             var sink = new MeshSink();
             CoarseTerrain.Build(sink, area, WorldStyle.GroundColor(meta.ground), terrain); // before BuildBase: simplifies the field
+            // Decks instead of draped ribbons where there is a gap below; fills the pits at bridge ends (before BuildBase).
+            int bridges = BridgeBuilder.Prepare(data, area, terrain);
             GroundBuilder.BuildBase(sink, area, WorldStyle.GroundColor(meta.ground), terrain);
             int terrainTris = CoarseTerrain.TerrainTriangles(sink);
             GroundBuilder.BuildAreas(data, sink, area);
-            int bridges = BridgeBuilder.Prepare(data, area, terrain); // decks instead of draped ribbons where there is a gap below
             int lines = GroundBuilder.BuildLines(data, sink, area);
             BridgeBuilder.Build(data, sink, terrain);
             var motorway = MotorwayBuilder.Build(data, sink, area, terrain); // lane markings, guard rails
@@ -236,7 +237,7 @@ namespace LeGamez.Editor.OsmImport
             // Leave a preview of the area open (unsaved scene with all tiles) for snapshot tools.
             AreaPreview.Open(d);
 
-            Debug.Log($"[OSM] {meta.name}: motorway {motorway.carriageways} carriageway pieces/{motorway.ramps} ramps/{motorway.railKm:F1} km guard rail/{traffic.motorway} exit signs, {bridges} bridge decks");
+            Debug.Log($"[OSM] {meta.name}: motorway {motorway.carriageways} carriageway pieces/{motorway.ramps} ramps/{motorway.railKm:F1} km guard rail/{motorway.deadEnds} dead-end barriers/{traffic.motorway} exit signs, {bridges} bridge decks");
             Debug.Log($"[OSM] {meta.name}: {buildings} buildings (+{osmExtra} OSM-only), {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, gardens {gardens.plots} plots/{gardens.measured} measured hedges/{gardens.hedges} hedges/{gardens.fences} fences/{gardens.walls} walls/{gardens.drawn} drawn, terrain {(terrain.IsFlat ? "flat" : "DGM1")}, aerial {(aerial != null ? "DOP20" : "-")}, trees {(lidarTrees != null ? "LiDAR" : "OSM")}, " +
                       $"furniture {furniture.mapped} mapped/{furniture.benches} benches/{furniture.planters} planters/{furniture.seating} café tables/{furniture.fountains} fountains, {edits} hand-placed/{EditsPlacer.ChangedCount} edited, " +
                       $"facade {FacadeRecords.Windows} windows/{FacadeRecords.Doors} doors/{FacadeRecords.Gutters} gutters/{FacadeRecords.Verges} verges/{FacadeRecords.Ridges} ridges, traffic {traffic.junctionSignals} signal junctions/{traffic.crossingSignals} signal crossings/{traffic.heads} heads/{traffic.zebras} zebras/{traffic.lanes} lanes/{traffic.stops} stop/{traffic.giveWays} give way/{traffic.priority} priority/{traffic.speed} speed/{traffic.oneway} one-way/{traffic.names} names/{traffic.mapped} mapped, {pois.Count} POIs, " +
