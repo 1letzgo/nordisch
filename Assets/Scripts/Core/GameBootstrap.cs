@@ -61,7 +61,11 @@ namespace LeGamez.Core
             }
 
             // The world streams in around the camera – the start surroundings must be there before anything is placed.
-            var loading = LoadingScreen(area != null ? area.displayName : "");
+            // Title = the start point nearest to where the player lands (Oldenburg, not the area name Westerstede).
+            string title = area != null ? area.displayName : "";
+            int titleStart = area != null && area.starts.Count > 1 ? area.NearestStart(hasSaved ? saved : spawn) : -1;
+            if (titleStart >= 0 && !string.IsNullOrEmpty(area.starts[titleStart].name)) title = area.starts[titleStart].name;
+            var loading = LoadingScreen(title);
             yield return WorldStreamer.WaitFor(hasSaved ? saved : spawn, 220f);
             Destroy(loading);
 
