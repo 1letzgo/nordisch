@@ -77,6 +77,46 @@ MonoBehaviour:
   - {x: 19224.158, y: 21.09765, z: -13240.606}
   - {x: 19162.365, y: 21.309904, z: -12739.407}
   - {x: 19219.47, y: 20.820417, z: -12844.553}
+  - {x: 18629.176, y: 20.44801, z: -12872.937}
+  - {x: 18849.557, y: 20.773575, z: -13069.968}
+  - {x: 18560.576, y: 20.385015, z: -12977.684}
+  - {x: 19286.537, y: 20.612286, z: -12947.695}
+  - {x: 18877.08, y: 22.497265, z: -12707.143}
+  - {x: 19518.254, y: 19.835953, z: -12732.707}
+  - {x: 19586.605, y: 20.200947, z: -12775.952}
+  - {x: 19596.273, y: 20.205944, z: -12726.356}
+  - {x: 19560.088, y: 20.256634, z: -12804.768}
+  - {x: 19456.61, y: 20.41648, z: -12910.878}
+  - {x: 19310.285, y: 20.761635, z: -13153.353}
+  - {x: 19270.328, y: 20.699297, z: -13143.445}
+  - {x: 19233.082, y: 21.457773, z: -13180.797}
+  - {x: 19244.557, y: 21.782913, z: -13309.561}
+  - {x: 18903.1, y: 20.588997, z: -13151.903}
+  - {x: 18638.307, y: 21.129253, z: -12702.232}
+  - {x: 19538.645, y: 20.400702, z: -12559.946}
+  - {x: 19586.713, y: 20.574636, z: -12526.133}
+  - {x: -2809.0168, y: 20.896343, z: -5307.729}
+  - {x: 19254.746, y: 20.994585, z: -13039.129}
+  - {x: 19710.63, y: 20.850643, z: -12987.205}
+  - {x: 17328.8, y: 22.314543, z: -11532.286}
+  - {x: 19634.068, y: 20.280954, z: -12399.46}
+  - {x: 18192.98, y: 21.022055, z: -12646.393}
+  - {x: -3635.6755, y: 27.12393, z: 3904.3347}
+  - {x: -12.709665, y: 25.237097, z: 11.798245}
+  - {x: 2.9152215, y: 24.895626, z: -47.547234}
+  - {x: 11.084584, y: 24.279613, z: -224.01187}
+  - {x: 29.438055, y: 24.153774, z: -266.52756}
+  - {x: -3719.0918, y: 21.177706, z: -6762.131}
+  - {x: 18789.291, y: 20.528263, z: -13495.757}
+  - {x: 19595.277, y: 20.507158, z: -12673.284}
+  - {x: 17264.723, y: 22.040497, z: -11850.673}
+  - {x: 806.3173, y: 24.1216, z: 424.86954}
+  - {x: 18654.246, y: 21.632483, z: -12591.942}
+  - {x: 7470.7983, y: 30.35765, z: 1571.3893}
+  - {x: 18311.965, y: 20.654175, z: -12733.868}
+  - {x: 18885.611, y: 22.722126, z: -12651.335}
+  - {x: 18015.004, y: 21.202175, z: -12719.456}
+  - {x: 19611.219, y: 19.980015, z: -13021.77}
   carSpots:
   - {x: -1585.3455, y: 22.537159, z: -498.6063, w: -95.783005}
   - {x: 19048.104, y: 21.282896, z: -13159.077, w: -55.880447}
@@ -48361,16 +48401,16 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: Dreieck Oldenburg-West
-    position: {x: 17088.344, y: 32.322876, z: -11354}
+    position: {x: 17088.326, y: 32.315212, z: -11354.047}
     facing: {x: -0.9345098, y: 0.35593736}
-    height: 0.34
+    height: 0.21487603
     color:
       serializedVersion: 2
       rgba: 4293981428
   - text: "Wilhelmshaven \xB7 Oldenburg-B\xFCrgerfelde"
     position: {x: 17088.451, y: 31.78934, z: -11353.72}
     facing: {x: -0.9345098, y: 0.35593736}
-    height: 0.26
+    height: 0.16707617
     color:
       serializedVersion: 2
       rgba: 4293981428
@@ -48452,16 +48492,16 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: Oldenburg-Wechloy
-    position: {x: 15287.375, y: 29.372093, z: -10885.292}
+    position: {x: 15287.368, y: 29.348505, z: -10885.341}
     facing: {x: -0.9888435, y: 0.148958}
-    height: 0.34
+    height: 0.27807486
     color:
       serializedVersion: 2
       rgba: 4293981428
   - text: "Oldenburg-Wechloy \xB7 Oldenburg-Universit\xE4t"
     position: {x: 15287.42, y: 28.933413, z: -10884.995}
     facing: {x: -0.9888435, y: 0.148958}
-    height: 0.26
+    height: 0.15077606
     color:
       serializedVersion: 2
       rgba: 4293981428
@@ -48487,7 +48527,7 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: Neuenkruge
-    position: {x: 11472.566, y: 30.95877, z: -7099.1206}
+    position: {x: 11472.523, y: 30.957457, z: -7099.147}
     facing: {x: -0.5263257, y: 0.850283}
     height: 0.34
     color:
@@ -48522,16 +48562,16 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: Westerstede-West
-    position: {x: -1120.4335, y: 32.543068, z: 2225.2295}
+    position: {x: -1120.4045, y: 32.517387, z: 2225.2703}
     facing: {x: 0.81452185, y: -0.5801329}
-    height: 0.34
+    height: 0.29545453
     color:
       serializedVersion: 2
       rgba: 4293981428
   - text: "Westerstede-West \xB7 Wiesmoor"
     position: {x: -1120.6075, y: 32.110313, z: 2224.985}
     facing: {x: 0.81452185, y: -0.5801329}
-    height: 0.26
+    height: 0.22895624
     color:
       serializedVersion: 2
       rgba: 4293981428
@@ -48557,9 +48597,9 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: Dreieck Oldenburg-West
-    position: {x: 17673.734, y: 30.844564, z: -12248.796}
+    position: {x: 17673.783, y: 30.845308, z: -12248.806}
     facing: {x: -0.20767665, y: -0.9781976}
-    height: 0.34
+    height: 0.21487603
     color:
       serializedVersion: 2
       rgba: 4293981428
@@ -48599,16 +48639,16 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: Westerstede-West
-    position: {x: -2111.894, y: 31.19691, z: 2770.732}
+    position: {x: -2111.9153, y: 31.187998, z: 2770.6865}
     facing: {x: -0.90521634, y: 0.42495105}
-    height: 0.34
+    height: 0.29545453
     color:
       serializedVersion: 2
       rgba: 4293981428
   - text: "Westerstede-West \xB7 Moorburg"
     position: {x: -2111.7666, y: 30.670301, z: 2771.0034}
     facing: {x: -0.90521634, y: 0.42495105}
-    height: 0.26
+    height: 0.22895624
     color:
       serializedVersion: 2
       rgba: 4293981428
@@ -48627,7 +48667,7 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: Westerstede
-    position: {x: 519.9886, y: 35.670902, z: 804.4638}
+    position: {x: 519.9559, y: 35.644947, z: 804.426}
     facing: {x: -0.7563579, y: 0.65415806}
     height: 0.34
     color:
@@ -48655,16 +48695,16 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: Zwischenahner Meer
-    position: {x: 8706.845, y: 30.406223, z: -4859.7266}
+    position: {x: 8706.875, y: 30.410088, z: -4859.6865}
     facing: {x: 0.80512387, y: -0.5931067}
-    height: 0.34
+    height: 0.26262626
     color:
       serializedVersion: 2
       rgba: 4293981428
   - text: "Zwischenahner Meer \xB7 Dreibergen"
     position: {x: 8706.667, y: 29.802921, z: -4859.9683}
     facing: {x: 0.80512387, y: -0.5931067}
-    height: 0.26
+    height: 0.1994135
     color:
       serializedVersion: 2
       rgba: 4293981428
@@ -48690,16 +48730,16 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: Zwischenahner Meer
-    position: {x: 8114.914, y: 31.01137, z: -4382.1777}
+    position: {x: 8114.878, y: 31.000895, z: -4382.2124}
     facing: {x: -0.69619423, y: 0.7178535}
-    height: 0.34
+    height: 0.26262626
     color:
       serializedVersion: 2
       rgba: 4293981428
   - text: "Zwischenahner Meer \xB7 Wiefelstede"
     position: {x: 8115.1294, y: 30.471256, z: -4381.9688}
     facing: {x: -0.69619423, y: 0.7178535}
-    height: 0.26
+    height: 0.19318181
     color:
       serializedVersion: 2
       rgba: 4293981428
@@ -48725,16 +48765,16 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: Bad Zwischenahn-West
-    position: {x: 1955.145, y: 30.259296, z: -374.77136}
+    position: {x: 1955.134, y: 30.259285, z: -374.82016}
     facing: {x: -0.97559166, y: 0.21959266}
-    height: 0.34
+    height: 0.23636362
     color:
       serializedVersion: 2
       rgba: 4293981428
   - text: "Bad Zwischenahn \xB7 Edewecht"
     position: {x: 1955.2109, y: 29.679354, z: -374.4787}
     facing: {x: -0.97559166, y: 0.21959266}
-    height: 0.26
+    height: 0.23776224
     color:
       serializedVersion: 2
       rgba: 4293981428
@@ -48753,7 +48793,7 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: Westerstede
-    position: {x: 1339.5537, y: 30.967129, z: -82.974365}
+    position: {x: 1339.583, y: 30.943398, z: -82.93385}
     facing: {x: 0.8101265, y: -0.58625513}
     height: 0.34
     color:
@@ -48781,9 +48821,9 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: Oldenburg-Wechloy
-    position: {x: 17439.297, y: 32.613724, z: -11436.881}
+    position: {x: 17439.305, y: 32.60482, z: -11436.832}
     facing: {x: 0.98554, y: -0.169443}
-    height: 0.34
+    height: 0.27807486
     color:
       serializedVersion: 2
       rgba: 4293981428

@@ -22,7 +22,7 @@ namespace LeGamez.Vehicles
         Transform avatarModel;
         ThirdPersonCamera cam;
         CharacterController controller;
-        float walkSpeed, runSpeed, turnSmooth, ccRadius, ccHeight;
+        float walkSpeed, runSpeed, turnSmooth, ccRadius, ccHeight, ccStep;
         Vector3 ccCenter;
 
         void Start()
@@ -131,7 +131,9 @@ namespace LeGamez.Vehicles
 
             if (controller != null)
             {
-                ccRadius = controller.radius; ccHeight = controller.height; ccCenter = controller.center;
+                ccRadius = controller.radius; ccHeight = controller.height; ccCenter = controller.center; ccStep = controller.stepOffset;
+                // Wide car capsule: a low step offset, or it climbs over guard rails and kerb-high obstacles.
+                controller.stepOffset = Mathf.Min(ccStep, 0.25f);
                 controller.radius = v.ColliderRadius;
                 controller.height = Mathf.Max(ccHeight, v.ColliderRadius * 2f + 0.05f);
                 controller.center = new Vector3(0, controller.height * 0.5f, 0);
@@ -185,6 +187,7 @@ namespace LeGamez.Vehicles
                 controller.radius = ccRadius;
                 controller.height = ccHeight;
                 controller.center = ccCenter;
+                controller.stepOffset = ccStep;
             }
             if (avatarModel != null)
             {

@@ -67,8 +67,9 @@ namespace LeGamez.Editor.OsmImport
                                 s.Rect(-1.45f, 0.58f, 0.62f, 0.5f, White);
                                 s.Text(number, 0.58f, 0.34f, Black, -1.45f);
                             }
-                            s.Text(name, 0.6f, 0.34f, White, number.Length > 0 ? 0.3f : 0f);
-                            if (dest.Length > 0) s.Text(dest, 0.02f, 0.26f, White);
+                            // Long names get smaller letters (~0.55 × height per character), so they stay on the board.
+                            s.Text(name, 0.6f, Fit(name, 0.34f, number.Length > 0 ? 2.6f : 3.4f), White, number.Length > 0 ? 0.35f : 0f);
+                            if (dest.Length > 0) s.Text(dest, 0.02f, Fit(dest, 0.26f, 3.4f), White);
                             s.Text("500 m", -0.62f, 0.24f, White, 1.15f);
                         });
                         count++;
@@ -90,6 +91,8 @@ namespace LeGamez.Editor.OsmImport
             }
             return count;
         }
+
+        static float Fit(string text, float height, float width) => Mathf.Min(height, width / Mathf.Max(1, text.Length) / 0.55f);
 
         /// <summary>Point <paramref name="dist"/> metres before vertex <paramref name="vi"/> against the driving direction,
         /// following the carriageway into the ways before it; tan = driving direction there.</summary>

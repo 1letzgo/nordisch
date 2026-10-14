@@ -1,23 +1,12 @@
 {
   "areas": [
     {
-      "id": "oldenburg",
-      "name": "Oldenburg",
-      "lat": 53.1395,
-      "lon": 8.2145,
-      "size_m": 1000,
-      "vehicles": [
-        "bicycle",
-        "car"
-      ],
-      "ground": "grass"
-    },
-    {
       "id": "westerstede",
       "name": "Westerstede",
       "lat": 53.257,
       "lon": 7.9275,
       "size_m": 29250,
+      "key_size": 20650,
       "vehicles": [
         "bicycle",
         "car"
@@ -48,6 +37,11 @@
           "lat": 53.2523949,
           "lon": 7.9037102,
           "note": "Alte Weide 4 (Testauto)"
+        },
+        {
+          "lat": 53.138008,
+          "lon": 8.2135476,
+          "note": "Oldenburg, Theaterwall (Testauto)"
         }
       ]
     },

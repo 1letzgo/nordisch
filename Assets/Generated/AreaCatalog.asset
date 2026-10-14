@@ -45,13 +45,3 @@ MonoBehaviour:
     starts:
     - Westerstede
     - Oldenburg
-  - id: oldenburg
-    displayName: Oldenburg
-    sceneName: Oldenburg
-    lat: 53.1395
-    lon: 8.2145
-    poiCount: 30
-    vehicles:
-    - bicycle
-    - car
-    starts: []

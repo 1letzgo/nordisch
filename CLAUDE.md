@@ -98,6 +98,10 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    der Rampe, „Ausfahrt“-Schild; `motorway_junction` aus traffic.json). Rampen haben Rang 3 (Vorfahrt achten am Ende),
    an Autobahn-Ein-/Ausfädelungen keine Schilder. Straßenindex: Autobahn heißt nach `ref` („A 28“), Rampen
    „Anschlussstelle“; `StreetIndex.fast` markiert sie → Auto bis 130 km/h (`Car.MotorwaySpeed`, sonst 90).
+   Schutzplanken halten die Höhe des Fahrbahnrands (Dämme: längere Pfosten), im Fahrzeug ist `stepOffset` ≤ 0,25 m –
+   sonst steigt die breite Auto-Kapsel über die Planke. `"key_size"` (areas.json) hält `AreaData.sizeMeters` und damit
+   `AreaInfo.MemoryKey` beim Vergrößern um denselben Mittelpunkt stabil (gespeicherte Positionen/eigene Startpunkte
+   bleiben gültig). HUD-Titel = nächster Startpunkt (Westerstede/Oldenburg), Fahrradplätze bis 80.
 4. **In Unity importieren** (baut alle Gebiete, Menü-Vorschaubilder, Minimap-Karten, Hauptmenü-Szene):
    ```bash
    /Applications/Unity/Hub/Editor/6000.3.26f1/Unity.app/Contents/MacOS/Unity -batchmode -quit -projectPath . -buildTarget iOS \

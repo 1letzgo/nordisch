@@ -144,7 +144,7 @@ namespace LeGamez.Editor.OsmImport
             int bridges = BridgeBuilder.Prepare(data, area, terrain); // decks instead of draped ribbons where there is a gap below
             int lines = GroundBuilder.BuildLines(data, sink, area);
             BridgeBuilder.Build(data, sink, terrain);
-            var motorway = MotorwayBuilder.Build(data, sink, area); // lane markings, guard rails
+            var motorway = MotorwayBuilder.Build(data, sink, area, terrain); // lane markings, guard rails
             // Prefer official LGLN LoD2 buildings (real roof shapes); fall back to OSM extrusion.
             string lod2Path = Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".lod2.json");
             bool island = meta.ground == "sand";
@@ -581,7 +581,7 @@ namespace LeGamez.Editor.OsmImport
             return result;
         }
 
-        /// <summary>Up to 40 bicycle parkings, at least 40 m apart, as places for parked bikes.</summary>
+        /// <summary>Up to 80 bicycle parkings (two towns in one area), at least 40 m apart, as places for parked bikes.</summary>
         static List<Vector3> BikeSpots(OsmData data, AreaRect area, TerrainField terrain)
         {
             var spots = new List<Vector3>();
@@ -598,7 +598,7 @@ namespace LeGamez.Editor.OsmImport
                 if (free == null) continue;
                 var q = free.Value;
                 spots.Add(new Vector3(q.x, terrain.Height(q.x, q.y), q.y));
-                if (spots.Count >= 40) break;
+                if (spots.Count >= 80) break;
             }
             return spots;
         }

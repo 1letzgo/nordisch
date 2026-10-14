@@ -22,7 +22,7 @@ namespace LeGamez.Editor.OsmImport
         static readonly Color32 RailColor = WorldStyle.Hex("#A9AEB2");
         static readonly Color32 PostColor = WorldStyle.Hex("#7E8388");
 
-        public static Stats Build(OsmData data, MeshSink sink, AreaRect area)
+        public static Stats Build(OsmData data, MeshSink sink, AreaRect area, TerrainField terrain)
         {
             var st = new Stats();
             var ways = new List<OsmWay>();
@@ -69,9 +69,10 @@ namespace LeGamez.Editor.OsmImport
                 var near = GeoUtil.Bounds(w.points);
                 near.xMin -= 60f; near.yMin -= 60f; near.xMax += 60f; near.yMax += 60f;
                 foreach (var (o, ohw, ob) in roads)
-                    if (o != w && near.Overlaps(ob)) others.AddLine(o.points, ohw + 0.4f);
+                    // Bridges over the motorway are above it – no gap in the rail under them.
+                    if (o != w && near.Overlaps(ob) && !BridgeBuilder.IsDeck(o)) others.AddLine(o.points, ohw + 0.4f);
                 foreach (float side in new[] { 1f, -1f })
-                    st.railKm += Rail(sink, area, w.points, side * (width * 0.5f + RailOut), others) / 1000f;
+                    st.railKm += Rail(sink, area, terrain, w.points, side * (width * 0.5f + RailOut), others) / 1000f;
             }
             return st;
         }
@@ -116,8 +117,9 @@ namespace LeGamez.Editor.OsmImport
                 WorldStyle.LaneMarking);
 
         /// <summary>Guard rail at <paramref name="offset"/> beside a carriageway: beam on posts (Props: collider, lifted
-        /// onto the terrain per vertex). Returns the built length.</summary>
-        static float Rail(MeshSink sink, AreaRect area, List<Vector2> pts, float offset, PropPlacer.Clearance others)
+        /// onto the terrain per vertex). Where the ground falls away beside the road (embankments) the beam keeps the
+        /// height of the carriageway edge and the posts get longer – a car must not step over it. Returns the built length.</summary>
+        static float Rail(MeshSink sink, AreaRect area, TerrainField t, List<Vector2> pts, float offset, PropPlacer.Clearance others)
         {
             float built = 0f;
             for (int i = 0; i < pts.Count - 1; i++)
@@ -132,39 +134,49 @@ namespace LeGamez.Editor.OsmImport
                 {
                     Vector2 s0 = a + dir * (k * step) + n * offset, s1 = a + dir * ((k + 1) * step) + n * offset;
                     var mid = (s0 + s1) * 0.5f;
-                    if (!area.Contains(mid, 2f) || others.IsBlocked(mid, 0f) || BridgeBuilder.Covers(mid, 0.5f)) continue;
+                    if (!area.Contains(mid, 2f) || others.IsBlocked(mid, 0f)) continue;
                     if (!AreaMask.Allows(mid)) continue;
                     // Beam ends a bit beyond the piece, so bends close up.
                     s0 -= dir * 0.15f; s1 += dir * 0.15f;
                     var batch = sink.Get(WorldStyle.MatProps, mid);
                     var nn = n * Mathf.Sign(offset); // outwards
-                    Vector2 i0 = s0 - nn * 0.04f, i1 = s1 - nn * 0.04f, o0 = s0 + nn * 0.04f, o1 = s1 + nn * 0.04f;
+                    // A solid 24 cm block: a thinner one lies within the character controller's skin and gets pushed through.
+                    Vector2 i0 = s0 - nn * 0.12f, i1 = s1 - nn * 0.12f, o0 = s0 + nn * 0.12f, o1 = s1 + nn * 0.12f;
                     const float lo = 0.45f, hi = 0.78f;
+                    float d0 = Drop(t, s0, nn), d1 = Drop(t, s1, nn);
                     // Faces: towards the road, away from it, top (orientation by the side's normal).
                     if (offset > 0)
                     {
-                        MeshSink.Quad(batch, V(i0, lo), V(i0, hi), V(i1, hi), V(i1, lo), RailColor);
-                        MeshSink.Quad(batch, V(o1, lo), V(o1, hi), V(o0, hi), V(o0, lo), RailColor);
-                        MeshSink.Quad(batch, V(i0, hi), V(o0, hi), V(o1, hi), V(i1, hi), PostColor);
+                        MeshSink.Quad(batch, V(i0, lo + d0), V(i0, hi + d0), V(i1, hi + d1), V(i1, lo + d1), RailColor);
+                        MeshSink.Quad(batch, V(o1, lo + d1), V(o1, hi + d1), V(o0, hi + d0), V(o0, lo + d0), RailColor);
+                        MeshSink.Quad(batch, V(i0, hi + d0), V(o0, hi + d0), V(o1, hi + d1), V(i1, hi + d1), PostColor);
                     }
                     else
                     {
-                        MeshSink.Quad(batch, V(i1, lo), V(i1, hi), V(i0, hi), V(i0, lo), RailColor);
-                        MeshSink.Quad(batch, V(o0, lo), V(o0, hi), V(o1, hi), V(o1, lo), RailColor);
-                        MeshSink.Quad(batch, V(i1, hi), V(o1, hi), V(o0, hi), V(i0, hi), PostColor);
+                        MeshSink.Quad(batch, V(i1, lo + d1), V(i1, hi + d1), V(i0, hi + d0), V(i0, lo + d0), RailColor);
+                        MeshSink.Quad(batch, V(o0, lo + d0), V(o0, hi + d0), V(o1, hi + d1), V(o1, lo + d1), RailColor);
+                        MeshSink.Quad(batch, V(i1, hi + d1), V(o1, hi + d1), V(o0, hi + d0), V(i0, hi + d0), PostColor);
                     }
                     // Two posts per piece (behind the beam), front and back face only.
                     for (int p = 0; p < 2; p++)
                     {
-                        var c = Vector2.Lerp(s0, s1, 0.25f + 0.5f * p) + nn * 0.1f;
+                        var c = Vector2.Lerp(s0, s1, 0.25f + 0.5f * p) + nn * 0.2f;
+                        float top = hi + Mathf.Lerp(d0, d1, 0.25f + 0.5f * p);
                         Vector2 l = c - dir * 0.06f, r = c + dir * 0.06f;
-                        MeshSink.Quad(batch, V(l, 0f), V(l, hi), V(r, hi), V(r, 0f), PostColor);
-                        MeshSink.Quad(batch, V(r, 0f), V(r, hi), V(l, hi), V(l, 0f), PostColor);
+                        MeshSink.Quad(batch, V(l, 0f), V(l, top), V(r, top), V(r, 0f), PostColor);
+                        MeshSink.Quad(batch, V(r, 0f), V(r, top), V(l, top), V(l, 0f), PostColor);
                     }
                     built += step;
                 }
             }
             return built;
+        }
+
+        /// <summary>How far the ground at the rail lies below the carriageway edge (0 if higher).</summary>
+        static float Drop(TerrainField t, Vector2 rail, Vector2 outwards)
+        {
+            var edge = rail - outwards * RailOut;
+            return Mathf.Clamp(t.Height(edge.x, edge.y) - t.Height(rail.x, rail.y), 0f, 3f);
         }
 
         static Vector3 V(Vector2 p, float y) => new Vector3(p.x, y, p.y);
