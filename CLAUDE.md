@@ -391,8 +391,9 @@ Das Menü-Raster ist 2-spaltig und wächst mit; mehr als ~6 Gebiete brauchen sp�
   (Version/Build stehen schon richtig in der Info.plist, nichts von Hand ändern). Wird Android im selben Zug released,
   dieselbe Build-Nummer verwenden (also `release_android.sh` zuerst, dann ohne erneutes Hochzählen `BuildIOS`).
 - Generierte Kacheln (`Assets/Generated/*/tiles/`) sind nicht im Repo – nach dem Klonen `ImportAllBatch`.
-- Große Raster `Data/*.dop.png` und `Data/*.dgm.bin` sind nicht im Repo (ganze Inseln/Gemeinden > 100 MB) – nach dem Klonen
-  je Gebiet `Tools/dop/fetch_dop.py <id>` und `Tools/dgm/fetch_dgm.py <id>` laufen lassen (die JSON-Daten sind versioniert).
+- Große Raster `Data/*.dop.png`, `Data/*.dgm.bin` und die LoD2-Gebäude `Data/*.lod2.json` (Westerstede > 70 MB) sind nicht im Repo (ganze Inseln/Gemeinden > 100 MB) – nach dem Klonen
+  je Gebiet `Tools/dop/fetch_dop.py <id>`, `Tools/dgm/fetch_dgm.py <id>` und `Tools/lod2/fetch_lod2.py <id>` laufen lassen
+  (die übrigen JSON-Daten sind versioniert).
 
 ## Stolperfallen
 - Unity schreibt Template-Pakete (purchasing, analytics, collab-proxy, multiplayer.center) zurück in `Packages/manifest.json` → wieder entfernen.
