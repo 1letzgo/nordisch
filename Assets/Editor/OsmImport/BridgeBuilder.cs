@@ -21,8 +21,24 @@ namespace LeGamez.Editor.OsmImport
             public float h0, h1;    // surface height at both ends
             public float width, y;  // carriageway width, layer offset of the road style
             public Rect bounds;     // of the centre line
+            public float g0, g1;    // draped road surface at both ends (the approaches) – the deck eases onto it
+            public float r0, r1;    // length of those ramps (0 = none)
             public float Length => along[along.Length - 1];
-            public float HeightAt(float s) => Mathf.Lerp(h0, h1, Length > 0f ? s / Length : 0f);
+
+            /// <summary>Straight between the abutment heights, eased onto the approach road within r0/r1 of the ends (the
+            /// faceted terrain at a bridge end often lies a little lower or higher than the abutment – no step at the joint).</summary>
+            public float HeightAt(float s)
+            {
+                float len = Length, h = Mathf.Lerp(h0, h1, len > 0f ? s / len : 0f);
+                if (s < r0) h += (g0 - h0) * (1f - Smooth(s / r0));
+                if (len - s < r1) h += (g1 - h1) * (1f - Smooth((len - s) / r1));
+                return h;
+            }
+
+            /// <summary>[s0, s1] reaches into a ramp – the deck is built in short pieces there.</summary>
+            public bool Ramped(float s0, float s1) => s0 < r0 || Length - s1 < r1;
+
+            static float Smooth(float x) => x * x * (3f - 2f * x);
         }
 
         const float MinGap = 1.8f;      // m between a straight deck and the ground to count as a bridge
@@ -43,6 +59,7 @@ namespace LeGamez.Editor.OsmImport
         {
             decks.Clear();
             if (t.IsFlat) return 0;
+            var pits = new List<(Deck d, Vector2 u0, float s0, float a0, Vector2 u1, float s1, float a1)>();
             // Other carriageways (with their edges) are never raised by a pit fill – the road below, a road alongside.
             var roadsByEnd = new Dictionary<Vector2Int, List<OsmWay>>();
             var allRoads = new List<OsmWay>();
@@ -93,22 +110,70 @@ namespace LeGamez.Editor.OsmImport
                 }
                 if (gap < MinGap) continue;
                 decks[way] = d;
-                if (s0 <= 0f && s1 <= 0f) continue;
-                // Keep-out: every carriageway except this bridge and the approaches joining its ends.
+                if (s0 > 0f || s1 > 0f) pits.Add((d, u0, s0, a0, u1, s1, a1));
+            }
+            // Pits are filled once all decks are known: decks are never draped, so the ground under the neighbouring
+            // bridge (the other carriageway's) may rise too – otherwise the pit stays on the median side of the lane.
+            foreach (var (d, u0, s0, a0, u1, s1, a1) in pits)
+            {
+                var pts = d.way.points;
+                // Keep-out: every carriageway except decks and the approaches joining this bridge's ends.
                 var keep = new PropPlacer.Clearance();
-                var near = GeoUtil.Bounds(pts);
+                var near = d.bounds;
                 near.xMin -= 60f; near.yMin -= 60f; near.xMax += 60f; near.yMax += 60f;
-                var joined = new HashSet<OsmWay> { way };
+                var joined = new HashSet<OsmWay> { d.way };
                 foreach (var e in new[] { pts[0], pts[pts.Count - 1] })
                     if (roadsByEnd.TryGetValue(new Vector2Int(Mathf.RoundToInt(e.x * 10f), Mathf.RoundToInt(e.y * 10f)), out var l)) joined.UnionWith(l);
                 foreach (var o in allRoads)
-                    if (!joined.Contains(o) && GeoUtil.Bounds(o.points).Overlaps(near) && GroundBuilder.Carriageway(o.tags, out float ow, out _))
+                    if (!joined.Contains(o) && !decks.ContainsKey(o) && GeoUtil.Bounds(o.points).Overlaps(near) && GroundBuilder.Carriageway(o.tags, out float ow, out _))
                         keep.AddLine(o.points, ow * 0.5f + 2f);
-                FillPit(t, pts[0], u0, s0, a0, width * 0.5f + 2.5f, keep);
-                FillPit(t, pts[pts.Count - 1], u1, s1, a1, width * 0.5f + 2.5f, keep);
+                FillPit(t, pts[0], u0, s0, a0, d.width * 0.5f + 2.5f, keep);
+                FillPit(t, pts[pts.Count - 1], u1, s1, a1, d.width * 0.5f + 2.5f, keep);
+            }
+            // Decks joined end to end (viaducts in several ways): one height at the joint – each end's own abutment search
+            // looks the other way and finds different ground, a step of up to several metres.
+            var joints = new Dictionary<Vector2Int, List<(Deck d, bool start)>>();
+            foreach (var d in decks.Values)
+                foreach (bool start in new[] { true, false })
+                {
+                    var e = start ? d.way.points[0] : d.way.points[d.way.points.Count - 1];
+                    var k = new Vector2Int(Mathf.RoundToInt(e.x * 10f), Mathf.RoundToInt(e.y * 10f));
+                    if (!joints.TryGetValue(k, out var l)) joints[k] = l = new List<(Deck, bool)>();
+                    l.Add((d, start));
+                }
+            var shared = new HashSet<(Deck, bool)>();
+            foreach (var l in joints.Values)
+            {
+                if (l.Count < 2) continue;
+                float h = float.MinValue;
+                foreach (var (d, start) in l) h = Mathf.Max(h, start ? d.h0 : d.h1);
+                foreach (var (d, start) in l) { if (start) d.h0 = h; else d.h1 = h; shared.Add((d, start)); }
+            }
+            // Ends onto the approach roads as they will be draped (after all pit fills): ease the deck at ~1:12.
+            foreach (var d in decks.Values)
+            {
+                var pts = d.way.points;
+                d.g0 = shared.Contains((d, true)) ? d.h0 : t.Height(pts[0].x, pts[0].y) + d.y;
+                d.g1 = shared.Contains((d, false)) ? d.h1 : t.Height(pts[pts.Count - 1].x, pts[pts.Count - 1].y) + d.y;
+                // Bigger differences are a pit the fill could not reach (a road passing close below): diving into it
+                // would be worse – and the step holds cars – so the deck keeps the abutment height there.
+                if (Mathf.Abs(d.g0 - d.h0) > MaxStep) { Debug.Log($"[OSM] bridge {d.way.id}: {d.g0 - d.h0:+0.00;-0.00} m step at {pts[0]} left"); d.g0 = d.h0; }
+                if (Mathf.Abs(d.g1 - d.h1) > MaxStep) { Debug.Log($"[OSM] bridge {d.way.id}: {d.g1 - d.h1:+0.00;-0.00} m step at {pts[pts.Count - 1]} left"); d.g1 = d.h1; }
+                // A short deck may ease over its whole length if only one end needs it (the last span of a viaduct).
+                bool both = Mathf.Abs(d.g0 - d.h0) >= MinStep && Mathf.Abs(d.g1 - d.h1) >= MinStep;
+                d.r0 = RampLength(d.g0 - d.h0, d.Length * (both ? 0.5f : 1f));
+                d.r1 = RampLength(d.g1 - d.h1, d.Length * (both ? 0.5f : 1f));
+                if (d.r0 > 0f || d.r1 > 0f)
+                    Debug.Log($"[OSM] bridge {d.way.id} ({d.way.tags.Get("highway")}) eased onto the road: {d.g0 - d.h0:+0.00;-0.00} m over {d.r0:0} m at {pts[0]}, " +
+                              $"{d.g1 - d.h1:+0.00;-0.00} m over {d.r1:0} m at {pts[pts.Count - 1]}");
             }
             return decks.Count;
         }
+
+        const float MinStep = 0.03f, MaxStep = 1.2f;
+
+        static float RampLength(float step, float max) =>
+            Mathf.Abs(step) < MinStep ? 0f : Mathf.Min(Mathf.Max(Mathf.Abs(step) * 12f, 4f), max);
 
         /// <summary>Highest ground within 25 m outside a bridge end (along <paramref name="u"/>, pointing away from the
         /// bridge); <paramref name="at"/> = its distance.</summary>
@@ -172,70 +237,77 @@ namespace LeGamez.Editor.OsmImport
             var road = WorldStyle.Asphalt;
             for (int i = 0; i < pts.Count - 1; i++)
             {
-                Vector2 a = pts[i], b = pts[i + 1];
-                Vector2 dir = b - a;
+                Vector2 dir = pts[i + 1] - pts[i];
                 if (dir.sqrMagnitude < 1e-4f) continue;
                 dir.Normalize();
                 var n = new Vector2(-dir.y, dir.x); // left
-                float ya = d.HeightAt(d.along[i]), yb = d.HeightAt(d.along[i + 1]);
-                var batch = sink.Get(WorldStyle.MatTerrain, (a + b) * 0.5f);
-                // Road surface + kerb strips (slightly raised).
-                MeshSink.Quad(batch, P(a + n * hw, ya), P(b + n * hw, yb), P(b - n * hw, yb), P(a - n * hw, ya), road);
-                const float kerb = 0.15f;
-                MeshSink.Quad(batch, P(a + n * ow, ya + kerb), P(b + n * ow, yb + kerb), P(b + n * hw, yb + kerb), P(a + n * hw, ya + kerb), Concrete);
-                MeshSink.Quad(batch, P(a - n * hw, ya + kerb), P(b - n * hw, yb + kerb), P(b - n * ow, yb + kerb), P(a - n * ow, ya + kerb), Concrete);
-                // Kerb faces towards the road.
-                MeshSink.Quad(batch, P(a + n * hw, ya), P(a + n * hw, ya + kerb), P(b + n * hw, yb + kerb), P(b + n * hw, yb), ConcreteDark);
-                MeshSink.Quad(batch, P(b - n * hw, yb), P(b - n * hw, yb + kerb), P(a - n * hw, ya + kerb), P(a - n * hw, ya), ConcreteDark);
-                // Parapets (thin walls on the outer edge, both faces + top).
-                foreach (float side in new[] { 1f, -1f })
+                // Straight segments in one piece; where the deck eases onto the road, pieces of ≤ 2 m.
+                float sa = d.along[i], sb = d.along[i + 1];
+                int pieces = d.Ramped(sa, sb) ? Mathf.Max(1, Mathf.CeilToInt((sb - sa) / 2f)) : 1;
+                for (int j = 0; j < pieces; j++)
                 {
-                    var o = n * side * ow;
-                    var inner = n * side * (ow - 0.25f);
-                    Vector3 ao = P(a + o, ya + kerb), bo = P(b + o, yb + kerb), ai = P(a + inner, ya + kerb), bi = P(b + inner, yb + kerb);
-                    var up = Vector3.up * Parapet;
-                    if (side > 0)
+                    Vector2 a = Vector2.Lerp(pts[i], pts[i + 1], (float)j / pieces), b = Vector2.Lerp(pts[i], pts[i + 1], (float)(j + 1) / pieces);
+                    float ya = d.HeightAt(Mathf.Lerp(sa, sb, (float)j / pieces)), yb = d.HeightAt(Mathf.Lerp(sa, sb, (float)(j + 1) / pieces));
+                    bool first = i == 0 && j == 0, last = i == pts.Count - 2 && j == pieces - 1;
+                    var batch = sink.Get(WorldStyle.MatTerrain, (a + b) * 0.5f);
+                    // Road surface + kerb strips (slightly raised).
+                    MeshSink.Quad(batch, P(a + n * hw, ya), P(b + n * hw, yb), P(b - n * hw, yb), P(a - n * hw, ya), road);
+                    const float kerb = 0.15f;
+                    MeshSink.Quad(batch, P(a + n * ow, ya + kerb), P(b + n * ow, yb + kerb), P(b + n * hw, yb + kerb), P(a + n * hw, ya + kerb), Concrete);
+                    MeshSink.Quad(batch, P(a - n * hw, ya + kerb), P(b - n * hw, yb + kerb), P(b - n * ow, yb + kerb), P(a - n * ow, ya + kerb), Concrete);
+                    // Kerb faces towards the road.
+                    MeshSink.Quad(batch, P(a + n * hw, ya), P(a + n * hw, ya + kerb), P(b + n * hw, yb + kerb), P(b + n * hw, yb), ConcreteDark);
+                    MeshSink.Quad(batch, P(b - n * hw, yb), P(b - n * hw, yb + kerb), P(a - n * hw, ya + kerb), P(a - n * hw, ya), ConcreteDark);
+                    // Parapets (thin walls on the outer edge, both faces + top).
+                    foreach (float side in new[] { 1f, -1f })
                     {
-                        MeshSink.Quad(batch, bo, bo + up, ao + up, ao, Concrete);          // outside (left)
-                        MeshSink.Quad(batch, ai, ai + up, bi + up, bi, Concrete);          // inside
-                        MeshSink.Quad(batch, ao + up, bo + up, bi + up, ai + up, ConcreteDark);
+                        var o = n * side * ow;
+                        var inner = n * side * (ow - 0.25f);
+                        Vector3 ao = P(a + o, ya + kerb), bo = P(b + o, yb + kerb), ai = P(a + inner, ya + kerb), bi = P(b + inner, yb + kerb);
+                        var up = Vector3.up * Parapet;
+                        if (side > 0)
+                        {
+                            MeshSink.Quad(batch, bo, bo + up, ao + up, ao, Concrete);          // outside (left)
+                            MeshSink.Quad(batch, ai, ai + up, bi + up, bi, Concrete);          // inside
+                            MeshSink.Quad(batch, ao + up, bo + up, bi + up, ai + up, ConcreteDark);
+                        }
+                        else
+                        {
+                            MeshSink.Quad(batch, ao, ao + up, bo + up, bo, Concrete);          // outside (right)
+                            MeshSink.Quad(batch, bi, bi + up, ai + up, ai, Concrete);          // inside
+                            MeshSink.Quad(batch, ai + up, bi + up, bo + up, ao + up, ConcreteDark);
+                        }
+                        // Closed ends at both ends of the deck (a car sliding along the guard rail must not slip into the wall).
+                        var low = Vector3.down * 0.4f;
+                        if (first)
+                        {
+                            MeshSink.Quad(batch, ai + low, ai + up, ao + up, ao + low, Concrete);
+                            MeshSink.Quad(batch, ao + low, ao + up, ai + up, ai + low, Concrete);
+                        }
+                        if (last)
+                        {
+                            MeshSink.Quad(batch, bi + low, bi + up, bo + up, bo + low, Concrete);
+                            MeshSink.Quad(batch, bo + low, bo + up, bi + up, bi + low, Concrete);
+                        }
                     }
-                    else
+                    // Slab: outer faces down to the underside, and the underside itself (seen from the road below).
+                    var down = Vector3.down * Slab;
+                    Vector3 la = P(a + n * ow, ya + kerb), lb = P(b + n * ow, yb + kerb), ra = P(a - n * ow, ya + kerb), rb = P(b - n * ow, yb + kerb);
+                    MeshSink.Quad(batch, lb + down, lb, la, la + down, ConcreteDark);
+                    MeshSink.Quad(batch, ra + down, ra, rb, rb + down, ConcreteDark);
+                    MeshSink.Quad(batch, la + down, ra + down, rb + down, lb + down, ConcreteDark);
+                    // Joint to the next segment (bends): a small fan at the vertex.
+                    if (j == pieces - 1 && i + 1 < pts.Count - 1)
                     {
-                        MeshSink.Quad(batch, ao, ao + up, bo + up, bo, Concrete);          // outside (right)
-                        MeshSink.Quad(batch, bi, bi + up, ai + up, ai, Concrete);          // inside
-                        MeshSink.Quad(batch, ai + up, bi + up, bo + up, ao + up, ConcreteDark);
+                        var c = pts[i + 1];
+                        var next = (pts[i + 2] - c).normalized;
+                        var n2 = new Vector2(-next.y, next.x);
+                        float yc = d.HeightAt(d.along[i + 1]);
+                        MeshSink.Tri(batch, P(c, yc), P(c + n * hw, yc), P(c + n2 * hw, yc), road);
+                        MeshSink.Tri(batch, P(c, yc), P(c - n2 * hw, yc), P(c - n * hw, yc), road);
+                        MeshSink.Tri(batch, P(c, yc), P(c + n2 * hw, yc), P(c + n * hw, yc), road);
+                        MeshSink.Tri(batch, P(c, yc), P(c - n * hw, yc), P(c - n2 * hw, yc), road);
                     }
-                    // Closed ends at both ends of the deck (a car sliding along the guard rail must not slip into the wall).
-                    var low = Vector3.down * 0.4f;
-                    if (i == 0)
-                    {
-                        MeshSink.Quad(batch, ai + low, ai + up, ao + up, ao + low, Concrete);
-                        MeshSink.Quad(batch, ao + low, ao + up, ai + up, ai + low, Concrete);
-                    }
-                    if (i == pts.Count - 2)
-                    {
-                        MeshSink.Quad(batch, bi + low, bi + up, bo + up, bo + low, Concrete);
-                        MeshSink.Quad(batch, bo + low, bo + up, bi + up, bi + low, Concrete);
-                    }
-                }
-                // Slab: outer faces down to the underside, and the underside itself (seen from the road below).
-                var down = Vector3.down * Slab;
-                Vector3 la = P(a + n * ow, ya + kerb), lb = P(b + n * ow, yb + kerb), ra = P(a - n * ow, ya + kerb), rb = P(b - n * ow, yb + kerb);
-                MeshSink.Quad(batch, lb + down, lb, la, la + down, ConcreteDark);
-                MeshSink.Quad(batch, ra + down, ra, rb, rb + down, ConcreteDark);
-                MeshSink.Quad(batch, la + down, ra + down, rb + down, lb + down, ConcreteDark);
-                // Joint to the next segment (bends): a small fan at the vertex.
-                if (i + 1 < pts.Count - 1)
-                {
-                    var c = pts[i + 1];
-                    var next = (pts[i + 2] - c).normalized;
-                    var n2 = new Vector2(-next.y, next.x);
-                    float yc = d.HeightAt(d.along[i + 1]);
-                    MeshSink.Tri(batch, P(c, yc), P(c + n * hw, yc), P(c + n2 * hw, yc), road);
-                    MeshSink.Tri(batch, P(c, yc), P(c - n2 * hw, yc), P(c - n * hw, yc), road);
-                    MeshSink.Tri(batch, P(c, yc), P(c + n2 * hw, yc), P(c + n * hw, yc), road);
-                    MeshSink.Tri(batch, P(c, yc), P(c - n * hw, yc), P(c - n2 * hw, yc), road);
                 }
             }
             if (d.width >= 5f) CentreLine(sink, d);
@@ -264,10 +336,16 @@ namespace LeGamez.Editor.OsmImport
                 for (float s = 0f; s < len; s += gap > 0f ? dash + gap : len)
                 {
                     float e = gap > 0f ? Mathf.Min(s + dash, len) : len;
-                    Vector2 p0 = a + dir * s + n * offset, p1 = a + dir * e + n * offset;
-                    float y0 = d.HeightAt(d.along[i] + s) + 0.012f, y1 = d.HeightAt(d.along[i] + e) + 0.012f;
-                    MeshSink.Quad(sink.Get(WorldStyle.MatTerrain, p0), P(p0 + n * halfWidth, y0), P(p1 + n * halfWidth, y1),
-                        P(p1 - n * halfWidth, y1), P(p0 - n * halfWidth, y0), WorldStyle.LaneMarking);
+                    // Follow the eased ends in pieces of ≤ 2 m.
+                    int pieces = d.Ramped(d.along[i] + s, d.along[i] + e) ? Mathf.Max(1, Mathf.CeilToInt((e - s) / 2f)) : 1;
+                    for (int k = 0; k < pieces; k++)
+                    {
+                        float u0 = Mathf.Lerp(s, e, (float)k / pieces), u1 = Mathf.Lerp(s, e, (float)(k + 1) / pieces);
+                        Vector2 p0 = a + dir * u0 + n * offset, p1 = a + dir * u1 + n * offset;
+                        float y0 = d.HeightAt(d.along[i] + u0) + 0.012f, y1 = d.HeightAt(d.along[i] + u1) + 0.012f;
+                        MeshSink.Quad(sink.Get(WorldStyle.MatTerrain, p0), P(p0 + n * halfWidth, y0), P(p1 + n * halfWidth, y1),
+                            P(p1 - n * halfWidth, y1), P(p0 - n * halfWidth, y0), WorldStyle.LaneMarking);
+                    }
                 }
             }
         }

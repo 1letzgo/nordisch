@@ -38,8 +38,12 @@ namespace LeGamez.Editor
                     Debug.Log($"[Stats] {path}: {instances} instances ({drawn / 1000}k tris when drawn, {calls} tile×prototype batches = " +
                               $"{(float)calls / Mathf.Max(1, withInstances):0.0} per tile with instances, {withInstances} such tiles): " +
                               string.Join(", ", Enumerable.Range(0, perProto.Length).Where(p => perProto[p] > 0).Select(p => $"#{p} {perProto[p]}×{InstancePrototypes.Triangles(p)}")));
-                long total = byMat.Values.Sum(v => v.tris);
-                Debug.Log($"[Stats] {path}: {total / 1000}k tris, {byMat.Values.Sum(v => v.verts) / 1000}k verts\n" +
+                // Collision-only parts (WorldTile.FlagNoRender, group "Blockers") are listed but never drawn.
+                const string hidden = "Blockers";
+                long total = byMat.Where(kv => kv.Key != hidden).Sum(kv => kv.Value.tris);
+                byMat.TryGetValue(hidden, out var coll);
+                Debug.Log($"[Stats] {path}: {total / 1000}k tris drawn (+{coll.tris / 1000}k collision-only), " +
+                          $"{byMat.Where(kv => kv.Key != hidden).Sum(kv => kv.Value.verts) / 1000}k verts\n" +
                           string.Join("\n", byMat.OrderByDescending(kv => kv.Value.tris)
                               .Select(kv => $"[Stats]   {kv.Key,-16} {kv.Value.tris / 1000,7}k tris {kv.Value.verts / 1000,7}k verts {kv.Value.meshes,5} meshes")));
             }

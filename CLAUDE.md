@@ -98,17 +98,25 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    der Rampe, „Ausfahrt“-Schild; `motorway_junction` aus traffic.json). Rampen haben Rang 3 (Vorfahrt achten am Ende),
    an Autobahn-Ein-/Ausfädelungen keine Schilder. Straßenindex: Autobahn heißt nach `ref` („A 28“), Rampen
    „Anschlussstelle“; `StreetIndex.fast` markiert sie → Auto bis 130 km/h (`Car.MotorwaySpeed`, sonst 90).
-   Schutzplanken: durchgehender, geschlossener Streifen (Holm 0,6–1,05 m über Unterfahrschutz bis zum Boden, 20 cm dick,
-   Props-Kollider) entlang verketteter Fahrbahnen/Rampen (Gehrung, keine Keillücken), Höhe = höchster Punkt zwischen
-   Mittellinie und Planke + 1,05 m (Dämme, Widerlager bis 12 m tiefer). Lücken nur, wo eine *anschließende* Fahrbahn
-   (gemeinsamer Punkt, Rampen-Ketten) nahe kommt – nie für die Gegenfahrbahn (Mittelplanke), Parallelstraßen oder
-   Brücken darüber. Sackgassen (Autobahn verlässt den gebauten Teil) bekommen eine Sperre quer. Höhe > Radius der
-   Auto-Kapsel (0,95 m), sonst klettert der CharacterController darüber; im Auto `stepOffset` ≤ 0,25 m, `slopeLimit` 35°.
+   Schutzplanken: sichtbar = verzinkter W-Holm 0,44–0,75 m mit Pfosten alle 3–4 m (Bucket `Rails`, Trees-Material,
+   ohne Kollider, ~4 Dreiecke/m); was das Auto hält = unsichtbare, geschlossene Wand 1,4 m hoch, 20 cm dick (Bucket
+   `Blockers` → Kachel-Part mit `WorldTile.FlagNoRender` = nur MeshCollider, kein Renderer; **ab Kartenformat 8**,
+   ältere Apps würden die Wand zeichnen). Entlang verketteter Fahrbahnen/Rampen (Gehrung, keine Keillücken), Höhe =
+   höchster Punkt zwischen Mittellinie und Planke + Holm/Wand (Dämme, Widerlager bis 12 m tiefer). Lücken nur, wo eine
+   *anschließende* Fahrbahn (gemeinsamer Punkt, Rampen-Ketten) nahe kommt – nie für die Gegenfahrbahn (Mittelplanke),
+   Parallelstraßen oder Brücken darüber. Wand ≫ Radius der Auto-Kapsel (0,95 m): bei 1,05 m kletterte der
+   CharacterController noch an einzelnen Stellen darüber; im Auto `stepOffset` ≤ 0,25 m, `slopeLimit` 35°.
+   **Kartenende** (Fahrbahn verlässt den gebauten Teil, an Ende *und* Anfang einer Kette, nur die erste Sperre von innen,
+   `MotorwayBuilder.DeadEnds`): Absperrschranke Z. 600 rot-weiß von Planke zu Planke mit gelben Warnleuchten, Leitbaken
+   Z. 605 an beiden Rändern auf den letzten 40 m, unsichtbare Wand dahinter; gelbe Tafel „Ende des Kartenbereichs“ über
+   der Schranke und 400 m vorher (`TrafficBuilder.MapEndSigns`).
    `BridgeBuilder` nimmt als Endhöhe den höchsten Boden ≤ 25 m vor dem Brückenende (das DGM hat dort oft eine Grube)
-   und füllt die Grube im Fahrbahnstreifen auf (vor `BuildBase`, nicht auf anderen Fahrbahnen); Brüstungen mit
-   geschlossenen Enden. Prüfen: `-executeMethod LeGamez.Editor.MotorwayDriveTest.Run -area <id> [-fresh] [-trace x,z]`
+   und füllt die Grube im Fahrbahnstreifen auf (vor `BuildBase`, nach allen Brücken, nicht auf anderen Fahrbahnen –
+   Brückenplatten zählen nicht); aneinanderstoßende Brücken (Viadukte aus mehreren Ways) bekommen am Stoß dieselbe
+   Höhe; wo der drapierte Anschluss trotzdem höher/tiefer liegt, läuft die Platte auf ~1:12 (≥ 4 m, kurze Endfelder
+   ganz) weich auf die Straße (`Deck.HeightAt`, Log „eased onto the road“). Brüstungen mit geschlossenen Enden. Prüfen: `-executeMethod LeGamez.Editor.MotorwayDriveTest.Run -area <id> [-fresh] [-trace x,z]`
    (Auto-Kapsel fährt von jedem 150. m jeder Autobahn-Fahrbahn 180 m geradeaus mit ±10/25°; `-fresh` baut Planken
-   neu ohne Re-Import). Westerstede: 1439 von 1452 Fahrten an der Planke, 12 durch Ausfahrtslücken, 1 auf Fahrbahn. `"key_size"` (areas.json) hält `AreaData.sizeMeters` und damit
+   neu ohne Re-Import). Westerstede: 1448 von 1452 Fahrten an der Planke, 3 über Rastplatz-Ausfahrten, 1 auf Fahrbahn (vorher 1439, die meisten „Ausfahrtslücken“ waren übersprungene 1,05-m-Wände). `"key_size"` (areas.json) hält `AreaData.sizeMeters` und damit
    `AreaInfo.MemoryKey` beim Vergrößern um denselben Mittelpunkt stabil (gespeicherte Positionen/eigene Startpunkte
    bleiben gültig). HUD-Titel = nächster Startpunkt (Westerstede/Oldenburg), Fahrradplätze bis 80.
 4. **In Unity importieren** (baut alle Gebiete, Menü-Vorschaubilder, Minimap-Karten, Hauptmenü-Szene):
