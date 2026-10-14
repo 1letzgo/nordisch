@@ -434,7 +434,7 @@ namespace LeGamez.Core
             var byId = new Dictionary<string, Map>();
             foreach (var m in Maps) byId[m.Id] = m;
 
-            // Installed maps first – they stay listed even when the catalog dropped them or is unreachable.
+            // Installed maps first – they stay listed while the catalog is unreachable.
             if (Directory.Exists(Root))
                 foreach (var dir in Directory.GetDirectories(Root))
                 {
@@ -468,11 +468,20 @@ namespace LeGamez.Core
                     m.entry = e;
                 }
 
-            // Dropped from the catalog and not installed: gone.
+            // Dropped from the catalog (area merged into another, e.g. Oldenburg → start point in Westerstede): gone,
+            // installed copies too – except the area being played right now.
             if (catalog?.maps != null)
             {
                 var listed = new HashSet<string>();
                 foreach (var e in catalog.maps) if (e?.id != null) listed.Add(e.id);
+                foreach (var m in Maps)
+                    if (m.installed != null && !m.Busy && m != Current && !listed.Contains(m.Id))
+                    {
+                        try { if (Directory.Exists(MapDir(m.Id))) Directory.Delete(MapDir(m.Id), true); }
+                        catch (Exception e) { Debug.LogWarning($"[Maps] delete {m.Id}: {e.Message}"); }
+                        m.installed = null;
+                        m.info = null;
+                    }
                 Maps.RemoveAll(m => m.installed == null && !m.Busy && !listed.Contains(m.Id));
             }
 

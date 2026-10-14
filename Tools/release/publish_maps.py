@@ -8,6 +8,7 @@ names, so unchanged regions keep their URL and are neither uploaded again nor do
 sha256 per file). The catalog lives in the pre-release "maps":
   https://github.com/1letzgo/nordisch/releases/download/maps/maps.json
 Builds for other app formats / Unity versions stay in the catalog (older apps keep finding theirs) unless --drop-old.
+Areas that are not exported any more are removed from the catalog completely.
 
   python3 Tools/release/publish_maps.py [--dry-run] [--drop-old]
 
@@ -162,18 +163,16 @@ def main():
                 starts.append(entry)
             e["starts"] = starts
 
-    # Areas merged into others or dropped (e.g. "oldenburg" → part of "westerstede"): remove their builds of the
-    # formats published now, so current apps don't list them; older apps keep their older-format builds.
-    exported = {m["id"] for idx in indexes for m in idx["maps"]}
-    formats = {idx["format"] for idx in indexes}
+    # Areas merged into others or dropped (e.g. "oldenburg" → start point in "westerstede"): remove them from the
+    # catalog entirely. Keeping only their older-format builds made current apps list a second card with
+    # "Karte wird aktualisiert" next to the new start point.
+    # Known = exported now or still defined in areas.json (a partial publish must not drop the other areas).
+    with open(os.path.join(ROOT, "Tools", "osm", "areas.json")) as f:
+        defined = {ar["id"] for ar in json.load(f)["areas"]}
+    known = defined | {m["id"] for idx in indexes for m in idx["maps"]}
     for e in list(entries.values()):
-        if e["id"] in exported:
-            continue
-        before = len(e.get("builds", []))
-        e["builds"] = [b for b in e.get("builds", []) if b.get("format") not in formats]
-        if len(e["builds"]) != before:
-            print(f"  {e['id']:<14} not exported – dropped its format {sorted(formats)} builds")
-        if not e["builds"]:
+        if e["id"] not in known:
+            print(f"  {e['id']:<14} not in areas.json – removed from the catalog")
             del entries[e["id"]]
 
     catalog = {"schema": 1, "updated": time.strftime("%Y-%m-%dT%H:%M:%S%z"),

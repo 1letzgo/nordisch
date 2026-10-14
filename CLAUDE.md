@@ -219,7 +219,8 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
   unity (leer), version (yyyyMMddHHmm), url, size, sha256, files[] = {name, region, url, size, sha256}, start[] =
   Regionen ≤ 1,2 km um den Spawn}. Dateien liegen inhaltsadressiert (`<id>-f5-<name>-<sha12>.bin`) in der Pre-Release
   **`maps-<id>`** (Asset-Limit pro Release), Katalog + Thumbnails in `maps`. Unveränderte Regionen behalten ihre URL →
-  kein Upload, kein erneuter Download. Nicht mehr referenzierte Assets werden gelöscht.
+  kein Upload, kein erneuter Download. Nicht mehr referenzierte Assets werden gelöscht. Gebiete, die nicht mehr in
+  `areas.json` stehen (z. B. `oldenburg`, jetzt Startpunkt in Westerstede), fliegen ganz aus dem Katalog.
 - **Nur Benötigtes auf dem Gerät**: „Laden“ holt `area.bin` + Startregionen; alle anderen Regionen lädt
   `Core/RegionTileSource` bei Bedarf (Kachel gebraucht oder Spieler ≤ 1,6 km entfernt, eine Region nach der anderen).
   Kacheln werden im Hintergrund-Thread gelesen/entpackt, auf dem Hauptthread zu Meshes (1 Kachel pro Frame).
