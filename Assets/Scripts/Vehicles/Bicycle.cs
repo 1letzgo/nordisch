@@ -25,7 +25,7 @@ namespace LeGamez.Vehicles
         public override float AxleBase => WheelBase;
         public override float RearAxle => WheelBase * 0.5f;
         public override float MaxSteer => 38f;
-        public override float LateralAccel => 5f;
+        public override float LateralAccel => 12f;                // grip cap: ~10 m turning circle radius at cruise (11 m/s), was 24 m
         public override float TopSpeed => 13f;                    // ~47 km/h, game-fast
         public override float AccelTime => 2.5f;
         public override float BrakeDecel => 8f;
@@ -90,11 +90,12 @@ namespace LeGamez.Vehicles
             frontWheel.localRotation = Quaternion.Euler(0f, SteerAngle, 0f) * Quaternion.Euler(wheelSpin, 0f, 0f);
             rearWheel.localRotation = Quaternion.Euler(wheelSpin, 0f, 0f);
 
-            // Lean into turns proportional to yaw rate × speed.
+            // Lean into turns like a real rider: atan(lateral acceleration / g), lateral acceleration = yaw rate × speed.
             float yaw = transform.eulerAngles.y;
             float yawRate = Mathf.DeltaAngle(lastYaw, yaw) / Mathf.Max(Time.deltaTime, 0.0001f);
             lastYaw = yaw;
-            float target = Mathf.Clamp(-yawRate * speed * 0.004f, -22f, 22f);
+            float lateral = yawRate * Mathf.Deg2Rad * speed;
+            float target = Mathf.Clamp(-Mathf.Atan(lateral / 9.81f) * Mathf.Rad2Deg * 0.8f, -30f, 30f);
             lean = Mathf.SmoothDamp(lean, target, ref leanVel, 0.15f);
             body.localRotation = Quaternion.Euler(0, 0, lean);
         }
