@@ -48876,6 +48876,132 @@ MonoBehaviour:
     color:
       serializedVersion: 2
       rgba: 4293981428
+  - text: Ende des
+    position: {x: 17955.098, y: 31.041162, z: -10998.08}
+    facing: {x: -0.71780664, y: -0.6962426}
+    height: 0.3
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: Kartenbereichs
+    position: {x: 17955.098, y: 30.591164, z: -10998.08}
+    facing: {x: -0.71780664, y: -0.6962426}
+    height: 0.3
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: Ende des
+    position: {x: 17499.234, y: 29.257563, z: -12946.885}
+    facing: {x: -0.10169449, y: 0.9948157}
+    height: 0.3
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: Kartenbereichs
+    position: {x: 17499.234, y: 28.807564, z: -12946.885}
+    facing: {x: -0.10169449, y: 0.9948157}
+    height: 0.3
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: Ende des
+    position: {x: 17510.207, y: 29.446589, z: -12946.4}
+    facing: {x: -0.1113388, y: 0.9937825}
+    height: 0.3
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: Kartenbereichs
+    position: {x: 17510.207, y: 28.99659, z: -12946.4}
+    facing: {x: -0.1113388, y: 0.9937825}
+    height: 0.3
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: Ende des
+    position: {x: 17960.48, y: 31.32547, z: -11008.687}
+    facing: {x: -0.69663864, y: -0.7174222}
+    height: 0.3
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: Kartenbereichs
+    position: {x: 17960.48, y: 30.875471, z: -11008.687}
+    facing: {x: -0.69663864, y: -0.7174222}
+    height: 0.3
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: Ende des
+    position: {x: 17781.129, y: 25.890505, z: -11353.351}
+    facing: {x: -0.15818243, y: -0.98740995}
+    height: 0.3
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: Kartenbereichs
+    position: {x: 17781.129, y: 25.530504, z: -11353.351}
+    facing: {x: -0.15818243, y: -0.98740995}
+    height: 0.3
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: 400 m
+    position: {x: 17781.129, y: 25.090504, z: -11353.351}
+    facing: {x: -0.15818243, y: -0.98740995}
+    height: 0.26
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: Ende des
+    position: {x: -6575.902, y: 32.55369, z: 2699.859}
+    facing: {x: 0.79433864, y: 0.6074753}
+    height: 0.3
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: Kartenbereichs
+    position: {x: -6575.902, y: 32.10369, z: 2699.859}
+    facing: {x: 0.79433864, y: 0.6074753}
+    height: 0.3
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: Ende des
+    position: {x: -6535.2544, y: 32.302185, z: 2744.803}
+    facing: {x: 0.79114735, y: 0.6116256}
+    height: 0.3
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: Kartenbereichs
+    position: {x: -6535.2544, y: 31.852184, z: 2744.803}
+    facing: {x: 0.79114735, y: 0.6116256}
+    height: 0.3
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: Ende des
+    position: {x: -6226.197, y: 30.721214, z: 2996.5347}
+    facing: {x: 0.79752636, y: 0.60328406}
+    height: 0.3
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: Kartenbereichs
+    position: {x: -6226.197, y: 30.361214, z: 2996.5347}
+    facing: {x: 0.79752636, y: 0.60328406}
+    height: 0.3
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
+  - text: 400 m
+    position: {x: -6226.197, y: 29.921213, z: 2996.5347}
+    facing: {x: 0.79752636, y: 0.60328406}
+    height: 0.26
+    color:
+      serializedVersion: 2
+      rgba: 4279769112
   - text: Esso
     position: {x: 297.63998, y: 25.95108, z: -567.2}
     facing: {x: -0.0012767529, y: -0.9999992}
