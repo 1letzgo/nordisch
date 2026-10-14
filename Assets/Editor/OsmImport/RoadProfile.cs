@@ -100,20 +100,26 @@ namespace LeGamez.Editor.OsmImport
             foreach (var c in chains) Measure(c, t, before);
             // Deck ends: the approach's profile ends where the built deck ends (further out on an extended deck).
             var deckSurface = new Dictionary<Vector2Int, float>();
-            var deckBuilt = new Dictionary<Vector2Int, (Vector2 built, float surface)>();
-            foreach (var (end, built, surface) in BridgeBuilder.FreeEnds())
+            var deckBuilt = new Dictionary<Vector2Int, (Vector2 built, float ext, float surface)>();
+            foreach (var (end, built, ext, surface) in BridgeBuilder.FreeEnds())
             {
                 deckSurface[Key(end)] = surface;
-                if ((built - end).sqrMagnitude > 0.01f) deckBuilt[Key(end)] = (built, surface);
+                if (ext > 0.05f) deckBuilt[Key(end)] = (built, ext, surface);
             }
             for (int i = chains.Count - 1; i >= 0; i--)
             {
                 var c = chains[i];
                 foreach (bool start in new[] { true, false })
                 {
-                    if (!deckBuilt.TryGetValue(Key(start ? c.pts[0] : c.pts[c.pts.Count - 1]), out var db)) continue;
-                    var end = Cut(c, start, Vector2.Distance(db.built, start ? c.pts[0] : c.pts[c.pts.Count - 1]));
-                    if (end.HasValue) deckSurface[Key(end.Value)] = db.surface;
+                    if (c.pts.Count < 2 || !deckBuilt.TryGetValue(Key(start ? c.pts[0] : c.pts[c.pts.Count - 1]), out var db)) continue;
+                    // The deck runs on along its approach's centre line – only that chain is cut (not a path or ramp
+                    // leaving from the same node in another direction).
+                    var keep = new List<Vector2>(c.pts);
+                    var keepS = new List<float>(c.vertexS);
+                    var end = Cut(c, start, db.ext);
+                    if (!end.HasValue) continue; // all of it under the deck
+                    if ((end.Value - db.built).sqrMagnitude < 1f) deckSurface[Key(end.Value)] = db.surface;
+                    else { c.pts.Clear(); c.pts.AddRange(keep); c.vertexS.Clear(); c.vertexS.AddRange(keepS); }
                 }
                 if (c.pts.Count < 2 || c.Length < 2f) { chains.RemoveAt(i); continue; }
                 c.startDeck = deckSurface.ContainsKey(Key(c.pts[0]));
@@ -127,7 +133,7 @@ namespace LeGamez.Editor.OsmImport
 
             skippedDecks = 0; bigLogs = 0;
             var claim = new byte[t.Samples.Length];           // 0 free … 254 blend weight, 255 = a road's level core
-            var cores = new Dictionary<int, (float d, int rank)>(); // who set a core sample: nearest centre of the same rank wins; rank −1 = abutment
+            var cores = new Dictionary<int, (float d, int rank, bool ribbon)>(); // who set a core sample: nearest centre of the same rank wins; rank −1 = abutment; ribbon = under the ribbon itself (not just a cell corner)
             var nodeHeight = new Dictionary<Vector2Int, float>(); // ground height of profiled chains at their vertices
             int written = 0, anchored = 0;
             float maxUp = 0f, maxDown = 0f;
@@ -410,23 +416,56 @@ namespace LeGamez.Editor.OsmImport
         static Vector2 maxUpAt, maxDownAt;
         static int bigLogs;
 
-        static void Write(Chain c, float[] h, TerrainField t, byte[] claim, Dictionary<int, (float d, int rank)> cores, ref int written, ref float maxUp, ref float maxDown)
+        static void Write(Chain c, float[] h, TerrainField t, byte[] claim, Dictionary<int, (float d, int rank, bool ribbon)> cores, ref int written, ref float maxUp, ref float maxDown)
         {
             var k = c.kind;
             float core = c.halfWidth + k.shoulder;
             if (k.rank <= 5) core = Mathf.Max(core, MinCore);
-            float reach = core + k.blend;
+            var s = t.Samples;
+            float step = t.Step;
+            // Carriageways: every terrain cell the ribbon (+ 0.5 m) touches must lie entirely at road height, so all its
+            // corners – and the samples they are interpolated from – take the profile, however far off the centre and
+            // however steep the old ground (an embankment edge, a ditch, the ground beside a deck end). Otherwise the cell
+            // tilts and the ribbon's edge drops off in a jagged step. Cells are marked by their centre (half a diagonal).
+            bool cells = k.rank <= 5;
+            float cs = TerrainField.CellSize, cellHalf = cs * 0.70711f;
+            float cellR = c.halfWidth + 0.5f + cellHalf;              // a cell centre this close → the cell touches the ribbon
+            float support = step;                                    // samples closer than a step to a corner feed it (bilinear)
+            float hardReach = cells ? cellR + cellHalf + support : 0f;
+            float pastEnd = cells ? 2f * cellHalf + support + 0.5f : PastEnd;
+            float reach = Mathf.Max(core + k.blend, hardReach);
             int n = h.Length;
             var pts = new Vector2[n];
             for (int i = 0; i < n; i++) pts[i] = PointAt(c, i);
-            var s = t.Samples;
-            float step = t.Step;
+            var touched = new HashSet<long>();
             var target = new Dictionary<int, (float d, float h, bool past)>();
             for (int i = 0; i < n - 1; i++)
             {
                 Vector2 a = pts[i], ab = pts[i + 1] - a;
                 float len2 = ab.sqrMagnitude;
                 if (len2 < 1e-6f) continue;
+                float len = Mathf.Sqrt(len2);
+                bool deckStart = i == 0 && c.startDeck, deckEnd = i == n - 2 && c.endDeck;
+                if (cells)
+                {
+                    int cx0 = Mathf.FloorToInt((Mathf.Min(a.x, a.x + ab.x) - cellR) / cs), cx1 = Mathf.FloorToInt((Mathf.Max(a.x, a.x + ab.x) + cellR) / cs);
+                    int cz0 = Mathf.FloorToInt((Mathf.Min(a.y, a.y + ab.y) - cellR) / cs), cz1 = Mathf.FloorToInt((Mathf.Max(a.y, a.y + ab.y) + cellR) / cs);
+                    for (int cz = cz0; cz <= cz1; cz++)
+                    for (int cx = cx0; cx <= cx1; cx++)
+                    {
+                        var m = new Vector2((cx + 0.5f) * cs, (cz + 0.5f) * cs);
+                        float u = Vector2.Dot(m - a, ab) / len2;
+                        float d;
+                        // At a deck end the ribbon ends flat: cells up to half a diagonal beyond it, across its width.
+                        if (deckStart && u < 0f || deckEnd && u > 1f)
+                        {
+                            if ((u < 0f ? -u : u - 1f) * len > cellHalf) continue;
+                            d = Mathf.Abs((m.x - a.x) * ab.y - (m.y - a.y) * ab.x) / len;
+                        }
+                        else d = Vector2.Distance(m, a + ab * Mathf.Clamp01(u));
+                        if (d <= cellR) touched.Add(CellKey(cx, cz));
+                    }
+                }
                 int i0 = Mathf.Max(0, Mathf.FloorToInt((Mathf.Min(a.x, a.x + ab.x) - reach - t.XMin) / step));
                 int i1 = Mathf.Min(t.Nx - 1, Mathf.CeilToInt((Mathf.Max(a.x, a.x + ab.x) + reach - t.XMin) / step));
                 int k0 = Mathf.Max(0, Mathf.FloorToInt((Mathf.Min(a.y, a.y + ab.y) - reach - t.ZMin) / step));
@@ -436,13 +475,13 @@ namespace LeGamez.Editor.OsmImport
                 {
                     var q = new Vector2(t.XMin + ix * step, t.ZMin + kz * step);
                     float u = Vector2.Dot(q - a, ab) / len2;
-                    // Past a deck end only the abutment (the cell the ribbon ends in) – the deck takes over, below it runs
+                    // Past a deck end only the abutment (the cells the ribbon ends in) – the deck takes over, below it runs
                     // another road or water.
-                    bool past = i == 0 && c.startDeck && u < 0f || i == n - 2 && c.endDeck && u > 1f;
-                    if (past && (u < 0f ? -u : u - 1f) * Mathf.Sqrt(len2) > PastEnd) continue;
+                    bool past = deckStart && u < 0f || deckEnd && u > 1f;
+                    if (past && (u < 0f ? -u : u - 1f) * len > pastEnd) continue;
+                    float d = past ? Mathf.Abs((q.x - a.x) * ab.y - (q.y - a.y) * ab.x) / len : Vector2.Distance(q, a + ab * Mathf.Clamp01(u));
                     u = Mathf.Clamp01(u);
-                    float d = Vector2.Distance(q, a + ab * u);
-                    if (d > (past ? c.halfWidth + 1.5f : reach)) continue;
+                    if (d > (past ? Mathf.Max(c.halfWidth + 1.5f, hardReach) : reach)) continue;
                     int idx = kz * t.Nx + ix;
                     if (target.TryGetValue(idx, out var old) && old.d <= d) continue;
                     target[idx] = (d, Mathf.Lerp(h[i], h[i + 1], u), past);
@@ -451,7 +490,10 @@ namespace LeGamez.Editor.OsmImport
             foreach (var kv in target)
             {
                 int idx = kv.Key;
-                float w = kv.Value.d <= core || kv.Value.past ? 1f : Fade((kv.Value.d - core) / k.blend);
+                bool corner = cells && Supports(t, idx, touched, support);
+                // Old abutment rule (no cell rule for paths): the cell the ribbon ends in, 5 m.
+                if (kv.Value.past && !corner && (cells || kv.Value.d > c.halfWidth + 1.5f)) continue;
+                float w = kv.Value.d <= core || kv.Value.past || corner ? 1f : Fade((kv.Value.d - core) / k.blend);
                 if (w <= 0f) continue;
                 // A core stays – unless this is a road of the same rank whose centre is nearer (two carriageways side
                 // by side: each keeps its own profile up to the middle, no ripples from the neighbour's). An abutment
@@ -460,27 +502,45 @@ namespace LeGamez.Editor.OsmImport
                 if (claim[idx] == 255)
                 {
                     if (w < 1f || kv.Value.past || !cores.TryGetValue(idx, out var owner)) continue;
-                    if (owner.rank < 0 ? kv.Value.d > c.halfWidth + 0.5f : owner.rank != k.rank || owner.d <= kv.Value.d) continue;
+                    // Motorway/ramps: a sample under this one's ribbon beats one the other only needs as a cell corner (a ramp
+                    // right beside the carriageway keeps its own height; the shared cell tilts between the two ribbons).
+                    bool mine = k.rank <= 1 && kv.Value.d <= c.halfWidth + 0.5f;
+                    if (!(mine && owner.rank >= 0 && owner.rank <= 1 && !owner.ribbon) &&
+                        (owner.rank < 0 ? kv.Value.d > c.halfWidth + 0.5f : owner.rank != k.rank || owner.d <= kv.Value.d)) continue;
                 }
                 int ix = idx % t.Nx, kz = idx / t.Nx;
                 var q = new Vector2(t.XMin + ix * step, t.ZMin + kz * step);
                 if (CoarseTerrain.Owns(q.x, q.y)) continue;
                 // Under a bridge deck only the road below may move the ground (an approach's embankment would bury it);
-                // the own carriageway beside a parallel deck (ramp bridge next to the motorway bridge) is fine.
-                if (!kv.Value.past && kv.Value.d > c.halfWidth + 1f && BridgeBuilder.Above(q, 1f, out float deck) && kv.Value.h > deck - 2.5f) continue;
+                // the own carriageway beside a parallel deck (ramp bridge next to the motorway bridge) is fine. The corners
+                // of this road's cells are still needed there – kept just under the deck (hidden by it).
+                float hv = kv.Value.h, deck = 0f;
+                bool underDeck = !kv.Value.past && kv.Value.d > c.halfWidth + 1f && BridgeBuilder.Above(q, 1f, out deck) && kv.Value.h > deck - 2.5f;
+                if (underDeck && !corner) continue;
+                if (underDeck) hv = Mathf.Min(hv, deck - c.y - 0.05f);
                 float old = s[idx], nh;
                 if (CoastBuilder.Active && old < CoastBuilder.SeaLevel) continue; // sea, harbour basin: a pier is no dam
-                // Beyond the ribbon itself big differences are another feature (a bridge abutment next to the road, a
+                // Under the deck (the abutment) never above its surface – a deck running downhill would be pierced.
+                if (kv.Value.past)
+                {
+                    Vector2 e0 = c.pts[0], e1 = c.pts[c.pts.Count - 1];
+                    var end = c.startDeck && (!c.endDeck || (q - e0).sqrMagnitude < (q - e1).sqrMagnitude) ? e0 : e1;
+                    // Beside the deck too: the abutment cells reach past its parapets – terrain above a deck running
+                    // downhill would carry a car round the parapet.
+                    if (BridgeBuilder.SurfaceAbeam(end, q, out float abeam)) hv = Mathf.Min(hv, abeam - c.y);
+                    if (BridgeBuilder.Above(q, 0f, out float over)) hv = Mathf.Min(hv, over - c.y);
+                }
+                // Beyond the ribbon and its cells big differences are another feature (a bridge abutment next to the road, a
                 // ditch, a yard) – the shoulder levels up to 2 m, the blend zone up to 'keep'; beyond twice that, leave it.
-                bool hard = kv.Value.past || kv.Value.d <= c.halfWidth + 1f;
-                if (!hard) w *= Mathf.Clamp01(2f - Mathf.Abs(kv.Value.h - old) / (kv.Value.d <= core ? Mathf.Max(k.keep, 2f) : k.keep));
+                bool hard = kv.Value.past || corner || kv.Value.d <= c.halfWidth + 1f;
+                if (!hard) w *= Mathf.Clamp01(2f - Mathf.Abs(hv - old) / (kv.Value.d <= core ? Mathf.Max(k.keep, 2f) : k.keep));
                 if (w <= 0f) continue;
-                if (w >= 1f) { nh = kv.Value.h; claim[idx] = 255; cores[idx] = (kv.Value.d, kv.Value.past ? -1 : k.rank); }
+                if (w >= 1f) { nh = hv; claim[idx] = 255; cores[idx] = (kv.Value.d, kv.Value.past ? -1 : k.rank, kv.Value.d <= c.halfWidth + 0.5f); }
                 else
                 {
                     float prev = claim[idx] / 254f;
                     if (w <= prev) continue;
-                    nh = Mathf.Lerp(old, kv.Value.h, (w - prev) / (1f - prev));
+                    nh = Mathf.Lerp(old, hv, (w - prev) / (1f - prev));
                     claim[idx] = (byte)Mathf.RoundToInt(w * 254f);
                 }
                 if (Mathf.Abs(nh - old) > 3f && bigLogs++ < 6)
@@ -490,6 +550,26 @@ namespace LeGamez.Editor.OsmImport
                 if (nh - old > maxUp) { maxUp = nh - old; maxUpAt = new Vector2(t.XMin + ix * step, t.ZMin + kz * step); }
                 if (old - nh > maxDown) { maxDown = old - nh; maxDownAt = new Vector2(t.XMin + ix * step, t.ZMin + kz * step); }
             }
+        }
+
+        static long CellKey(int cx, int cz) => ((long)cx << 32) ^ (uint)cz;
+
+        /// <summary>Sample idx feeds a corner of a touched cell (corners lie on the <see cref="TerrainField.CellSize"/>
+        /// grid; on a finer sample grid every sample closer than one step to a corner feeds it bilinearly).</summary>
+        static bool Supports(TerrainField t, int idx, HashSet<long> touched, float support)
+        {
+            if (touched.Count == 0) return false;
+            float cs = TerrainField.CellSize;
+            float x = t.XMin + (idx % t.Nx) * t.Step, z = t.ZMin + (idx / t.Nx) * t.Step;
+            float r = support - 1e-3f;
+            int kx0 = Mathf.CeilToInt((x - r) / cs), kx1 = Mathf.FloorToInt((x + r) / cs);
+            int kz0 = Mathf.CeilToInt((z - r) / cs), kz1 = Mathf.FloorToInt((z + r) / cs);
+            for (int kz = kz0; kz <= kz1; kz++)
+            for (int kx = kx0; kx <= kx1; kx++)
+                for (int dz = -1; dz <= 0; dz++)
+                for (int dx = -1; dx <= 0; dx++)
+                    if (touched.Contains(CellKey(kx + dx, kz + dz))) return true;
+            return false;
         }
 
         // ------------------------------------------------------------------ roughness

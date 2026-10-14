@@ -46,7 +46,7 @@ MonoBehaviour:
   - id: node/6356149387
     name: Inselmuseum
     category: 1
-    position: {x: -73.30818, y: 7.5284085, z: -296.58157}
+    position: {x: -73.30818, y: 7.42236, z: -296.58157}
     lat: 53.770317800084236
     lon: 7.69388569994832
   - id: node/11966298606
@@ -58,7 +58,7 @@ MonoBehaviour:
   - id: node/12050513930
     name: Historischer Rettungsschuppen
     category: 1
-    position: {x: -1524.0969, y: 7.674626, z: -1444.4171}
+    position: {x: -1524.0969, y: 7.7230105, z: -1444.4171}
     lat: 53.75993709991266
     lon: 7.671833400581602
   - id: node/796187659
@@ -76,7 +76,7 @@ MonoBehaviour:
   - id: node/2359302868
     name: Kleiner Utkieker
     category: 0
-    position: {x: -1534.531, y: 5.772443, z: -1594.5765}
+    position: {x: -1534.531, y: 5.7724423, z: -1594.5765}
     lat: 53.75857910052919
     lon: 7.6716748003017
   - id: node/4634119884
@@ -112,19 +112,19 @@ MonoBehaviour:
   - id: node/2329941881
     name: Drinkeldodenkarkhof
     category: 3
-    position: {x: 358.12653, y: 6.975472, z: -143.09381}
+    position: {x: 358.12653, y: 6.9967012, z: -143.09381}
     lat: 53.77170590002139
     lon: 7.700443599837011
   - id: way/219044316
     name: "Dalbenspro\xDF 1,2 & 3"
     category: 5
-    position: {x: 16.423557, y: 7.9682884, z: -728.5345}
+    position: {x: 16.423557, y: 7.9771214, z: -728.5345}
     lat: 53.766411340054056
     lon: 7.69524964158553
   - id: node/13142485163
     name: Mut zum Wagnis
     category: 5
-    position: {x: 2016.6097, y: 7.0356736, z: -516.071}
+    position: {x: 2016.6097, y: 7.138924, z: -516.071}
     lat: 53.76833279989974
     lon: 7.725652899646652
   - id: node/11932591209

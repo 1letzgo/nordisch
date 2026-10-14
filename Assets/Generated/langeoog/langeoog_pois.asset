@@ -52,7 +52,7 @@ MonoBehaviour:
   - id: way/168678234
     name: Infohaus Altes Wasserwerk
     category: 1
-    position: {x: -467.44962, y: 6.753981, z: -67.35476}
+    position: {x: -467.44962, y: 6.7365203, z: -67.35476}
     lat: 53.745890862596845
     lon: 7.475399147943547
   - id: node/2866654401
@@ -94,13 +94,13 @@ MonoBehaviour:
   - id: node/7961950418
     name: Lale-Andersen-Haus
     category: 0
-    position: {x: 402.2744, y: 8.28296, z: 664.2512}
+    position: {x: 402.2744, y: 8.216386, z: 664.2512}
     lat: 53.75250730027586
     lon: 7.488610799978796
   - id: node/971065532
     name: "K\xF6 2"
     category: 3
-    position: {x: 244.73647, y: 4.9372473, z: -50.14531}
+    position: {x: 244.73647, y: 4.9288416, z: -50.14531}
     lat: 53.74604649999594
     lon: 7.486217699996886
   - id: way/41397790
@@ -136,7 +136,7 @@ MonoBehaviour:
   - id: node/1351748727
     name: Lili Marleen
     category: 3
-    position: {x: -300.65912, y: 7.380753, z: 65.504036}
+    position: {x: -300.65912, y: 7.271075, z: 65.504036}
     lat: 53.74709239998507
     lon: 7.477932799920504
   - id: node/975845132

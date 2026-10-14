@@ -113,10 +113,11 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    `BridgeBuilder` nimmt als Endhöhe den höchsten Boden ≤ 25 m vor dem Brückenende (das DGM hat dort oft eine Grube)
    und füllt die Grube im Fahrbahnstreifen auf (vor `BuildBase`, nach allen Brücken, nicht auf anderen Fahrbahnen –
    Brückenplatten zählen nicht); aneinanderstoßende Brücken (Viadukte aus mehreren Ways) bekommen am Stoß dieselbe
-   Höhe; wo der drapierte Anschluss trotzdem höher/tiefer liegt, läuft die Platte auf ~1:12 (≥ 4 m, kurze Endfelder
+   Höhe, mindestens die Gerade zwischen den beiden fernen Enden (sonst fanden beide Widerlagersuchen das Tal darunter:
+   22-%-Senke im Viadukt am Dreieck Oldenburg-West, Autos flogen über die Brüstung); wo der drapierte Anschluss trotzdem höher/tiefer liegt, läuft die Platte auf ~1:12 (≥ 4 m, kurze Endfelder
    ganz) weich auf die Straße (`Deck.HeightAt`, Log „eased onto the road“). Brüstungen mit geschlossenen Enden. Prüfen: `-executeMethod LeGamez.Editor.MotorwayDriveTest.Run -area <id> [-fresh] [-trace x,z]`
    (Auto-Kapsel fährt von jedem 150. m jeder Autobahn-Fahrbahn 180 m geradeaus mit ±10/25°; `-fresh` baut Planken
-   neu ohne Re-Import). Westerstede: 1448 von 1452 Fahrten an der Planke, 3 über Rastplatz-Ausfahrten, 1 auf Fahrbahn (vorher 1439, die meisten „Ausfahrtslücken“ waren übersprungene 1,05-m-Wände). `"key_size"` (areas.json) hält `AreaData.sizeMeters` und damit
+   neu ohne Re-Import). Westerstede: 1448 von 1452 Fahrten an der Planke, 4 über Rastplatz-/Ausfahrtslücken (vorher 1439, die meisten „Ausfahrtslücken“ waren übersprungene 1,05-m-Wände). `"key_size"` (areas.json) hält `AreaData.sizeMeters` und damit
    `AreaInfo.MemoryKey` beim Vergrößern um denselben Mittelpunkt stabil (gespeicherte Positionen/eigene Startpunkte
    bleiben gültig). HUD-Titel = nächster Startpunkt (Westerstede/Oldenburg), Fahrradplätze bis 80.
    **Glatte Fahrbahnen** (`RoadProfile`, nach `BridgeBuilder.Prepare`, vor `EaseEnds`/`BuildBase`): drapierte Straßen
@@ -126,8 +127,30 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    Höhenfeld geschrieben wird: quer eben (mind. 5 m ab Mitte), seitlich weich auslaufend; große Unterschiede neben der
    Fahrbahn (Rampen kreuzender Brücken, Gräben, Höfe) bleiben. Anker: gemeinsame Knoten mit schon profilierten Straßen
    (Rang: Autobahn → … → Fußweg) und freie Brückenenden (Fahrbahn trifft die Platte; dahinter eine Zelle Widerlager).
-   Läuft ein Weg dicht unter einem Brückenende durch (OSM-Brücken oft zu kurz), verlängert `BridgeBuilder` die Platte
-   um ≤ 8 m über die Zufahrt. Unter Brücken schreibt nur die Straße darunter; Meer/Hafen, CoarseTerrain-Blöcke tabu.
+   **Ganze Zellen**: Das Gelände besteht aus 5-m-Zellen; eine Zelle, deren Ecken auf verschiedenen Höhen liegen, kippt
+   als steile Fläche durch die Fahrbahn („Stufe/Loch“ quer über die A28). Deshalb setzt `RoadProfile.Write` bei Fahrbahnen
+   (Rang ≤ 5) **alle Ecken jeder Zelle, die das Band (+ 0,5 m) berührt**, hart auf das Profil (auch steile Böschungskanten;
+   an Brückenenden die Zellen bis eine halbe Diagonale unter die Platte = Widerlager, nie über der Plattenoberfläche).
+   Autobahn/Rampen: eine Probe unter dem eigenen Band schlägt eine, die die andere Straße nur als Zellecke braucht.
+   Geht unter einem Brückenende ein Weg/eine Straße durch (≥ 1 m tiefer), teilen sich dessen Zellen und die der Zufahrt
+   Ecken → `BridgeBuilder.Extension` verlängert die Platte **entlang der Zufahrt** (Polylinie, ≤ 30 m), bis keine Zelle am
+   Ende mehr an eine Zelle des Wegs darunter grenzt (`SharesCell`); nie über einen Knoten hinaus, an dem eine andere
+   Fahrbahn ebenerdig anschließt. `RoadProfile` kürzt die Zufahrt um genau diese Länge. Unter Brücken schreibt nur die
+   Straße darunter; Meer/Hafen, CoarseTerrain-Blöcke tabu.
+   Kollider: Die Zufahrt fährt auf dem Gelände (das Band liegt 10 cm drüber, nur gezeichnet), die Platte auf ihrer
+   Fahrbahn → an jedem freien Plattenende eine unsichtbare 2-m-Rampe (`EndWedge`, Bucket `Blockers`) statt 10-cm-Kante.
+   Brüstungen weichen anderen Platten aus (`SideEdge`, Log „parapet … in the median/open towards“): stünde die
+   Brüstung auf der Fahrbahn einer anderen Brücke gleicher Höhe, steht sie bei Gegenrichtung mittig (Mittelwand zweier
+   Richtungsfahrbahn-Brücken, OSM-Achsen oft nur 9 m auseinander), bei gleicher Richtung (Rampenbrücke fädelt ein/aus)
+   entfällt sie, wo deren Platte dahinter weitergeht. Platten in Stücken ≤ 6 m.
+   Prüfen: `-executeMethod LeGamez.Editor.RoadStepCheck.Run -area <id> [-classes motorway,motorway_link|all] [-min 0.05]`
+   lädt die Kacheln entlang der Straßen, fährt Mitte und ±halbe Breite alle 0,5 m auf den Kollidern (Gelände, Platten,
+   Blockers) ab und meldet senkrechte Stufen (> 4 cm auf 5 cm), Knicke/Abbrüche (Steigung auf 1 m weicht > 12 % vom
+   Mittel ab) und Löcher → `Builds/RoadSteps/<id>.csv` + `-views`-Liste für `AreaViewSnapshot`; `-at x,z;…` druckt
+   Profile/Plattenenden an einer Stelle. Westerstede Autobahn+Rampen: 84 Stellen → 19 (Rest ≤ 0,55 m auf Rampen an Dreieck
+   Oldenburg-West/Wechloy: Rampe und Fahrbahn in derselben 5-m-Zelle auf verschiedener Höhe), alle Straßen 272 → 79;
+   „WALL in lane“ = Planken-Wand (`Blockers`) in einer Spur (Einfädelbereiche, Kartenende-Sperren) – Sache von
+   `MotorwayBuilder`.
    Log „road roughness“ (Abweichung von der 5-m-Sehne je Klasse vorher → nachher), Profile in
    `Builds/RoadProfile/<id>_roads.csv`, Plot `python3 Tools/dgm/plot_road_profile.py <id>`; nur das Gelände prüfen
    (ohne Import, ~1 min): `-executeMethod LeGamez.Editor.OsmImport.OsmAreaImporter.RoadProfileBatch -area <id>`.

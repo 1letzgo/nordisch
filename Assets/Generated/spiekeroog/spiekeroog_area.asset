@@ -33,12 +33,12 @@ MonoBehaviour:
     yaw: 0
     bikeSpot: {x: -3.3907163, y: 6.80214, z: -0.8071902}
   bikeSpots:
-  - {x: -188.26704, y: 6.674423, z: -90.537994}
-  - {x: 2098.3455, y: 7.5363092, z: -501.13242}
+  - {x: -188.26704, y: 6.455834, z: -90.537994}
+  - {x: 2098.3455, y: 7.5516067, z: -501.13242}
   - {x: -53.12421, y: 6.1007175, z: -258.4004}
   - {x: 172.29367, y: 10.037273, z: 536.4829}
-  - {x: -237.3453, y: 8.041744, z: -3.8258605}
-  - {x: -86.1698, y: 5.8303576, z: -192.69731}
+  - {x: -237.3453, y: 8.031693, z: -3.8258605}
+  - {x: -86.1698, y: 5.8268604, z: -192.69731}
   carSpots: []
   pois: {fileID: 11400000, guid: 602fb089eb2454c2ba6e6f7034633cfe, type: 2}
   streets: {fileID: 11400000, guid: 1496b46cb6ae14e3ab534ac081ec54d3, type: 2}
@@ -1701,812 +1701,812 @@ MonoBehaviour:
   trafficSignals: []
   signTexts:
   - text: Richelweg
-    position: {x: -63.408188, y: 8.486298, z: -436.19675}
+    position: {x: -63.408188, y: 8.502931, z: -436.19675}
     facing: {x: -0.011708578, y: 0.9999314}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Richelweg
-    position: {x: -63.407578, y: 8.485764, z: -436.24875}
+    position: {x: -63.407578, y: 8.502468, z: -436.24875}
     facing: {x: 0.011708578, y: -0.9999314}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "W\xFCppspoor"
-    position: {x: -63.825924, y: 8.205054, z: -435.8455}
+    position: {x: -63.825924, y: 8.218214, z: -435.8455}
     facing: {x: -0.9996867, y: -0.025030823}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "W\xFCppspoor"
-    position: {x: -63.773937, y: 8.203162, z: -435.8442}
+    position: {x: -63.773937, y: 8.216697, z: -435.8442}
     facing: {x: 0.9996867, y: 0.025030823}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCdermenss"
-    position: {x: 54.972992, y: 9.171832, z: -323.94702}
+    position: {x: 54.972992, y: 9.176299, z: -323.94702}
     facing: {x: 0.9989305, y: 0.046235975}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCdermenss"
-    position: {x: 54.92105, y: 9.172665, z: -323.9494}
+    position: {x: 54.92105, y: 9.177075, z: -323.9494}
     facing: {x: -0.9989305, y: -0.046235975}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderloog"
-    position: {x: 54.62547, y: 8.877902, z: -323.75995}
+    position: {x: 54.62547, y: 8.88176, z: -323.75995}
     facing: {x: 0.5615368, y: -0.82745177}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderloog"
-    position: {x: 54.59627, y: 8.878479, z: -323.71692}
+    position: {x: 54.59627, y: 8.882255, z: -323.71692}
     facing: {x: -0.5615368, y: 0.82745177}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Ostend
-    position: {x: 510.30402, y: 9.90942, z: -73.53102}
+    position: {x: 510.30402, y: 9.92032, z: -73.53102}
     facing: {x: 0.6847095, y: 0.72881603}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Ostend
-    position: {x: 510.26843, y: 9.906396, z: -73.56891}
+    position: {x: 510.26843, y: 9.917412, z: -73.56891}
     facing: {x: -0.6847095, y: -0.72881603}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Tranpad
-    position: {x: 510.34262, y: 9.624996, z: -73.20075}
+    position: {x: 510.34262, y: 9.634876, z: -73.20075}
     facing: {x: -0.51188123, y: 0.8590562}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Tranpad
-    position: {x: 510.36923, y: 9.624154, z: -73.245415}
+    position: {x: 510.36923, y: 9.634172, z: -73.245415}
     facing: {x: 0.51188123, y: -0.8590562}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Ostend
-    position: {x: 548.2098, y: 8.877064, z: -148.68091}
+    position: {x: 548.2098, y: 8.877647, z: -148.68091}
     facing: {x: -0.98919785, y: -0.14658627}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Ostend
-    position: {x: 548.26117, y: 8.877298, z: -148.67331}
+    position: {x: 548.26117, y: 8.877865, z: -148.67331}
     facing: {x: 0.98919785, y: 0.14658627}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Friederikenweg
-    position: {x: 547.6886, y: 8.574423, z: -149.04477}
+    position: {x: 547.6886, y: 8.575176, z: -149.04477}
     facing: {x: 0.15078738, y: -0.9885662}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Friederikenweg
-    position: {x: 547.68066, y: 8.574435, z: -148.99338}
+    position: {x: 547.68066, y: 8.5751915, z: -148.99338}
     facing: {x: -0.15078738, y: 0.9885662}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Ostend
-    position: {x: 554.40735, y: 8.967682, z: -211.20638}
+    position: {x: 554.40735, y: 8.968657, z: -211.20638}
     facing: {x: -0.995482, y: 0.09495023}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Ostend
-    position: {x: 554.4591, y: 8.967763, z: -211.21132}
+    position: {x: 554.4591, y: 8.968733, z: -211.21132}
     facing: {x: 0.995482, y: -0.09495023}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kaapd\xFCnenweg"
-    position: {x: 553.9042, y: 8.66705, z: -211.53926}
+    position: {x: 553.9042, y: 8.667946, z: -211.53926}
     facing: {x: 0.09940351, y: -0.9950473}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Kaapd\xFCnenweg"
-    position: {x: 553.8989, y: 8.667022, z: -211.4875}
+    position: {x: 553.8989, y: 8.6679325, z: -211.4875}
     facing: {x: -0.09940351, y: 0.9950473}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Friederikenweg
-    position: {x: 384.67822, y: 9.201119, z: -154.9996}
+    position: {x: 384.67822, y: 9.199957, z: -154.9996}
     facing: {x: -0.015449487, y: 0.9998806}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Friederikenweg
-    position: {x: 384.67902, y: 9.20133, z: -155.05157}
+    position: {x: 384.67902, y: 9.200087, z: -155.05157}
     facing: {x: 0.015449487, y: -0.9998806}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: An d'nee Kark
-    position: {x: 384.17688, y: 8.904258, z: -155.57997}
+    position: {x: 384.17688, y: 8.902064, z: -155.57997}
     facing: {x: 0.99252707, y: 0.12202439}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: An d'nee Kark
-    position: {x: 384.1253, y: 8.904362, z: -155.58632}
+    position: {x: 384.1253, y: 8.902145, z: -155.58632}
     facing: {x: -0.99252707, y: -0.12202439}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melksett
-    position: {x: -222.64037, y: 8.3805065, z: -349.06372}
+    position: {x: -222.64037, y: 8.3803005, z: -349.06372}
     facing: {x: 0.9940126, y: 0.10926555}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melksett
-    position: {x: -222.69206, y: 8.380384, z: -349.0694}
+    position: {x: -222.69206, y: 8.380185, z: -349.0694}
     facing: {x: -0.9940126, y: -0.10926555}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Westerloog
-    position: {x: -223.10832, y: 8.080097, z: -348.8602}
+    position: {x: -223.10832, y: 8.07998, z: -348.8602}
     facing: {x: 0.250397, y: -0.9681433}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Westerloog
-    position: {x: -223.12135, y: 8.080208, z: -348.80984}
+    position: {x: -223.12135, y: 8.080098, z: -348.80984}
     facing: {x: -0.250397, y: 0.9681433}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melksett
-    position: {x: -201.83832, y: 7.8179207, z: -428.39545}
+    position: {x: -201.83832, y: 7.781272, z: -428.39545}
     facing: {x: -0.9759199, y: -0.2181291}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melksett
-    position: {x: -201.7876, y: 7.8178535, z: -428.3841}
+    position: {x: -201.7876, y: 7.7809453, z: -428.3841}
     facing: {x: 0.9759199, y: 0.2181291}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Pollerdiek
-    position: {x: -201.33257, y: 7.507142, z: -428.594}
+    position: {x: -201.33257, y: 7.475029, z: -428.594}
     facing: {x: -0.240855, y: 0.9705611}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Pollerdiek
-    position: {x: -201.32005, y: 7.5053988, z: -428.64447}
+    position: {x: -201.32005, y: 7.4744377, z: -428.64447}
     facing: {x: 0.240855, y: -0.9705611}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melksett
-    position: {x: -75.06611, y: 8.539878, z: -538.02747}
+    position: {x: -75.06611, y: 8.54074, z: -538.02747}
     facing: {x: -0.004241943, y: -0.999991}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melksett
-    position: {x: -75.06588, y: 8.540499, z: -537.97546}
+    position: {x: -75.06588, y: 8.541311, z: -537.97546}
     facing: {x: 0.004241943, y: 0.999991}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "W\xFCppspoor"
-    position: {x: -74.74617, y: 8.247933, z: -537.6201}
+    position: {x: -74.74617, y: 8.248455, z: -537.6201}
     facing: {x: -0.99988395, y: 0.015230752}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "W\xFCppspoor"
-    position: {x: -74.69417, y: 8.248156, z: -537.62085}
+    position: {x: -74.69417, y: 8.2487, z: -537.62085}
     facing: {x: 0.99988395, y: -0.015230752}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: An d'nee Kark
-    position: {x: 381.29108, y: 9.476233, z: -143.63065}
+    position: {x: 381.29108, y: 9.477411, z: -143.63065}
     facing: {x: 0.93537945, y: 0.35364574}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: An d'nee Kark
-    position: {x: 381.24243, y: 9.475998, z: -143.64902}
+    position: {x: 381.24243, y: 9.477182, z: -143.64902}
     facing: {x: -0.93537945, y: -0.35364574}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Tranpad
-    position: {x: 381.33112, y: 9.183464, z: -142.9757}
+    position: {x: 381.33112, y: 9.184431, z: -142.9757}
     facing: {x: -0.41578373, y: 0.9094635}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Tranpad
-    position: {x: 381.35272, y: 9.182959, z: -143.02296}
+    position: {x: 381.35272, y: 9.18394, z: -143.02296}
     facing: {x: 0.41578373, y: -0.9094635}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: An d'nee Kark
-    position: {x: 381.70236, y: 9.132136, z: -229.85153}
+    position: {x: 381.70236, y: 9.132046, z: -229.85153}
     facing: {x: -0.8426198, y: 0.538509}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: An d'nee Kark
-    position: {x: 381.7462, y: 9.131849, z: -229.87955}
+    position: {x: 381.7462, y: 9.131761, z: -229.87955}
     facing: {x: 0.8426198, y: -0.538509}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderloog
-    position: {x: 380.96045, y: 8.833289, z: -230.28868}
+    position: {x: 380.96045, y: 8.8332405, z: -230.28868}
     facing: {x: -0.14572667, y: -0.98932487}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderloog
-    position: {x: 380.96802, y: 8.833489, z: -230.23723}
+    position: {x: 380.96802, y: 8.833442, z: -230.23723}
     facing: {x: 0.14572667, y: 0.98932487}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: An d'nee Kark
-    position: {x: 379.66492, y: 8.63095, z: -288.664}
+    position: {x: 379.66492, y: 8.628425, z: -288.664}
     facing: {x: -0.99942, y: -0.034052525}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: An d'nee Kark
-    position: {x: 379.71686, y: 8.631015, z: -288.66223}
+    position: {x: 379.71686, y: 8.628487, z: -288.66223}
     facing: {x: 0.99942, y: 0.034052525}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderloog"
-    position: {x: 379.32767, y: 8.321813, z: -289.18317}
+    position: {x: 379.32767, y: 8.320268, z: -289.18317}
     facing: {x: -0.15118915, y: -0.9885049}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderloog"
-    position: {x: 379.33548, y: 8.3227, z: -289.13177}
+    position: {x: 379.33548, y: 8.321058, z: -289.13177}
     facing: {x: 0.15118915, y: 0.9885049}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "L\xFCttpad"
-    position: {x: 282.31192, y: 9.169129, z: -219.29317}
+    position: {x: 282.31192, y: 9.169266, z: -219.29317}
     facing: {x: 0.99860126, y: 0.052871704}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "L\xFCttpad"
-    position: {x: 282.25998, y: 9.168684, z: -219.29594}
+    position: {x: 282.25998, y: 9.168823, z: -219.29594}
     facing: {x: -0.99860126, y: -0.052871704}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderloog
-    position: {x: 282.72504, y: 8.872467, z: -219.10884}
+    position: {x: 282.72504, y: 8.872582, z: -219.10884}
     facing: {x: 0.29142734, y: 0.956593}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderloog
-    position: {x: 282.70984, y: 8.872399, z: -219.15858}
+    position: {x: 282.70984, y: 8.872515, z: -219.15858}
     facing: {x: -0.29142734, y: -0.956593}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "L\xFCttpad"
-    position: {x: 279.349, y: 8.7822, z: -289.02136}
+    position: {x: 279.349, y: 8.782309, z: -289.02136}
     facing: {x: -0.99860126, y: -0.052871704}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "L\xFCttpad"
-    position: {x: 279.40094, y: 8.782038, z: -289.01862}
+    position: {x: 279.40094, y: 8.782146, z: -289.01862}
     facing: {x: 0.99860126, y: 0.052871704}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderloog"
-    position: {x: 279.0088, y: 8.48134, z: -289.35043}
+    position: {x: 279.0088, y: 8.481413, z: -289.35043}
     facing: {x: 0.019256547, y: -0.99981457}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderloog"
-    position: {x: 279.00775, y: 8.481667, z: -289.29843}
+    position: {x: 279.00775, y: 8.481745, z: -289.29843}
     facing: {x: -0.019256547, y: 0.99981457}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderpad
-    position: {x: -185.72072, y: 9.241911, z: -60.837692}
+    position: {x: -185.72072, y: 9.240765, z: -60.837692}
     facing: {x: -0.86092967, y: -0.50872403}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderpad
-    position: {x: -185.67595, y: 9.242114, z: -60.81124}
+    position: {x: -185.67595, y: 9.240959, z: -60.81124}
     facing: {x: 0.86092967, y: 0.50872403}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Noordert\xFCn"
-    position: {x: -185.282, y: 8.943597, z: -60.81453}
+    position: {x: -185.282, y: 8.942409, z: -60.81453}
     facing: {x: -0.8523076, y: 0.5230408}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Noordert\xFCn"
-    position: {x: -185.23769, y: 8.943728, z: -60.84173}
+    position: {x: -185.23769, y: 8.942542, z: -60.84173}
     facing: {x: 0.8523076, y: -0.5230408}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderpad
-    position: {x: -180.44476, y: 9.035845, z: -133.86378}
+    position: {x: -180.44476, y: 9.034466, z: -133.86378}
     facing: {x: -0.9946259, y: -0.10353391}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderpad
-    position: {x: -180.39304, y: 9.035881, z: -133.85841}
+    position: {x: -180.39304, y: 9.0344925, z: -133.85841}
     facing: {x: 0.9946259, y: 0.10353391}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Gartenweg
-    position: {x: -180.75174, y: 8.73394, z: -134.35425}
+    position: {x: -180.75174, y: 8.733007, z: -134.35425}
     facing: {x: 0.116658576, y: -0.9931721}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Gartenweg
-    position: {x: -180.75781, y: 8.734129, z: -134.30261}
+    position: {x: -180.75781, y: 8.733152, z: -134.30261}
     facing: {x: -0.116658576, y: 0.9931721}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: In d'Kamp
-    position: {x: -204.70096, y: 8.50996, z: -337.6199}
+    position: {x: -204.70096, y: 8.504284, z: -337.6199}
     facing: {x: -0.9835505, y: -0.18063344}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: In d'Kamp
-    position: {x: -204.64984, y: 8.51108, z: -337.6105}
+    position: {x: -204.64984, y: 8.504416, z: -337.6105}
     facing: {x: 0.9835505, y: 0.18063344}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Westerloog
-    position: {x: -204.19368, y: 8.219103, z: -337.88638}
+    position: {x: -204.19368, y: 8.203619, z: -337.88638}
     facing: {x: -0.18705228, y: 0.98235}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Westerloog
-    position: {x: -204.18394, y: 8.219027, z: -337.93747}
+    position: {x: -204.18394, y: 8.203353, z: -337.93747}
     facing: {x: 0.18705228, y: -0.98235}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: In d'Kamp
-    position: {x: -84.73647, y: 8.50839, z: -206.21982}
+    position: {x: -84.73647, y: 8.512136, z: -206.21982}
     facing: {x: 0.19532526, y: -0.9807386}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: In d'Kamp
-    position: {x: -84.74662, y: 8.508562, z: -206.16882}
+    position: {x: -84.74662, y: 8.512247, z: -206.16882}
     facing: {x: -0.19532526, y: 0.9807386}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderpad
-    position: {x: -84.488686, y: 8.210387, z: -205.71175}
+    position: {x: -84.488686, y: 8.213363, z: -205.71175}
     facing: {x: -0.9736306, y: -0.22813042}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderpad
-    position: {x: -84.43806, y: 8.21047, z: -205.6999}
+    position: {x: -84.43806, y: 8.2134075, z: -205.6999}
     facing: {x: 0.9736306, y: 0.22813042}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Gartenweg
-    position: {x: -481.12592, y: 8.773241, z: -278.72794}
+    position: {x: -481.12592, y: 8.774076, z: -278.72794}
     facing: {x: -0.7066718, y: 0.7075415}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Gartenweg
-    position: {x: -481.08917, y: 8.772547, z: -278.76474}
+    position: {x: -481.08917, y: 8.773401, z: -278.76474}
     facing: {x: 0.7066718, y: -0.7075415}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Westerloog
-    position: {x: -481.13602, y: 8.462158, z: -279.3669}
+    position: {x: -481.13602, y: 8.463179, z: -279.3669}
     facing: {x: 0.8557734, y: 0.51735073}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Westerloog
-    position: {x: -481.18057, y: 8.461758, z: -279.39377}
+    position: {x: -481.18057, y: 8.462775, z: -279.39377}
     facing: {x: -0.8557734, y: -0.51735073}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Gartenweg
-    position: {x: -477.1869, y: 8.9799385, z: -266.3741}
+    position: {x: -477.1869, y: 8.969334, z: -266.3741}
     facing: {x: 0.7066718, y: -0.7075415}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Gartenweg
-    position: {x: -477.22363, y: 8.980768, z: -266.3373}
+    position: {x: -477.22363, y: 8.970009, z: -266.3373}
     facing: {x: -0.7066718, y: 0.7075415}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Up de H\xF6cht"
-    position: {x: -477.15182, y: 8.69754, z: -265.67062}
+    position: {x: -477.15182, y: 8.684502, z: -265.67062}
     facing: {x: -0.9103086, y: -0.41393015}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Up de H\xF6cht"
-    position: {x: -477.10446, y: 8.698188, z: -265.64908}
+    position: {x: -477.10446, y: 8.685109, z: -265.64908}
     facing: {x: 0.9103086, y: 0.41393015}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Gartenweg
-    position: {x: -425.26312, y: 9.002779, z: -214.61067}
+    position: {x: -425.26312, y: 9.001114, z: -214.61067}
     facing: {x: 0.70411867, y: -0.71008235}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Gartenweg
-    position: {x: -425.29974, y: 9.003843, z: -214.57375}
+    position: {x: -425.29974, y: 9.00209, z: -214.57375}
     facing: {x: -0.70411867, y: 0.71008235}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Up de D\xFCnen"
-    position: {x: -425.32898, y: 8.716947, z: -213.98026}
+    position: {x: -425.32898, y: 8.714658, z: -213.98026}
     facing: {x: -0.7684495, y: -0.63991046}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Up de D\xFCnen"
-    position: {x: -425.289, y: 8.717384, z: -213.94699}
+    position: {x: -425.289, y: 8.71513, z: -213.94699}
     facing: {x: 0.7684495, y: 0.63991046}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Gartenweg
-    position: {x: -334.65625, y: 9.4477415, z: -153.25859}
+    position: {x: -334.65625, y: 9.443768, z: -153.25859}
     facing: {x: 0.5700999, y: -0.8215754}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Gartenweg
-    position: {x: -334.6859, y: 9.449652, z: -153.21587}
+    position: {x: -334.6859, y: 9.44553, z: -153.21587}
     facing: {x: -0.5700999, y: 0.8215754}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Up de D\xFCnen"
-    position: {x: -334.51407, y: 9.170605, z: -152.57814}
+    position: {x: -334.51407, y: 9.165088, z: -152.57814}
     facing: {x: -0.9591347, y: -0.28294998}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Up de D\xFCnen"
-    position: {x: -334.4642, y: 9.170525, z: -152.5634}
+    position: {x: -334.4642, y: 9.165034, z: -152.5634}
     facing: {x: 0.9591347, y: 0.28294998}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Pollerdiek
-    position: {x: -73.24999, y: 8.5859, z: -426.9578}
+    position: {x: -73.24999, y: 8.590863, z: -426.9578}
     facing: {x: 0.022272743, y: -0.999752}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Pollerdiek
-    position: {x: -73.25115, y: 8.58584, z: -426.9058}
+    position: {x: -73.25115, y: 8.590725, z: -426.9058}
     facing: {x: -0.022272743, y: 0.999752}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "W\xFCppspoor"
-    position: {x: -72.790115, y: 8.29252, z: -427.30408}
+    position: {x: -72.790115, y: 8.297713, z: -427.30408}
     facing: {x: 0.9996867, y: 0.025030823}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "W\xFCppspoor"
-    position: {x: -72.84209, y: 8.291805, z: -427.30536}
+    position: {x: -72.84209, y: 8.297034, z: -427.30536}
     facing: {x: -0.9996867, y: -0.025030823}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderloog"
-    position: {x: 521.65576, y: 8.489, z: -339.27133}
+    position: {x: 521.65576, y: 8.486415, z: -339.27133}
     facing: {x: -0.19346078, y: -0.981108}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderloog"
-    position: {x: 521.6658, y: 8.490135, z: -339.2203}
+    position: {x: 521.6658, y: 8.487418, z: -339.2203}
     facing: {x: 0.19346078, y: 0.981108}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Ostend
-    position: {x: 522.0181, y: 8.195203, z: -339.0641}
+    position: {x: 522.0181, y: 8.191933, z: -339.0641}
     facing: {x: -0.99949, y: 0.031931516}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Ostend
-    position: {x: 522.0701, y: 8.195424, z: -339.0658}
+    position: {x: 522.0701, y: 8.192134, z: -339.0658}
     facing: {x: 0.99949, y: -0.031931516}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Bi d'Utkiek
-    position: {x: -90.206116, y: 9.067106, z: -143.55531}
+    position: {x: -90.206116, y: 9.058287, z: -143.55531}
     facing: {x: -0.109194495, y: 0.9940204}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Bi d'Utkiek
-    position: {x: -90.20044, y: 9.066768, z: -143.60701}
+    position: {x: -90.20044, y: 9.058028, z: -143.60701}
     facing: {x: 0.109194495, y: -0.9940204}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderpad
-    position: {x: -90.56901, y: 8.762357, z: -144.04636}
+    position: {x: -90.56901, y: 8.754854, z: -144.04636}
     facing: {x: 0.9849845, y: 0.17264287}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderpad
-    position: {x: -90.62022, y: 8.762106, z: -144.05533}
+    position: {x: -90.62022, y: 8.754686, z: -144.05533}
     facing: {x: -0.9849845, y: -0.17264287}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Bi d'Utkiek
-    position: {x: 227.76552, y: 9.719231, z: -157.94774}
+    position: {x: 227.76552, y: 9.717688, z: -157.94774}
     facing: {x: -0.17833443, y: -0.9839699}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Bi d'Utkiek
-    position: {x: 227.7748, y: 9.719349, z: -157.89656}
+    position: {x: 227.7748, y: 9.7178135, z: -157.89656}
     facing: {x: 0.17833443, y: 0.9839699}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Slurpad
-    position: {x: 228.14934, y: 9.418762, z: -158.29301}
+    position: {x: 228.14934, y: 9.417455, z: -158.29301}
     facing: {x: 0.9354668, y: -0.35341442}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Slurpad
-    position: {x: 228.1007, y: 9.418766, z: -158.27464}
+    position: {x: 228.1007, y: 9.417428, z: -158.27464}
     facing: {x: -0.9354668, y: 0.35341442}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderloog"
-    position: {x: 76.242485, y: 9.330927, z: -260.90225}
+    position: {x: 76.242485, y: 9.32909, z: -260.90225}
     facing: {x: 0.9840566, y: 0.17785554}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderloog"
-    position: {x: 76.19131, y: 9.330883, z: -260.91153}
+    position: {x: 76.19131, y: 9.329021, z: -260.91153}
     facing: {x: -0.9840566, y: -0.17785554}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderloog
-    position: {x: 75.70931, y: 9.028638, z: -260.69183}
+    position: {x: 75.70931, y: 9.027212, z: -260.69183}
     facing: {x: 0.29189557, y: -0.9564502}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderloog
-    position: {x: 75.69413, y: 9.028314, z: -260.6421}
+    position: {x: 75.69413, y: 9.026992, z: -260.6421}
     facing: {x: -0.29189557, y: 0.9564502}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderloog
-    position: {x: -41.550438, y: 9.15255, z: -284.86713}
+    position: {x: -41.550438, y: 9.119905, z: -284.86713}
     facing: {x: 0.746751, y: -0.6651037}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderloog
-    position: {x: -41.58927, y: 9.15299, z: -284.83252}
+    position: {x: -41.58927, y: 9.120142, z: -284.83252}
     facing: {x: -0.746751, y: 0.6651037}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderpad
-    position: {x: -41.50486, y: 8.846164, z: -284.15314}
+    position: {x: -41.50486, y: 8.81672, z: -284.15314}
     facing: {x: -0.8500618, y: -0.52668303}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Noorderpad
-    position: {x: -41.460655, y: 8.845144, z: -284.12573}
+    position: {x: -41.460655, y: 8.816194, z: -284.12573}
     facing: {x: 0.8500618, y: 0.52668303}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Wittd\xFCn"
-    position: {x: -453.4346, y: 14.4897585, z: -138.8015}
+    position: {x: -453.4346, y: 14.486968, z: -138.8015}
     facing: {x: -0.9310453, y: -0.3649037}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Wittd\xFCn"
-    position: {x: -453.3862, y: 14.488127, z: -138.78252}
+    position: {x: -453.3862, y: 14.485292, z: -138.78252}
     facing: {x: 0.9310453, y: 0.3649037}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Up de D\xFCnen"
-    position: {x: -452.91898, y: 14.170208, z: -138.79951}
+    position: {x: -452.91898, y: 14.167415, z: -138.79951}
     facing: {x: -0.5292704, y: 0.84845316}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "Up de D\xFCnen"
-    position: {x: -452.89145, y: 14.168686, z: -138.84361}
+    position: {x: -452.89145, y: 14.165995, z: -138.84361}
     facing: {x: 0.5292704, y: -0.84845316}
     height: 0.13
     color:
@@ -2541,175 +2541,175 @@ MonoBehaviour:
       serializedVersion: 2
       rgba: 4279769112
   - text: Westerloog
-    position: {x: -110.47368, y: 9.3411255, z: -325.80112}
+    position: {x: -110.47368, y: 9.339682, z: -325.80112}
     facing: {x: 0.10423785, y: -0.9945524}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Westerloog
-    position: {x: -110.479095, y: 9.340921, z: -325.74942}
+    position: {x: -110.479095, y: 9.339464, z: -325.74942}
     facing: {x: -0.10423785, y: 0.9945524}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderloog"
-    position: {x: -109.687195, y: 9.0524025, z: -325.84344}
+    position: {x: -109.687195, y: 9.051548, z: -325.84344}
     facing: {x: 0.35751876, y: 0.93390596}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderloog"
-    position: {x: -109.70578, y: 9.052346, z: -325.89197}
+    position: {x: -109.70578, y: 9.0515175, z: -325.89197}
     facing: {x: -0.35751876, y: -0.93390596}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderloog"
-    position: {x: -64.496376, y: 9.283331, z: -340.22116}
+    position: {x: -64.496376, y: 9.283448, z: -340.22116}
     facing: {x: -0.21798211, y: 0.97595274}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderloog"
-    position: {x: -64.48504, y: 9.283186, z: -340.27194}
+    position: {x: -64.48504, y: 9.283329, z: -340.27194}
     facing: {x: 0.21798211, y: -0.97595274}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "W\xFCppspoor"
-    position: {x: -64.83036, y: 8.984181, z: -340.71182}
+    position: {x: -64.83036, y: 8.984558, z: -340.71182}
     facing: {x: 0.99980044, y: 0.019977545}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "W\xFCppspoor"
-    position: {x: -64.88236, y: 8.984446, z: -340.71286}
+    position: {x: -64.88236, y: 8.984822, z: -340.71286}
     facing: {x: -0.99980044, y: -0.019977545}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderloog"
-    position: {x: -74.204956, y: 9.462064, z: -333.76846}
+    position: {x: -74.204956, y: 9.440557, z: -333.76846}
     facing: {x: 0.40750137, y: 0.91320455}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "S\xFCderloog"
-    position: {x: -74.22615, y: 9.461385, z: -333.81595}
+    position: {x: -74.22615, y: 9.440453, z: -333.81595}
     facing: {x: -0.40750137, y: -0.91320455}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "W\xFCppspoor"
-    position: {x: -74.70638, y: 9.165109, z: -333.28003}
+    position: {x: -74.70638, y: 9.156613, z: -333.28003}
     facing: {x: -0.95226693, y: -0.30526656}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "W\xFCppspoor"
-    position: {x: -74.65687, y: 9.165568, z: -333.26416}
+    position: {x: -74.65687, y: 9.155764, z: -333.26416}
     facing: {x: 0.95226693, y: 0.30526656}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melksett
-    position: {x: -74.25194, y: 8.501471, z: -487.63977}
+    position: {x: -74.25194, y: 8.50341, z: -487.63977}
     facing: {x: -0.064910926, y: -0.997891}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Melksett
-    position: {x: -74.248566, y: 8.50212, z: -487.5879}
+    position: {x: -74.248566, y: 8.504112, z: -487.5879}
     facing: {x: 0.064910926, y: 0.997891}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "W\xFCppspoor"
-    position: {x: -73.92596, y: 8.208716, z: -487.2528}
+    position: {x: -73.92596, y: 8.210709, z: -487.2528}
     facing: {x: -0.99958616, y: 0.02876658}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "W\xFCppspoor"
-    position: {x: -73.873985, y: 8.209114, z: -487.25427}
+    position: {x: -73.873985, y: 8.211045, z: -487.25427}
     facing: {x: 0.99958616, y: -0.02876658}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "W\xFCppspoor"
-    position: {x: -85.36598, y: 9.691607, z: -316.39276}
+    position: {x: -85.36598, y: 9.6903, z: -316.39276}
     facing: {x: 0.95226693, y: 0.30526656}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "W\xFCppspoor"
-    position: {x: -85.4155, y: 9.691143, z: -316.40863}
+    position: {x: -85.4155, y: 9.689863, z: -316.40863}
     facing: {x: -0.95226693, y: -0.30526656}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Westerloog
-    position: {x: -85.88759, y: 9.387613, z: -316.22836}
+    position: {x: -85.88759, y: 9.386788, z: -316.22836}
     facing: {x: 0.3953861, y: -0.918515}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Westerloog
-    position: {x: -85.90816, y: 9.387567, z: -316.18063}
+    position: {x: -85.90816, y: 9.3867855, z: -316.18063}
     facing: {x: -0.3953861, y: 0.918515}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Deichsicherungsweg
-    position: {x: -70.04746, y: 10.946477, z: -666.6662}
+    position: {x: -70.04746, y: 10.9551115, z: -666.6662}
     facing: {x: -0.18412375, y: 0.9829031}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: Deichsicherungsweg
-    position: {x: -70.03788, y: 10.946281, z: -666.7172}
+    position: {x: -70.03788, y: 10.954784, z: -666.7172}
     facing: {x: 0.18412375, y: -0.9829031}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "W\xFCppspoor"
-    position: {x: -70.89652, y: 10.668178, z: -666.463}
+    position: {x: -70.89652, y: 10.677309, z: -666.463}
     facing: {x: -0.9798184, y: -0.19988973}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: "W\xFCppspoor"
-    position: {x: -70.84557, y: 10.666853, z: -666.45264}
+    position: {x: -70.84557, y: 10.676012, z: -666.45264}
     facing: {x: 0.9798184, y: 0.19988973}
     height: 0.13
     color:
       serializedVersion: 2
       rgba: 4279769112
   - text: EDEKA
-    position: {x: -225.59666, y: 10.629686, z: -381.76947}
+    position: {x: -225.59666, y: 10.605191, z: -381.76947}
     facing: {x: 0.96414953, y: 0.26535937}
     height: 0.8060001
     color:
