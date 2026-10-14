@@ -145,6 +145,23 @@ def main():
                     e["thumb"] = url_of(CATALOG_TAG, tname)
                     print(f"  {m['id']:<14} thumbnail updated")
 
+            # Default start points (one menu card each); the first one uses the map thumbnail.
+            starts = []
+            old_starts = {st.get("name"): st for st in e.get("starts", [])}
+            for k, st in enumerate(m.get("starts", [])):
+                entry = {"name": st["name"], "x": st["x"], "z": st["z"], "yaw": st.get("yaw", 0), "thumb": ""}
+                local = st.get("thumb") or ""
+                if k > 0 and local and os.path.exists(local):
+                    sname = f"{m['id']}-start{k}-thumb-{sha256(local)[:10]}.png"
+                    url = url_of(CATALOG_TAG, sname)
+                    if old_starts.get(st["name"], {}).get("thumb") != url:
+                        shutil.copyfile(local, os.path.join(stage, sname))
+                        uploads.setdefault(CATALOG_TAG, []).append(os.path.join(stage, sname))
+                        print(f"  {m['id']:<14} start '{st['name']}' thumbnail updated")
+                    entry["thumb"] = url
+                starts.append(entry)
+            e["starts"] = starts
+
     catalog = {"schema": 1, "updated": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
                "maps": sorted(entries.values(), key=lambda e: -e.get("lat", 0))}
     out = os.path.join(ROOT, "Builds", "Maps", "maps.json")
@@ -166,7 +183,7 @@ def main():
     # Drop assets no catalog entry references any more (replaced regions/builds, old thumbnails).
     referenced = {}
     for e in catalog["maps"]:
-        urls = [e.get("thumb", "")]
+        urls = [e.get("thumb", "")] + [st.get("thumb", "") for st in e.get("starts", [])]
         for b in e.get("builds", []):
             urls.append(b.get("url", ""))
             urls += [f["url"] for f in b.get("files", [])]
