@@ -37,8 +37,9 @@ namespace LeGamez.Core
         /// 1 = scene bundle; 2 = scene + tiles bundle; 3 = AreaData + tiles bundle; 4 = AreaData + one bundle per 1 km region
         /// (all AssetBundles, per platform/engine); 5 = own MapFormat files, one per region; 6 = area.bin + one world pack
         /// per area, entries fetched with HTTP Range requests; 7 = 6 + instanced trees/bushes/lamps in the tile blobs (INS1);
-        /// 8 = 7 + collider-only tile parts (WorldTile.FlagNoRender: invisible motorway barrier walls).</summary>
-        public const int Format = 8;
+        /// 8 = 7 + collider-only tile parts (WorldTile.FlagNoRender: invisible motorway barrier walls);
+        /// 9 = 8 + chunked world pack (4 × 4 km pack files, pack2.idx in area.bin – MapFormat.ChunkedPackFormat).</summary>
+        public const int Format = 9;
 
         public const string CatalogUrl = "https://github.com/1letzgo/nordisch/releases/download/maps/maps.json";
         /// <summary>Max. size of cached world pack entries on the device (area files don't count).</summary>
@@ -323,8 +324,9 @@ namespace LeGamez.Core
         public static string EntryPath(string id, string entry, ulong hash) =>
             Path.Combine(CacheDir(id), $"{entry.Replace('/', '_')}-{hash:x16}.bin");
 
-        /// <summary>URL of the area's world pack in the installed build (null for builds before format 6).</summary>
-        public static string PackUrl(Map m) => m?.installed?.File(PackFile)?.url;
+        /// <summary>URL of a pack file of the installed build: world.bin (null <paramref name="file"/>) or a chunk of a
+        /// chunked pack (World/MapFormat.ChunkFile); null for builds before format 6.</summary>
+        public static string PackUrl(Map m, string file = null) => m?.installed?.File(file ?? PackFile)?.url;
 
         internal static void TouchEntry(string id, string path) => usage[$"{id}/{Path.GetFileName(path)}"] = DateTime.UtcNow.Ticks;
 
@@ -386,7 +388,7 @@ namespace LeGamez.Core
             if (m.latest == null) return list;
             foreach (var f in m.latest.AllFiles)
             {
-                if (f.name == PackFile) continue; // never on the device as a whole
+                if (World.MapFormat.IsPackFile(f.name)) continue; // never on the device as a whole
                 bool area = string.IsNullOrEmpty(f.region);
                 FileEntry have = null;
                 if (m.info != null) foreach (var h in m.info.files) if (h.name == f.name) { have = h; break; }
@@ -587,7 +589,7 @@ namespace LeGamez.Core
             if (update) files.AddRange(ChangedFiles(m));
             else
                 foreach (var f in b.AllFiles)
-                    if (f.name != PackFile && string.IsNullOrEmpty(f.region)) files.Add(f);
+                    if (!World.MapFormat.IsPackFile(f.name) && string.IsNullOrEmpty(f.region)) files.Add(f);
             long total = 0, done = 0;
             foreach (var f in files) total += Math.Max(1, f.size);
 

@@ -48,3 +48,4 @@ mono_crash.*
 /Data/*.dgm.bin
 /Data/*.lod2.json
 /Assets/Generated/*/regions~/
+/Assets/Generated/*/build~/

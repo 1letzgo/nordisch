@@ -96,6 +96,8 @@ namespace LeGamez.Editor
         /// (minimap, Generated/&lt;id&gt;/regions~/, into the region files on export) and the small overview of the whole area
         /// composed from them (full map, AreaData.mapTexture → area file). Only the tiles around the current view are
         /// loaded, so whole municipalities fit into memory. <paramref name="onlyId"/>: one area.
+        /// Incremental: only images that tiles changed since the last rendering can show are made again
+        /// (<see cref="OsmImport.TileManifest.DirtyMaps"/>, written by the importer); unknown state = everything.
         /// </summary>
         [MenuItem("LeGamez/Render Menu Thumbnails")]
         public static void RenderThumbnails() => RenderThumbnails(null);
@@ -114,6 +116,7 @@ namespace LeGamez.Editor
             foreach (var dataPath in paths)
             {
                 var data = AssetDatabase.LoadAssetAtPath<AreaData>(dataPath);
+                var dirty = OsmImport.TileManifest.DirtyMaps(data.areaId); // null = render everything
                 var area = AreaPreview.Open(data, allTiles: false);
                 if (area == null) continue;
                 var world = Object.FindAnyObjectByType<WorldStreamer>();
@@ -132,17 +135,18 @@ namespace LeGamez.Editor
                 // Look at the best POI (or the centre) from the south at ~40° down.
                 Vector3 focus = area.pois != null && area.pois.entries.Count > 0 ? area.pois.entries[0].position : Vector3.zero;
                 focus = Vector3.Lerp(focus, Vector3.zero, 0.4f);
-                if (world != null) world.LoadAroundInEditor(focus, 2500f);
+                string file = AreaCatalog.ThumbPath(area.areaId);
+                bool thumb = Affects(dirty, focus, ThumbReach) || !File.Exists(file);
+                if (world != null && thumb) world.LoadAroundInEditor(focus, 2500f);
                 camGo.transform.position = focus + new Vector3(-90f, 170f, -200f);
                 camGo.transform.LookAt(focus);
                 bool fog = RenderSettings.fog;
                 RenderSettings.fog = false;
-                string file = AreaCatalog.ThumbPath(area.areaId);
-                RenderTo(cam, file, 768, 512);
-                var startThumbs = RenderStartThumbs(area, data, world, cam);
+                if (thumb) RenderTo(cam, file, 768, 512);
+                var startThumbs = RenderStartThumbs(area, data, world, cam, dirty);
 
                 string mapFile = AreaCatalog.MapPath(area.areaId);
-                if (world != null) RenderMaps(area, data, world, cam, mapFile);
+                if (world != null) RenderMaps(area, data, world, cam, mapFile, dirty);
                 RenderSettings.fog = fog;
                 AssetDatabase.ImportAsset(mapFile);
                 if (AssetImporter.GetAtPath(mapFile) is TextureImporter mi)
@@ -159,7 +163,7 @@ namespace LeGamez.Editor
 
                 Object.DestroyImmediate(volume.gameObject);
                 Object.DestroyImmediate(camGo);
-                startThumbs.Insert(0, file);
+                if (thumb) startThumbs.Insert(0, file);
                 foreach (var thumbFile in startThumbs)
                 {
                     AssetDatabase.ImportAsset(thumbFile);
@@ -177,7 +181,24 @@ namespace LeGamez.Editor
                 data.mapTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(mapFile);
                 EditorUtility.SetDirty(data);
                 AssetDatabase.SaveAssets();
+                if (world != null) OsmImport.TileManifest.ClearDirtyMaps(data.areaId);
             }
+        }
+
+        /// <summary>Card images look this far (m) – changes further away don't show.</summary>
+        const float ThumbReach = 1500f;
+
+        /// <summary>True if a changed tile (null set = everything changed) lies within <paramref name="reach"/> of the point.</summary>
+        static bool Affects(System.Collections.Generic.HashSet<Vector2Int> dirty, Vector3 at, float reach)
+        {
+            if (dirty == null) return true;
+            foreach (var k in dirty)
+            {
+                float s = WorldStreamer.TileSize, x0 = k.x * s, z0 = k.y * s;
+                float dx = Mathf.Max(x0 - at.x, 0f, at.x - (x0 + s)), dz = Mathf.Max(z0 - at.z, 0f, at.z - (z0 + s));
+                if (dx * dx + dz * dz < reach * reach) return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -185,7 +206,8 @@ namespace LeGamez.Editor
         /// area thumbnail, centred between the start and the best POI near it. Removes images of starts that are gone.
         /// Returns the files written.
         /// </summary>
-        static System.Collections.Generic.List<string> RenderStartThumbs(AreaInfo area, AreaData data, WorldStreamer world, Camera cam)
+        static System.Collections.Generic.List<string> RenderStartThumbs(AreaInfo area, AreaData data, WorldStreamer world, Camera cam,
+            System.Collections.Generic.HashSet<Vector2Int> dirty)
         {
             var files = new System.Collections.Generic.List<string>();
             var starts = data.StartList();
@@ -196,6 +218,7 @@ namespace LeGamez.Editor
                     foreach (var p in area.pois.entries) // ranked: the first one close enough
                         if (Vector2.Distance(new Vector2(p.position.x, p.position.z), new Vector2(at.x, at.z)) < 600f) { poi = p.position; break; }
                 Vector3 focus = Vector3.Lerp(poi, at, 0.4f);
+                if (!Affects(dirty, focus, ThumbReach) && File.Exists(AreaCatalog.ThumbPath(area.areaId, k))) continue; // unchanged
                 if (world != null) world.LoadAroundInEditor(focus, 2500f);
                 cam.transform.position = focus + new Vector3(-90f, 170f, -200f);
                 cam.transform.LookAt(focus);
@@ -221,11 +244,12 @@ namespace LeGamez.Editor
         /// tiles stay loaded, and box-filtered into the overview image of the whole area (+ MapMargin), ~1 px/m up to
         /// <see cref="OverviewMax"/> px.
         /// </summary>
-        static void RenderMaps(AreaInfo area, AreaData data, WorldStreamer world, Camera cam, string overviewFile)
+        static void RenderMaps(AreaInfo area, AreaData data, WorldStreamer world, Camera cam, string overviewFile,
+            System.Collections.Generic.HashSet<Vector2Int> dirty)
         {
             string id = area.areaId;
             string dir = WorldStreamer.EditorRegionMapDir(id);
-            if (Directory.Exists(dir)) Directory.Delete(dir, true); // no stale regions
+            if (dirty == null && Directory.Exists(dir)) Directory.Delete(dir, true); // no stale regions
             Directory.CreateDirectory(dir);
 
             Vector2 mapSize = area.MapSize, mapCenter = area.BoundsCenter, mapMin = mapCenter - mapSize * 0.5f;
@@ -253,20 +277,39 @@ namespace LeGamez.Editor
 
             var regions = data.tileKeys.Select(WorldStreamer.RegionOf).Distinct()
                 .OrderBy(r => r.x).ThenBy(r => (r.x & 1) == 0 ? r.y : -r.y).ToList();
+            if (dirty != null)
+            {
+                // Images of regions that are gone (incremental runs keep the folder).
+                var keep = new System.Collections.Generic.HashSet<string>(regions.Select(r => Path.GetFileName(WorldStreamer.EditorRegionMapPath(id, r))));
+                foreach (var f in Directory.GetFiles(dir, "*.jpg")) if (!keep.Contains(Path.GetFileName(f))) File.Delete(f);
+            }
             const int px = RegionContent.MapPixels;
             float k = px / WorldStreamer.RegionSize; // region pixels per metre
             long bytes = 0;
+            int rendered = 0;
             for (int n = 0; n < regions.Count; n++)
             {
                 var r = regions[n];
                 var b = RegionContent.Bounds(r);
                 const float margin = 30f; // trees and roofs reaching over the region edge
-                world.KeepInEditor(new Rect(b.xMin - margin, b.yMin - margin, b.width + 2 * margin, b.height + 2 * margin));
-                cam.transform.SetPositionAndRotation(new Vector3(b.center.x, 500f, b.center.y), Quaternion.Euler(90f, 0f, 0f));
-                var tex = RenderToTexture(cam, px, px);
-                var jpg = tex.EncodeToJPG(RegionJpegQuality);
-                File.WriteAllBytes(WorldStreamer.EditorRegionMapPath(id, r), jpg);
-                bytes += jpg.Length;
+                string regionFile = WorldStreamer.EditorRegionMapPath(id, r);
+                Texture2D tex = null;
+                if (dirty != null && File.Exists(regionFile) && !TouchesRegion(dirty, b, margin))
+                {
+                    // Unchanged region: keep its image, only add it to the overview.
+                    tex = new Texture2D(2, 2, TextureFormat.RGB24, false);
+                    if (!tex.LoadImage(File.ReadAllBytes(regionFile)) || tex.width != px || tex.height != px) { Object.DestroyImmediate(tex); tex = null; }
+                }
+                if (tex == null)
+                {
+                    world.KeepInEditor(new Rect(b.xMin - margin, b.yMin - margin, b.width + 2 * margin, b.height + 2 * margin));
+                    cam.transform.SetPositionAndRotation(new Vector3(b.center.x, 500f, b.center.y), Quaternion.Euler(90f, 0f, 0f));
+                    tex = RenderToTexture(cam, px, px);
+                    var jpg = tex.EncodeToJPG(RegionJpegQuality);
+                    File.WriteAllBytes(regionFile, jpg);
+                    bytes += jpg.Length;
+                    rendered++;
+                }
 
                 // Box filter into the overview (rows bottom-up = south to north in both images).
                 var src = tex.GetPixels32();
@@ -309,7 +352,17 @@ namespace LeGamez.Editor
             cam.orthographic = wasOrtho;
             cam.clearFlags = camClear;
             cam.backgroundColor = camBg;
-            Debug.Log($"[Snapshot] {id}: {regions.Count} region maps ({bytes / 1024} KB, {bytes / 1024 / Mathf.Max(1, regions.Count)} KB each), overview {ow}x{oh} ({ovJpg.Length / 1024} KB)");
+            Debug.Log($"[Snapshot] {id}: {rendered} of {regions.Count} region maps rendered ({bytes / 1024} KB, {bytes / 1024 / Mathf.Max(1, rendered)} KB each), overview {ow}x{oh} ({ovJpg.Length / 1024} KB)");
+        }
+
+        /// <summary>A changed tile overlaps the region grown by <paramref name="margin"/> (what its image shows).</summary>
+        static bool TouchesRegion(System.Collections.Generic.HashSet<Vector2Int> dirty, Rect region, float margin)
+        {
+            float s = WorldStreamer.TileSize;
+            foreach (var t in dirty)
+                if (t.x * s < region.xMax + margin && (t.x + 1) * s > region.xMin - margin &&
+                    t.y * s < region.yMax + margin && (t.y + 1) * s > region.yMin - margin) return true;
+            return false;
         }
 
         static void Render(Camera cam, string file) => RenderTo(cam, file, Width, Height);

@@ -35,21 +35,23 @@ namespace LeGamez.Editor.OsmImport
         }
 
         [MenuItem("LeGamez/Import All Areas")]
-        public static void ImportAll()
+        public static void ImportAll() => ImportAll(preview: true);
+
+        static void ImportAll(bool preview)
         {
             CreateMenuScene();
             var files = Directory.GetFiles(DataDir, "*.osm.json").OrderBy(f => f).ToArray();
             for (int i = 0; i < files.Length; i++)
             {
                 EditorUtility.DisplayProgressBar("LeGamez OSM Import", Path.GetFileName(files[i]), (float)i / files.Length);
-                try { ImportArea(files[i]); }
+                try { ImportArea(files[i], preview); }
                 finally { EditorUtility.ClearProgressBar(); }
             }
         }
 
         public static void ImportAllBatch()
         {
-            ImportAll();
+            ImportAll(preview: false); // the thumbnails load the tiles they need themselves
             SceneSnapshot.RenderThumbnails();
             CreateMenuScene();
             AssetDatabase.SaveAssets();
@@ -61,9 +63,12 @@ namespace LeGamez.Editor.OsmImport
             var args = System.Environment.GetCommandLineArgs();
             int i = System.Array.IndexOf(args, "-area");
             if (i < 0 || i + 1 >= args.Length) throw new System.ArgumentException("missing -area <id>");
-            ImportArea(Path.Combine(DataDir, args[i + 1] + ".osm.json"));
+            // -full: rebuild every tile (otherwise only tiles whose content changed are draped, meshed and written).
+            ImportArea(Path.Combine(DataDir, args[i + 1] + ".osm.json"), preview: false, full: System.Array.IndexOf(args, "-full") >= 0);
+            var sw = Stopwatch.StartNew();
             SceneSnapshot.RenderThumbnails(args[i + 1]); // only this area
             AssetDatabase.SaveAssets();
+            Debug.Log($"[Import] {args[i + 1]} thumbnails/region maps: {sw.ElapsedMilliseconds} ms (rss {Process.GetCurrentProcess().WorkingSet64 >> 20} MB)");
         }
 
         const string MenuScenePath = "Assets/Scenes/MainMenu.unity";
@@ -118,10 +123,15 @@ namespace LeGamez.Editor.OsmImport
             EditorUtility.SetDirty(catalog);
         }
 
-        public static string ImportArea(string jsonPath)
+        /// <param name="preview">Leave the area open with all tiles loaded (snapshot tools); batch imports don't need it –
+        /// loading every tile of a whole municipality costs minutes and gigabytes.</param>
+        /// <param name="full">Rebuild every tile, even those whose signature is unchanged (<see cref="TileBuild"/>).</param>
+        public static string ImportArea(string jsonPath, bool preview = true, bool full = false)
         {
             var sw = Stopwatch.StartNew();
+            ImportProfile.Begin(Path.GetFileName(jsonPath).Replace(".osm.json", ""));
             var data = OsmData.Load(jsonPath);
+            ImportProfile.Mark("load osm");
             var meta = data.meta;
             var area = meta.bounds;
             var rng = new System.Random(meta.id.GetHashCode());
@@ -129,23 +139,31 @@ namespace LeGamez.Editor.OsmImport
             // Large areas: only settlements + road corridors are built, the rest is coarse terrain (AreaMask, CoarseTerrain).
             var mask = AreaMask.Load(Path.GetDirectoryName(jsonPath), meta.id);
             var maskStats = mask?.Filter(data);
+            ImportProfile.Mark("mask");
             var terrain = TerrainField.Load(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".dgm.bin"));
             var lidarTrees = PropPlacer.LoadLidarTrees(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".trees.json"));
             if (mask != null && lidarTrees != null) lidarTrees = lidarTrees.FindAll(t => mask.Inside(t.x, t.y));
             var aerial = AerialImage.Load(Path.GetDirectoryName(jsonPath), meta.id);
+            ImportProfile.Mark("load dgm/trees/dop");
             aerial?.SetCanopy(lidarTrees);
             CoastBuilder.Prepare(data, area, terrain, aerial); // islands: sea level, water, tidal flats (rewrites the terrain)
             aerial?.SetBuiltUp(data); // open country: smoothed fields/meadows instead of per-pixel cover
+            ImportProfile.Mark("aerial canopy/coast/built-up");
             var sink = new MeshSink();
             CoarseTerrain.Build(sink, area, WorldStyle.GroundColor(meta.ground), terrain); // before BuildBase: simplifies the field
+            ImportProfile.Mark("coarse terrain");
             // Decks instead of draped ribbons where there is a gap below; fills the pits at bridge ends (before BuildBase).
             int bridges = BridgeBuilder.Prepare(data, area, terrain);
             GroundBuilder.BuildBase(sink, area, WorldStyle.GroundColor(meta.ground), terrain);
+            ImportProfile.Mark("ground base");
             int terrainTris = CoarseTerrain.TerrainTriangles(sink);
             GroundBuilder.BuildAreas(data, sink, area);
+            ImportProfile.Mark("ground areas");
             int lines = GroundBuilder.BuildLines(data, sink, area);
+            ImportProfile.Mark("ground lines");
             BridgeBuilder.Build(data, sink, terrain);
             var motorway = MotorwayBuilder.Build(data, sink, area, terrain); // lane markings, guard rails
+            ImportProfile.Mark("bridges/motorway");
             // Prefer official LGLN LoD2 buildings (real roof shapes); fall back to OSM extrusion.
             string lod2Path = Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".lod2.json");
             bool island = meta.ground == "sand";
@@ -153,31 +171,47 @@ namespace LeGamez.Editor.OsmImport
             BuildingOverrides.Load(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".buildings.json"));
             bool hasLod2 = Lod2Builder.TryBuild(lod2Path, data, sink, area, island, out int buildings);
             if (!hasLod2) buildings = BuildingBuilder.Build(data, sink, area, rng);
+            ImportProfile.Mark("buildings lod2");
             // LoD2 lags behind reality (new estates): extrude the OSM houses it doesn't have. Own random
             // generator, so the shared sequence – and with it all generated object ids – stays unchanged.
             int osmExtra = hasLod2 ? BuildingBuilder.Build(data, sink, area, new System.Random(meta.id.GetHashCode() ^ 0x0B5D), Lod2Builder.Covers) : 0;
             BuildingOverrides.ReportUnused();
+            ImportProfile.Mark("buildings osm");
             EditsPlacer.Begin(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".edits.json"));
             int trees = PropPlacer.PlaceTrees(data, sink, area, rng, lidarTrees);
+            ImportProfile.Mark("trees");
             int lamps = PropPlacer.PlaceStreetLamps(data, sink, area);
             int barriers = GroundBuilder.BuildBarriers(data, sink, area);
+            ImportProfile.Mark("lamps/barriers");
             var gardens = GardenBuilder.Build(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".parcels.json"), data, sink, area);
+            ImportProfile.Mark("gardens");
             var furniture = FurniturePlacer.Place(data, sink, area, rng);
+            ImportProfile.Mark("furniture");
             var traffic = TrafficBuilder.Build(Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".traffic.json"), data, sink, area);
             CommercialBuilder.Build(data, sink, area); // petrol stations etc.; after traffic (adds sign texts)
+            ImportProfile.Mark("traffic/commercial");
             int edits = EditsPlacer.PlaceNew(sink, area);
             var pois = PoiExtractor.Extract(data, area);
             foreach (var poi in pois) poi.position.y = terrain.Height(poi.position.x, poi.position.z);
+            ImportProfile.Mark("edits/pois");
+
+            // Incremental: only tiles whose content (before draping) changed since the last import are built from here on.
+            var sea = new MeshSink();
+            CoastBuilder.BuildSea(sea, area); // level sea surface, not draped – added after draping
+            var plan = TileBuild.Make(meta.id, sink, sea, terrain, full || !AssetDatabase.IsValidFolder($"{GeneratedRoot}/{meta.id}/tiles"));
+            ImportProfile.Mark("sea/tile signatures");
 
             // Fit everything onto the terrain: overlays are cut & draped, small objects lifted.
             foreach (var kv in sink.Batches)
             {
+                if (!plan.Builds(TileBuild.KeyOf(kv.Key))) continue; // unchanged tile: its asset stays
                 string m = kv.Key.mat;
                 if (m == WorldStyle.MatGround || m == WorldStyle.MatWater) TerrainDrape.Drape(kv.Value, terrain);
                 else if (WorldStyle.Lifted(m)) TerrainDrape.Lift(kv.Value, terrain);
             }
             TerrainDrape.Lift(sink.instances, terrain); // instanced trees, bushes, lamps
-            CoastBuilder.BuildSea(sink, area); // level sea surface, not draped
+            TileBuild.Append(sink, sea);
+            ImportProfile.Mark("drape/lift");
 
             string areaDir = $"{GeneratedRoot}/{meta.id}";
             EnsureFolder(areaDir);
@@ -188,6 +222,7 @@ namespace LeGamez.Editor.OsmImport
             FacadeRecords.Save(facadePath);
             AssetDatabase.ImportAsset(facadePath);
             var materials = EnsureMaterials();
+            ImportProfile.Mark("catalogs/facade");
 
             // POI database asset.
             string poiPath = $"{areaDir}/{meta.id}_pois.asset";
@@ -220,6 +255,7 @@ namespace LeGamez.Editor.OsmImport
             d.allowedVehicles = new List<string>(meta.vehicles);
             d.attribution = hasLod2 ? "© OpenStreetMap-Mitwirkende (ODbL) · 3D-Gebäude, Gelände, Luftbilder © LGLN (CC BY 4.0)" : "© OpenStreetMap-Mitwirkende (ODbL)";
             d.starts = Starts(data, area, terrain);
+            ImportProfile.Mark("pois/starts");
             d.spawn = d.starts[0].position;          // old apps only know the first start
             d.spawnBikeSpot = d.starts[0].bikeSpot;
             d.bikeSpots = BikeSpots(data, area, terrain);
@@ -228,14 +264,17 @@ namespace LeGamez.Editor.OsmImport
             d.streets = BuildStreets(data, $"{areaDir}/{meta.id}_streets.asset");
             d.facade = AssetDatabase.LoadAssetAtPath<TextAsset>(facadePath);
             TrafficBuilder.Export(terrain, d.trafficHeads, d.trafficSignals, d.signTexts);
+            ImportProfile.Mark("bikes/cars/streets/traffic export");
             // World geometry: one asset per WorldStreamer tile (meshes as sub-assets), loaded around the camera at runtime.
-            d.tileKeys = WriteTiles(sink, meta.id, areaDir);
+            d.tileKeys = WriteTiles(sink, meta.id, areaDir, plan);
+            ImportProfile.Mark("write tiles");
             EditorUtility.SetDirty(d);
             UpdateCatalog(meta, pois.Count, d.starts);
             AssetDatabase.SaveAssets();
 
             // Leave a preview of the area open (unsaved scene with all tiles) for snapshot tools.
-            AreaPreview.Open(d);
+            if (preview) AreaPreview.Open(d);
+            ImportProfile.Mark("save/preview");
 
             Debug.Log($"[OSM] {meta.name}: motorway {motorway.carriageways} carriageway pieces/{motorway.ramps} ramps/{motorway.railKm:F1} km guard rail/{motorway.deadEnds} dead-end barriers/{traffic.motorway} exit signs, {bridges} bridge decks");
             Debug.Log($"[OSM] {meta.name}: {buildings} buildings (+{osmExtra} OSM-only), {lines} lines, {trees} plants, {lamps} lamps, {barriers} barriers, gardens {gardens.plots} plots/{gardens.measured} measured hedges/{gardens.hedges} hedges/{gardens.fences} fences/{gardens.walls} walls/{gardens.drawn} drawn, terrain {(terrain.IsFlat ? "flat" : "DGM1")}, aerial {(aerial != null ? "DOP20" : "-")}, trees {(lidarTrees != null ? "LiDAR" : "OSM")}, " +
@@ -243,6 +282,7 @@ namespace LeGamez.Editor.OsmImport
                       $"facade {FacadeRecords.Windows} windows/{FacadeRecords.Doors} doors/{FacadeRecords.Gutters} gutters/{FacadeRecords.Verges} verges/{FacadeRecords.Ridges} ridges, traffic {traffic.junctionSignals} signal junctions/{traffic.crossingSignals} signal crossings/{traffic.heads} heads/{traffic.zebras} zebras/{traffic.lanes} lanes/{traffic.stops} stop/{traffic.giveWays} give way/{traffic.priority} priority/{traffic.speed} speed/{traffic.oneway} one-way/{traffic.names} names/{traffic.mapped} mapped, {pois.Count} POIs, " +
                       $"{(maskStats.HasValue ? $"mask -{maskStats.Value.nodes} nodes/-{maskStats.Value.polygons} areas/-{maskStats.Value.ways} ways/{maskStats.Value.pieces} cut, {CoarseTerrain.Blocks} coarse terrain blocks ({CoarseTerrain.Triangles} of {terrainTris} terrain tris, {CoarseTerrain.Trees} forest-edge trees), " : "")}" +
                       $"{sink.Batches.Count()} meshes + {sink.instances.Count} instances in {sw.ElapsedMilliseconds} ms -> {areaPath}");
+            ImportProfile.End();
             return areaPath;
         }
 
@@ -250,76 +290,167 @@ namespace LeGamez.Editor.OsmImport
 
         /// <summary>
         /// Sorts the sink's batches (100 m chunks, 25 m for details) into <see cref="WorldStreamer.TileSize"/> tiles and
-        /// writes one <see cref="WorldTile"/> asset per tile to &lt;areaDir&gt;/tiles (old tiles are removed first).
-        /// Meshes without collider are not CPU-readable – halves their memory on the device.
+        /// writes one <see cref="WorldTile"/> asset per tile to &lt;areaDir&gt;/tiles – only tiles the plan builds
+        /// (<see cref="TileBuild"/>); the others keep their asset, tiles that are gone are deleted. Tile by tile, the
+        /// geometry is released as it goes. Meshes without collider are not CPU-readable – halves their memory on the device.
         /// </summary>
-        static List<Vector2Int> WriteTiles(MeshSink sink, string id, string areaDir)
+        static List<Vector2Int> WriteTiles(MeshSink sink, string id, string areaDir, TileBuild.Plan plan)
         {
             string tileDir = $"{areaDir}/tiles";
-            if (AssetDatabase.IsValidFolder(tileDir)) AssetDatabase.DeleteAsset(tileDir);
             AssetDatabase.DeleteAsset($"{areaDir}/{id}_meshes.asset"); // pre-streaming single mesh file
+            var previous = plan.previous;
+            // Unknown state (first import with signatures, forced rebuild …): rewrite everything.
+            if (previous == null && AssetDatabase.IsValidFolder(tileDir)) AssetDatabase.DeleteAsset(tileDir);
+            TileManifest.Clear(id); // until the tiles below are written
             EnsureFolder(tileDir);
 
-            var tiles = new Dictionary<Vector2Int, WorldTile>();
-            WorldTile TileAt(Vector2Int key)
+            // Batches and instances per tile, in the sink's order (= part order inside the tile, as before).
+            var batchesOf = new Dictionary<Vector2Int, List<KeyValuePair<(string mat, Vector2Int chunk), MeshSink.Batch>>>();
+            var instancesOf = new Dictionary<Vector2Int, List<WorldTile.Instance>>();
+            var order = new List<Vector2Int>();
+            foreach (var kv in sink.Batches)
             {
-                if (!tiles.TryGetValue(key, out var tile))
+                if (kv.Value.vertices.Count == 0) continue;
+                var key = TileBuild.KeyOf(kv.Key);
+                if (!batchesOf.TryGetValue(key, out var list))
                 {
-                    tile = ScriptableObject.CreateInstance<WorldTile>();
+                    batchesOf[key] = list = new List<KeyValuePair<(string, Vector2Int), MeshSink.Batch>>();
+                    order.Add(key);
+                }
+                list.Add(kv);
+            }
+            // Instanced trees/bushes/lamps go to the tile under their origin (crowns may overhang its edge a bit –
+            // the renderer's bounds include them).
+            foreach (var inst in sink.instances)
+            {
+                var key = WorldStreamer.KeyOf(inst.position.x, inst.position.z);
+                if (!instancesOf.TryGetValue(key, out var list))
+                {
+                    instancesOf[key] = list = new List<WorldTile.Instance>();
+                    if (!batchesOf.ContainsKey(key)) order.Add(key);
+                }
+                list.Add(inst);
+            }
+
+            var hashes = new Dictionary<Vector2Int, ulong>();
+            var changed = new List<Vector2Int>();
+            var tMesh = new Stopwatch(); var tWrite = new Stopwatch();
+            int written = 0, kept = 0, removed = 0;
+            var pending = new List<WorldTile>();
+            // Asset writes are batched: one asset-database refresh per WriteBatch tiles instead of one per tile (that
+            // refresh was ~95 % of the import time), and the written tiles are unloaded after each batch (flat memory;
+            // only these – a general UnloadUnusedAssets would also drop the area's unsaved assets held in locals).
+            void Flush()
+            {
+                tWrite.Start();
+                // Save only after the deferred imports ran – saved inside StartAssetEditing, the meshes (sub-assets)
+                // went missing from the files.
+                AssetDatabase.StopAssetEditing();
+                AssetDatabase.SaveAssets();
+                foreach (var t in pending)
+                {
+                    foreach (var part in t.parts) Resources.UnloadAsset(part.mesh);
+                    Resources.UnloadAsset(t);
+                }
+                pending.Clear();
+                AssetDatabase.StartAssetEditing();
+                tWrite.Stop();
+            }
+            AssetDatabase.StartAssetEditing();
+            try
+            {
+                foreach (var key in order)
+                {
+                    hashes[key] = plan.signatures[key];
+                    if (!plan.Builds(key))
+                    {
+                        // Unchanged: the asset on disk has exactly this content.
+                        if (batchesOf.TryGetValue(key, out var skipped)) foreach (var kv in skipped) Release(kv.Value);
+                        kept++;
+                        continue;
+                    }
+                    var tile = ScriptableObject.CreateInstance<WorldTile>();
                     tile.key = key;
                     tile.name = WorldStreamer.TileName(id, key);
-                    AssetDatabase.CreateAsset(tile, WorldStreamer.EditorTilePath(id, key));
-                    tiles[key] = tile;
-                }
-                return tile;
-            }
-            {
-                foreach (var kv in sink.Batches)
-                {
-                    var (mat, chunk) = kv.Key;
-                    if (kv.Value.vertices.Count == 0) continue;
-                    float chunkSize = mat == WorldStyle.MatDetails ? MeshSink.DetailChunkSize : MeshSink.ChunkSize;
-                    var key = WorldStreamer.KeyOf((chunk.x + 0.5f) * chunkSize, (chunk.y + 0.5f) * chunkSize);
-                    var tile = TileAt(key);
+                    tMesh.Start();
+                    if (batchesOf.TryGetValue(key, out var batches))
+                        foreach (var kv in batches)
+                        {
+                            var (mat, chunk) = kv.Key;
+                            string style = WorldStyle.MaterialOf(mat);
+                            bool facadeData = (style == WorldStyle.MatBuildings || style == WorldStyle.MatGround) && WorldStyle.Renders(mat);
+                            var mesh = MeshSink.ToMesh(kv.Value, $"{id}_{mat}_{chunk.x}_{chunk.y}", facadeData);
+                            MeshUtility.Optimize(mesh);
+                            Release(kv.Value); // large areas: the geometry now lives in the mesh only
+                            bool collider = WorldStyle.HasCollider(mat) || mat == WorldStyle.MatWater;
 
-                    string style = WorldStyle.MaterialOf(mat);
-                    bool facadeData = (style == WorldStyle.MatBuildings || style == WorldStyle.MatGround) && WorldStyle.Renders(mat);
-                    var mesh = MeshSink.ToMesh(kv.Value, $"{id}_{mat}_{chunk.x}_{chunk.y}", facadeData);
-                    MeshUtility.Optimize(mesh);
-                    Release(kv.Value); // large areas: the geometry now lives in the mesh only
-                    bool collider = WorldStyle.HasCollider(mat) || mat == WorldStyle.MatWater;
-                    AssetDatabase.AddObjectToAsset(mesh, tile);
-                    if (!collider)
-                    {
-                        var so = new SerializedObject(mesh);
-                        so.FindProperty("m_IsReadable").boolValue = false;
-                        so.ApplyModifiedPropertiesWithoutUndo();
-                    }
-
-                    int mi = System.Array.IndexOf(WorldTile.MaterialNames, style); // = GameMaterials.worldMaterials index
-                    bool casts = mat != WorldStyle.MatGround && mat != WorldStyle.MatWater && mat != WorldStyle.MatDetails && WorldStyle.Renders(mat);
-                    // Thin props (lamps, trunks, fences) block the player but not the camera probe; water sits on
-                    // the built-in "Water" layer so placement can detect it, the player walks through.
-                    int layer = mat == WorldStyle.MatProps || mat == WorldStyle.MatTreeTrunks || mat == WorldStyle.MatBlockers ? 2
-                              : mat == WorldStyle.MatDetails ? WorldStyle.DetailsLayer
-                              : mat == WorldStyle.MatWater ? 4 : 0;
-                    tile.parts.Add(new WorldTile.Part
-                    {
-                        mesh = mesh, material = mi, layer = layer, group = mat,
-                        flags = (byte)((collider ? WorldTile.FlagCollider : 0) | (casts ? WorldTile.FlagShadows : 0) |
+                            int mi = System.Array.IndexOf(WorldTile.MaterialNames, style); // = GameMaterials.worldMaterials index
+                            bool casts = mat != WorldStyle.MatGround && mat != WorldStyle.MatWater && mat != WorldStyle.MatDetails && WorldStyle.Renders(mat);
+                            // Thin props (lamps, trunks, fences) block the player but not the camera probe; water sits on
+                            // the built-in "Water" layer so placement can detect it, the player walks through.
+                            int layer = mat == WorldStyle.MatProps || mat == WorldStyle.MatTreeTrunks || mat == WorldStyle.MatBlockers ? 2
+                                      : mat == WorldStyle.MatDetails ? WorldStyle.DetailsLayer
+                                      : mat == WorldStyle.MatWater ? 4 : 0;
+                            tile.parts.Add(new WorldTile.Part
+                            {
+                                mesh = mesh, material = mi, layer = layer, group = mat,
+                                flags = (byte)((collider ? WorldTile.FlagCollider : 0) | (casts ? WorldTile.FlagShadows : 0) |
                                        (WorldStyle.Renders(mat) ? 0 : WorldTile.FlagNoRender)),
-                    });
+                            });
+                        }
+                    if (instancesOf.TryGetValue(key, out var instances)) tile.instances.AddRange(instances);
+                    tMesh.Stop();
+
+                    string path = WorldStreamer.EditorTilePath(id, key);
+                    tWrite.Start();
+                    if (File.Exists(path)) AssetDatabase.DeleteAsset(path); // changed tile: replace the old asset
+                    AssetDatabase.CreateAsset(tile, path);
+                    foreach (var part in tile.parts)
+                    {
+                        AssetDatabase.AddObjectToAsset(part.mesh, tile);
+                        if ((part.flags & WorldTile.FlagCollider) == 0)
+                        {
+                            var so = new SerializedObject(part.mesh);
+                            so.FindProperty("m_IsReadable").boolValue = false;
+                            so.ApplyModifiedPropertiesWithoutUndo();
+                        }
+                    }
+                    EditorUtility.SetDirty(tile);
+                    tWrite.Stop();
+                    changed.Add(key);
+                    written++;
+                    pending.Add(tile);
+                    if (pending.Count >= WriteBatch) Flush();
                 }
-                // Instanced trees/bushes/lamps go to the tile under their origin (crowns may overhang its edge a bit –
-                // the renderer's bounds include them).
-                foreach (var inst in sink.instances) TileAt(WorldStreamer.KeyOf(inst.position.x, inst.position.z)).instances.Add(inst);
-                foreach (var t in tiles.Values) EditorUtility.SetDirty(t);
+                // Tiles of the last import that are empty now.
+                if (previous != null)
+                    foreach (var key in previous.Keys)
+                    {
+                        if (hashes.ContainsKey(key)) continue;
+                        AssetDatabase.DeleteAsset(WorldStreamer.EditorTilePath(id, key));
+                        changed.Add(key);
+                        removed++;
+                    }
+                tWrite.Start();
             }
-            AssetDatabase.SaveAssets();
-            var keys = tiles.Keys.ToList();
+            finally { AssetDatabase.StopAssetEditing(); }
+            AssetDatabase.SaveAssets(); // after the deferred imports (see Flush)
+            tWrite.Stop();
+            TileManifest.Save(id, hashes);
+            TileManifest.MarkMapsDirty(id, previous == null ? null : changed);
+            LastChangedTiles = previous == null ? null : changed;
+            Debug.Log($"[Import] {id} tiles: {written} written, {kept} unchanged, {removed} removed (meshes {tMesh.ElapsedMilliseconds} ms, write {tWrite.ElapsedMilliseconds} ms)");
+
+            var keys = hashes.Keys.ToList();
             keys.Sort((a, b) => a.x != b.x ? a.x.CompareTo(b.x) : a.y.CompareTo(b.y));
             return keys;
         }
+
+        /// <summary>Tiles written per asset-database refresh (<see cref="WriteTiles"/>).</summary>
+        const int WriteBatch = 1000;
+
+        /// <summary>Tiles the last <see cref="ImportArea"/> wrote or removed; null = all of them (no previous import known).</summary>
+        public static List<Vector2Int> LastChangedTiles { get; private set; }
 
         static void Release(MeshSink.Batch b)
         {

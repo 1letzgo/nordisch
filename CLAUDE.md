@@ -133,19 +133,40 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    liegen in der App (`GameMaterials.worldMaterials`, `signTextMaterial`, vom Importer gesetzt). Editor-Werkzeuge öffnen ein
    Gebiet mit `Editor/AreaPreview.Open` (ungespeicherte Szene, alle Kacheln). Im Editor zeigt das Menü das Gebiet sofort als Karte;
    in die App kommt sie erst per **Veröffentlichen** (Schritt 7). Die Build-Settings enthalten nur `MainMenu`.
+   **Inkrementell** (`OsmImport/TileBuild`): Ein erneuter Import lässt alle Builder laufen (gleiche Zufallsfolge → gleiche
+   Objekt-IDs, Kataloge vollständig), drapiert/vernetzt/schreibt aber nur Kacheln, deren **Signatur** sich geändert hat
+   (Hash der Kachelgeometrie vor dem Drapieren + Meer + Instanzen + Gelände + `TileBuild.Version`; Liste in
+   `Generated/<id>/build~/tiles.txt`, nicht im Repo). Regionsbilder/Kartenbilder nur, wo sich Kacheln geändert haben
+   (`build~/maps-dirty.txt`). Westerstede: voll ~8 min (vorher ~42 min), ein Haus/Objekt geändert ~2,5 min (2 Kacheln).
+   `TileBuild.Version` erhöhen, wenn sich Code *nach* der Signatur ändert (TerrainDrape, `MeshSink.ToMesh`, Part-Regeln in
+   `WriteTiles`); `-full` (ImportAreaBatch) oder `build~/` löschen baut alles. Asset-Schreiben gebündelt
+   (`StartAssetEditing`, 1000 Kacheln je Refresh, Speichern erst nach `StopAssetEditing` – sonst fehlen die Meshes in den
+   Dateien); ein Refresh je Kachel war ~95 % der alten Importzeit. `[Import]`-Zeilen im Log = Zeiten je Phase
+   (`ImportProfile`); `-executeMethod LeGamez.Editor.TileDigest.Run -area <id> -out <datei>` = Inhalts-Hash je Kachel
+   (zwei Importe exakt vergleichen).
 5. **Prüfen**: `-executeMethod LeGamez.Editor.SceneSnapshot.RenderAll` rendert Luft-/Straßen-/Wahrzeichen-Bilder nach `Builds/Snapshots/`.
    POI-Auswahl in `Assets/Generated/<id>/<id>_pois.asset` ansehen (max. 30, Hotels/Läden sind ausgefiltert).
 6. **Bauen & aufs iPhone** – siehe unten.
 7. **Veröffentlichen**: `Tools/release/publish_maps.sh [<id> …]` – siehe „Karten-Downloads“.
 
 ### Karten-Downloads (App enthält keine Karten, lädt nie ganze Karten)
-- **Format 8** (= 6 + Instanzen in den Kacheln (7) + reine Kollisionsteile `WorldTile.FlagNoRender` (8); `World/MapFormat`, dieselben Dateien für iOS und Android, unabhängig von der Unity-Version): je Gebiet
+- **Format 9** (= 6 + Instanzen in den Kacheln (7) + reine Kollisionsteile `WorldTile.FlagNoRender` (8) + gestückeltes World-Pack in 4×4-km-Dateien (9); `World/MapFormat`, dieselben Dateien für iOS und Android, unabhängig von der Unity-Version): je Gebiet
   `area.bin` (AreaData-JSON + kleine Übersichtskarte + **Index des World-Packs**, ~0,2–1 MB) und `world.bin` (alle
   Einträge hintereinander: `t/<x>_<z>` = 200-m-Kachel (Deflate; Geometrie + Abschnitt „INS1“ mit Baum-/Busch-/Laternen-Instanzen), `f/<rx>_<rz>` = Fassaden-Records der 1-km-Region,
   `m/<rx>_<rz>` = Minimap-JPEG der Region). Die App holt **einzelne Einträge per HTTP-Range** (`Core/PackTileSource`,
   GitHub-Release-Assets liefern 206) und cached sie unter ihrem Inhalts-Hash (`maps/<id>/cache/<entry>-<hash>.bin`).
   Export: `Editor/MapExport` (`-executeMethod LeGamez.Editor.MapExport.ExportBatch [-areas a,b]`) → `Builds/Maps/<id>/`
   + `Builds/Maps/index.json`. Vorher: Format 5 = eine Datei pro Region, Formate 1–4 = AssetBundles.
+  **Inkrementeller Export**: `Builds/Maps/<id>/export.json` merkt sich je Eintrag die Quelle (Kachel-Signatur aus
+  `build~/tiles.txt`, Hash der Fassaden-Records/des Regionsbilds) und wo die Bytes liegen; Unverändertes wird aus den alten
+  Dateien kopiert (Westerstede 21 s statt 111 s). Prüfen wie die App: `-executeMethod LeGamez.Editor.MapExport.VerifyBatch`.
+  **Gestückeltes Pack** (ab `MapFormat.ChunkedPackFormat` = 9, greift sobald `MapStore.Format` ≥ 9): statt `world.bin`
+  Dateien je 4 × 4 km (`MapFormat.ChunkFile`, im Index `region = "pack"`): `world-<cx>_<cz>.bin` = Kacheln + Fassaden,
+  `world-<cx>_<cz>-maps.bin` = Regionsbilder (werden um jede geänderte Kachel neu gerendert und sind nie bytegleich –
+  eigene kleine Dateien, damit sie keine Geometrie-Stücke mitziehen). `area.bin` enthält `pack2.idx` (Datei je Eintrag);
+  `PackTileSource` holt jeden Eintrag aus seiner Datei. Westerstede: 126 Dateien; ein Haus + eine Bank geändert →
+  1 Geometrie-Stück (40 MB) + 4 Bild-Stücke (je ~1,6 MB) + `area.bin` = 48 MB statt 421 MB Upload (`publish_maps.py`
+  vergleicht SHA-256 je Datei, braucht keine Änderung). Format-7-Dateien (`pack.idx`) bleiben lesbar.
 - **Starten**: Startpunkt antippen (`MapStore.Start`) → nur `area.bin` holen/auffrischen, Welt-Szene, Ladebildschirm
   wartet auf die Kacheln um den Start (~1–3 MB). Weitere Kacheln, sobald der Streamer sie braucht, plus Vorladen bis 1,1 km (in Fahrt ab 10 m/s um den Punkt 15 s voraus, alle 0,1 s, bis 6 Anfragen;
   der Streamer sortiert ab 5 m/s nach Abstand zu einem Punkt 4 s voraus). Fahrzeuge bremsen auf 5 m/s, solange die Kachel
@@ -157,7 +178,7 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
   (`SceneSnapshot.RenderThumbnails`, gleiche Ansicht um den Start). `publish_maps.py` muss `starts` in den Katalog übernehmen
   und die Start-Bilder hochladen (`thumb` → URL), sonst zeigt die App nur eine Karte pro Gebiet.
 - `Tools/release/publish_maps.sh [--dry-run] [--drop-old] [<id> …]` exportiert und lädt **nur geänderte Dateien** (SHA-256)
-  hoch (bei Format 6: `area.bin` + `world.bin` je Gebiet). Katalog `https://github.com/1letzgo/nordisch/releases/download/maps/maps.json` (Pre-Release `maps`, nie „latest“ →
+  hoch (bei Format 6/7: `area.bin` + `world.bin` je Gebiet, ab 8: `area.bin` + geänderte `world-<cx>_<cz>.bin`). Katalog `https://github.com/1letzgo/nordisch/releases/download/maps/maps.json` (Pre-Release `maps`, nie „latest“ →
   stört den APK-Updater nicht): je Karte Name/Lage/Fahrzeuge/Thumbnail-URL und `builds[]` = {platform ("any"), format,
   unity (leer), version (yyyyMMddHHmm), url, size, sha256, files[] = {name, region, url, size, sha256}, start[] =
   Regionen ≤ 1,2 km um den Spawn}. Dateien liegen inhaltsadressiert (`<id>-f5-<name>-<sha12>.bin`) in der Pre-Release
@@ -303,7 +324,8 @@ Draufsicht je Gebiet (Unity-Renders + Hausumrisse). Neue Objekte setzen, außerd
   (`<typ>@<x·10>,<z·10>`, Liste in `Assets/Generated/<id>/<id>_objects.json`, schreibt der Importer).
 - Importer: `EditsPlacer` – alle Placer laufen über `EditsPlacer.Emit` (baut auch gelöschte, damit die Zufallsfolge
   und damit alle anderen Objekte gleich bleiben). Neue Objekttypen: in `FurniturePlacer/PropPlacer.BuildSingle` und `ObjectType.all` (Swift).
-- „In Unity übernehmen“ = `-executeMethod LeGamez.Editor.OsmImport.OsmAreaImporter.ImportAreaBatch -area <id>` (Unity-Editor muss zu sein).
+- „In Unity übernehmen“ = `-executeMethod LeGamez.Editor.OsmImport.OsmAreaImporter.ImportAreaBatch -area <id>` (Unity-Editor muss zu sein;
+  inkrementell: nur geänderte Kacheln + Regionsbilder, Westerstede ~2,5 min).
 - Bauen/Installieren:
   ```bash
   cd Tools/MapEditor && xcodegen generate && xcodebuild -project NordischMapEditor.xcodeproj -scheme NordischMapEditor \
