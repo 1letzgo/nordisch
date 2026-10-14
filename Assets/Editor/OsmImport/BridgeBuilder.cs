@@ -64,6 +64,7 @@ namespace LeGamez.Editor.OsmImport
         const float Slab = 1.1f;        // deck thickness under the road surface
         const float Parapet = 0.95f;
         const float Edge = 0.7f;        // kerb/parapet strip beside the carriageway
+        const float BlockTop = 1.4f;    // invisible wall on the parapet (Blockers), above the deck road
 
         static readonly Dictionary<OsmWay, Deck> decks = new Dictionary<OsmWay, Deck>();
         static readonly Color32 Concrete = WorldStyle.Hex("#B4B2AC");
@@ -512,9 +513,12 @@ namespace LeGamez.Editor.OsmImport
             var q = m + n * ow; // where the parapet would stand
             foreach (var r in roads)
             {
-                // Only other decks: beside a deck end a ground road may lie at deck height at its centre line while the
-                // ground falls away towards the deck (an open parapet there let a car drop off the side).
-                if (r.way == d.way || r.deck == null) continue;
+                // Other decks, and ground carriageways only where the ground under the parapet itself lies at the deck's
+                // height (a deck end run on beside a carriageway it merges with – the parapet stood in its lane): beside a
+                // deck end a ground road may lie at deck height at its centre line while the ground falls away towards
+                // the deck (an open parapet there let a car drop off the side).
+                if (r.way == d.way) continue;
+                if (r.deck == null && Mathf.Abs(t.Height(q.x, q.y) + r.y - surface) > 0.3f) continue;
                 float reach = r.hw + 0.3f;
                 var b = r.bounds;
                 if (q.x < b.xMin - reach || q.x > b.xMax + reach || q.y < b.yMin - reach || q.y > b.yMax + reach) continue;
@@ -616,6 +620,23 @@ namespace LeGamez.Editor.OsmImport
                             MeshSink.Quad(batch, ao, ao + up, bo + up, bo, Concrete);          // outside (right)
                             MeshSink.Quad(batch, bi, bi + up, ai + up, ai, Concrete);          // inside
                             MeshSink.Quad(batch, ai + up, bi + up, bo + up, ao + up, ConcreteDark);
+                        }
+                        // What holds the car: an invisible wall 1.4 m above the deck on the parapet (as on the guard rails –
+                        // the car capsule climbs over a 1.1 m parapet now and then). Vertices relative to the ground (lifted).
+                        {
+                            var bl = sink.Get(WorldStyle.MatBlockers, (a + b) * 0.5f);
+                            Vector3 G(Vector2 p, float y) => new Vector3(p.x, y - t.Height(p.x, p.y), p.y);
+                            Vector2 pa = a + o, pb = b + o, qa = a + ii, qb = b + ii;
+                            float a0 = ya - 0.4f, b0 = yb - 0.4f, a1 = ya + BlockTop, b1 = yb + BlockTop;
+                            foreach (var (u, v) in new[] { (pa, pb), (qa, qb) })
+                            {
+                                MeshSink.Quad(bl, G(u, a0), G(u, a1), G(v, b1), G(v, b0), Concrete);
+                                MeshSink.Quad(bl, G(v, b0), G(v, b1), G(u, a1), G(u, a0), Concrete);
+                            }
+                            MeshSink.Quad(bl, G(pa, a1), G(pb, b1), G(qb, b1), G(qa, a1), Concrete);
+                            MeshSink.Quad(bl, G(qa, a1), G(qb, b1), G(pb, b1), G(pa, a1), Concrete);
+                            if (first) { MeshSink.Quad(bl, G(pa, a0), G(pa, a1), G(qa, a1), G(qa, a0), Concrete); MeshSink.Quad(bl, G(qa, a0), G(qa, a1), G(pa, a1), G(pa, a0), Concrete); }
+                            if (last) { MeshSink.Quad(bl, G(pb, b0), G(pb, b1), G(qb, b1), G(qb, b0), Concrete); MeshSink.Quad(bl, G(qb, b0), G(qb, b1), G(pb, b1), G(pb, b0), Concrete); }
                         }
                         // Closed ends at both ends of the deck (a car sliding along the guard rail must not slip into the wall).
                         if (first)

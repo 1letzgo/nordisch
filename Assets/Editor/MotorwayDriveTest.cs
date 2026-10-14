@@ -25,10 +25,16 @@ namespace LeGamez.Editor
             string Arg(string k, string d) { int i = System.Array.IndexOf(args, k); return i >= 0 && i + 1 < args.Length ? args[i + 1] : d; }
             string id = Arg("-area", "westerstede");
             float spacing = float.Parse(Arg("-spacing", "150"), System.Globalization.CultureInfo.InvariantCulture);
-            var data = OsmData.Load(Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Data", id + ".osm.json")));
-            string dataDir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Data"));
-            AreaMask.Load(dataDir, id)?.Filter(data);
             bool fresh = System.Array.IndexOf(args, "-fresh") >= 0;
+            // -fresh: terrain as imported (road profiles, bridge pits) and the way objects the decks were prepared from.
+            OsmData data;
+            TerrainField terrain = null;
+            if (fresh) terrain = OsmAreaImporter.PrepareTerrain(id, out data);
+            else
+            {
+                data = OsmData.Load(Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Data", id + ".osm.json")));
+                AreaMask.Load(Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Data")), id)?.Filter(data);
+            }
             string tr = Arg("-trace", null);
             bool trace = tr != null;
             var traceAt = trace ? new Vector2(float.Parse(tr.Split(',')[0], System.Globalization.CultureInfo.InvariantCulture),
@@ -44,6 +50,12 @@ namespace LeGamez.Editor
                 roads.Add((w.points, width * 0.5f));
                 if (w.tags.Is("highway", "motorway")) motorways.Add(w);
             }
+            // Rest areas (highway=rest_area/services): a car that took the exit and left the lanes in there is no escape.
+            var restAreas = new List<List<Vector2>>();
+            foreach (var pg in data.polygons)
+                if ((pg.tags.Is("highway", "rest_area") || pg.tags.Is("highway", "services")) && pg.outer.Count >= 3) restAreas.Add(pg.outer);
+            foreach (var w in data.ways) // mapped as closed highway ways
+                if ((w.tags.Is("highway", "rest_area") || w.tags.Is("highway", "services")) && w.IsClosed) restAreas.Add(w.points);
             var starts = new List<(Vector2 p, Vector2 dir)>();
             foreach (var w in motorways)
             {
@@ -78,9 +90,6 @@ namespace LeGamez.Editor
             }
             if (fresh)
             {
-                var terrain = TerrainField.Load(Path.Combine(dataDir, id + ".dgm.bin"));
-                BridgeBuilder.Prepare(data, data.meta.bounds, terrain);
-                BridgeBuilder.EaseEnds(terrain); // without RoadProfile – rails/decks only
                 var sink = new MeshSink();
                 var st = MotorwayBuilder.Build(data, sink, data.meta.bounds, terrain);
                 BridgeBuilder.Build(data, sink, terrain); // decks again (on top of the tiles' ones): changes to them count too
@@ -92,7 +101,7 @@ namespace LeGamez.Editor
                     go.AddComponent<MeshCollider>().sharedMesh = MeshSink.ToMesh(kv.Value, "rails", false);
                     parts++;
                 }
-                Debug.Log($"[DriveTest] fresh rails: {st.railKm:F1} km");
+                Debug.Log($"[DriveTest] fresh rails: {st.railKm:F1} km, {st.restAreas} rest-area access rails, {st.deadEnds} map ends");
             }
             Physics.SyncTransforms();
             Debug.Log($"[DriveTest] {starts.Count} starts on {motorways.Count} motorway ways, {keys.Count} tiles, {parts} collider meshes");
@@ -101,7 +110,7 @@ namespace LeGamez.Editor
             var cc = player.AddComponent<CharacterController>();
             cc.radius = 0.95f; cc.height = 1.95f; cc.center = new Vector3(0f, 0.975f, 0f); cc.stepOffset = 0.25f; cc.slopeLimit = 35f; // as VehicleManager sets it for cars
             const float step = 36.5f / 60f; // 130 km/h at 60 fps
-            int runs = 0, escapes = 0, held = 0, onRoad = 0;
+            int runs = 0, escapes = 0, held = 0, onRoad = 0, inRestArea = 0;
             var escaped = new List<Vector2>();
             foreach (var (p, dir) in starts)
             foreach (float angle in new[] { -25f, -10f, 10f, 25f })
@@ -141,12 +150,18 @@ namespace LeGamez.Editor
                     if (road) break;
                 }
                 if (road) { if (blocked) held++; else onRoad++; continue; }
+                if (restAreas.Exists(r => OsmData.PointInRing(q, r)))
+                {
+                    inRestArea++;
+                    Debug.Log($"[DriveTest] rest area: start ({p.x:F0}, {p.y:F0}) angle {angle} -> ({q.x:F1}, {q.y:F1})");
+                    continue;
+                }
                 escapes++;
                 escaped.Add(q);
                 if (escapes <= 60) Debug.Log($"[DriveTest] ESCAPE start ({p.x:F0}, {p.y:F0}) angle {angle} -> ({q.x:F1}, {q.y:F1}) blocked-before {blocked}");
             }
             Object.DestroyImmediate(player);
-            Debug.Log($"[DriveTest] {runs} runs: {held} held by a rail, {onRoad} still on a carriageway, {escapes} ESCAPED");
+            Debug.Log($"[DriveTest] {runs} runs: {held} held by a rail, {onRoad} still on a carriageway, {inRestArea} off the lanes inside a rest area, {escapes} ESCAPED");
         }
     }
 }

@@ -9,12 +9,14 @@ namespace LeGamez.Editor.OsmImport
     /// rails on both sides of every carriageway and ramp (gaps where a ramp leaves or joins, none on bridges – the deck has
     /// parapets; drawn as W-profile beams on posts, held by an invisible closed wall). Where a carriageway leaves the map
     /// it is closed by a barrier with lamps and beacons. One-way carriageways run along their points; left = median.
+    /// Overlapping motorway/ramp asphalt (also non-joining ways and decks at grade) opens the rail, a too-close opposite
+    /// carriageway moves it to the middle; ramps into rest areas carry their rails on along the service roads.
     /// Blue exit signs come from <see cref="TrafficBuilder"/> (motorway_junction nodes in traffic.json).
     /// No shared random numbers – object ids stay as they are.
     /// </summary>
     public static class MotorwayBuilder
     {
-        public struct Stats { public int carriageways, ramps, deadEnds; public float railKm; }
+        public struct Stats { public int carriageways, ramps, deadEnds, restAreas; public float railKm; }
 
         static Vector2Int Key(Vector2 p) => new Vector2Int(Mathf.RoundToInt(p.x * 10f), Mathf.RoundToInt(p.y * 10f));
 
@@ -53,13 +55,45 @@ namespace LeGamez.Editor.OsmImport
                 if (o.points.Count >= 2 && !BridgeBuilder.IsDeck(o) && GroundBuilder.Carriageway(o.tags, out float ow, out _))
                     roads.Add((o, ow * 0.5f, GeoUtil.Bounds(o.points)));
             var ends = new List<DeadEnd>();
-            foreach (var chain in Chains(ways, "motorway").Concat(Chains(ways, "motorway_link")))
+            // Parking areas: rest-area rails stop at their edge (a parking lane beside the aisle stays open).
+            var parking = new PropPlacer.Clearance();
+            foreach (var pg in data.polygons)
+                if (pg.tags.Is("amenity", "parking") && pg.outer.Count >= 3) parking.AddPolygon(pg.outer);
+            // Carriageways and ramps, then the service roads of rest areas found on the way (appended while working).
+            var work = Chains(ways, "motorway").Concat(Chains(ways, "motorway_link")).ToList();
+            var restAreaWays = new HashSet<OsmWay>(); // rest-area service ways with rails (runs + branches)
+            var runWays = new HashSet<OsmWay>();      // … continuing a ramp (their rails are the ramp's)
+            for (int ci = 0; ci < work.Count; ci++)
             {
+                var chain = work[ci];
+                bool service = chain[0].tags.Is("highway", "service");
+                if (service && runWays.Contains(chain[0])) continue; // a later ramp's run took it
                 if (!GroundBuilder.Carriageway(chain[0].tags, out float width, out _)) continue;
-                var pts = new List<Vector2>();
+                var road = new List<Vector2>();
                 foreach (var w in chain)
-                    for (int i = pts.Count == 0 ? 0 : 1; i < w.points.Count; i++) pts.Add(w.points[i]);
+                    for (int i = road.Count == 0 ? 0 : 1; i < w.points.Count; i++) road.Add(w.points[i]);
                 var own = new HashSet<OsmWay>(chain);
+                // Rails run on along the access road of a rest area (a ramp that only meets service roads): without them
+                // the car leaves the ramp's end into the field beside the narrow service road.
+                var pts = new List<Vector2>(road);
+                var offs = new List<float>();
+                for (int i = 0; i < road.Count; i++) offs.Add(width * 0.5f + RailOut);
+                if (chain[0].tags.Is("highway", "motorway_link"))
+                {
+                    var head = RestAreaRun(roads, own, road[0], road[1]);
+                    var tail = RestAreaRun(roads, own, road[road.Count - 1], road[road.Count - 2]);
+                    foreach (var (q, hw) in head) { pts.Insert(0, q); offs.Insert(0, hw + RailOut); }
+                    foreach (var (q, hw) in tail) { pts.Add(q); offs.Add(hw + RailOut); }
+                    if (head.Count + tail.Count > 0)
+                    {
+                        st.restAreas++;
+                        // The other service roads branching off within RestAreaNet m get rails too (the lorry lane, the way
+                        // back out …) – without, the car crosses the narrow branch into the field.
+                        foreach (var w in own) { restAreaWays.Add(w); runWays.Add(w); }
+                        foreach (var b in RestAreaBranches(roads, own, restAreaWays, head, road[0]).Concat(RestAreaBranches(roads, own, restAreaWays, tail, road[road.Count - 1])))
+                            work.Add(new List<OsmWay> { b });
+                    }
+                }
                 var others = new PropPlacer.Clearance();
                 var near = GeoUtil.Bounds(pts);
                 near.xMin -= 60f; near.yMin -= 60f; near.xMax += 60f; near.yMax += 60f;
@@ -86,18 +120,62 @@ namespace LeGamez.Editor.OsmImport
                     }
                     foreach (var k in newKeys) gapKeys.Add(k);
                 }
+                // Other carriageways of the motorway system whose asphalt reaches the rail without sharing a node (merge
+                // tapers mapped as separate ways, two ramps side by side, the next way of a carriageway that ends beside
+                // this one): a rail there would stand in their lanes. Only where it lies within their band (IsBlocked) –
+                // a parallel ramp further away keeps its rail between; the opposite carriageway never opens one.
+                // Opposite carriageways (also ramps) mapped so close that the median rails would stand in each other's
+                // lanes: the median rail moves to the middle between both centre lines (Rail, "opp").
+                var opp = new List<List<Vector2>>();
+                foreach (var r in roads)
+                    if (!own.Contains(r.way) && near.Overlaps(r.bounds) && Opposite(r.way, pts)) opp.Add(r.way.points);
+                foreach (var (o, ohw, _) in cand)
+                    if (!added.Contains(o) && (o.tags.Is("highway", "motorway") || o.tags.Is("highway", "motorway_link")))
+                    {
+                        if (AgainstChain(o.points, pts)) { opp.Add(o.points); continue; }
+                        added.Add(o);
+                        others.AddLine(o.points, ohw + 0.4f);
+                    }
+                // The same for bridge decks at grade with this road (a ramp or carriageway that goes onto a deck right
+                // beside it; deck ends run on over the approach): only where the deck surface lies below the wall's top
+                // (LevelDeck above the ground at the rail) – a bridge crossing over keeps the rail below.
+                var level = new List<BridgeBuilder.Deck>();
+                foreach (var d in BridgeBuilder.Decks)
+                    if (near.Overlaps(d.bounds) && !own.Contains(d.way) && !Continues(d.way, road) && GroundBuilder.Carriageway(d.way.tags, out _, out _) &&
+                        (d.way.tags.Is("highway", "motorway") || d.way.tags.Is("highway", "motorway_link")))
+                    {
+                        if (AgainstChain(d.pts, pts)) opp.Add(d.pts);
+                        else level.Add(d);
+                    }
+                foreach (var dp in DebugAt)
+                {
+                    float best = float.MaxValue;
+                    for (int i = 0; i < pts.Count - 1; i++) best = Mathf.Min(best, DistSeg(dp, pts[i], pts[i + 1]));
+                    if (best > 15f) continue;
+                    Debug.Log($"[RailDebug] {dp} chain [{string.Join(",", chain.ConvertAll(c => c.id))}] {chain[0].tags.Get("highway")} dist {best:F1} hw {width * 0.5f:F1}");
+                    foreach (var o in data.ways)
+                    {
+                        if (o.points.Count < 2 || own.Contains(o) || !GroundBuilder.Carriageway(o.tags, out float ow2, out _)) continue;
+                        float od = float.MaxValue;
+                        for (int i = 0; i < o.points.Count - 1; i++) od = Mathf.Min(od, DistSeg(dp, o.points[i], o.points[i + 1]));
+                        if (od > 15f) continue;
+                        Debug.Log($"[RailDebug]    other {o.id} {o.tags.Get("highway")} dist {od:F1} hw {ow2 * 0.5f:F1} deck {BridgeBuilder.IsDeck(o)} cand {cand.Exists(r => r.way == o)} added {added.Contains(o)} opposite {Opposite(o, pts)}");
+                    }
+                }
+                Densify(pts, offs, 8f);
                 foreach (float side in new[] { 1f, -1f })
-                    st.railKm += Rail(sink, area, terrain, pts, side * (width * 0.5f + RailOut), others) / 1000f;
+                    st.railKm += Rail(sink, area, terrain, pts, offs.ConvertAll(o => o * side), others, level, opp,
+                                      own.Count > chain.Count || service ? parking : null) / 1000f;
                 // Map end (the motorway leaves the built part of the area): closed off at both ends of the chain – at its
                 // end for the traffic, at its start for wrong-way drivers.
-                for (int e = 0; e < 2; e++)
+                for (int e = 0; e < 2 && !service; e++)
                 {
-                    var tip = e == 0 ? pts[pts.Count - 1] : pts[0];
-                    var outward = e == 0 ? (tip - pts[pts.Count - 2]).normalized : (pts[0] - pts[1]).normalized;
+                    var tip = e == 0 ? road[road.Count - 1] : road[0];
+                    var outward = e == 0 ? (tip - road[road.Count - 2]).normalized : (road[0] - road[1]).normalized;
                     bool continues = false;
                     foreach (var o in data.ways) // incl. bridges: a chain also ends where the motorway goes onto a deck
                     {
-                        if (own.Contains(o) || o.points.Count < 2 || o.tags.Get("highway") == null) continue;
+                        if (chain.Contains(o) || o.points.Count < 2 || o.tags.Get("highway") == null) continue; // not own: a rest area's road is no map end
                         foreach (var q in o.points) if ((q - tip).sqrMagnitude < 9f) { continues = true; break; }
                         if (continues) break;
                     }
@@ -124,6 +202,94 @@ namespace LeGamez.Editor.OsmImport
                 Debug.Log($"[OSM] motorway map end at {d.point} ({(d.entry ? "start" : "end")} of the carriageway, out {d.dir}, half {d.half:0.0})");
             }
             return st;
+        }
+
+        const float RestAreaRail = 150f;
+
+        /// <summary>
+        /// Where a ramp ends (or starts) at service roads only – a rest area's access road – the service road continuing it
+        /// most straight, followed over further service ways for up to <see cref="RestAreaRail"/> m: (point, half width)
+        /// from the ramp's end outwards, without that end. Empty at a junction with any other road.
+        /// </summary>
+        static List<(Vector2 p, float hw)> RestAreaRun(List<(OsmWay way, float hw, Rect bounds)> roads, HashSet<OsmWay> own,
+                                                       Vector2 tip, Vector2 before)
+        {
+            var run = new List<(Vector2, float)>();
+            var used = own; // the service ways followed become part of the chain
+            float left = RestAreaRail;
+            var dir = (tip - before).normalized;
+            while (left > 0f)
+            {
+                var k = Key(tip);
+                OsmWay best = null; bool reversed = false; float bestDot = 0.5f, bestHw = 0f;
+                foreach (var (o, ohw, b) in roads)
+                {
+                    if (used.Contains(o) || tip.x < b.xMin - 1f || tip.x > b.xMax + 1f || tip.y < b.yMin - 1f || tip.y > b.yMax + 1f) continue;
+                    var op = o.points;
+                    // Ends within 3 m count (some ramps stop just short of the rest area's road in OSM).
+                    bool first = (op[0] - tip).sqrMagnitude < 9f, last = !first && (op[op.Count - 1] - tip).sqrMagnitude < 9f;
+                    bool middle = false;
+                    for (int i = 1; i < op.Count - 1 && !first && !last; i++) if (Key(op[i]) == k) middle = true;
+                    if (!first && !last && !middle) continue;
+                    if (!o.tags.Is("highway", "service") || middle) return run; // a junction with another road: stop here
+                    var next = first ? op[1] : op[op.Count - 2];
+                    float dot = Vector2.Dot((next - tip).normalized, dir);
+                    if (dot > bestDot) { bestDot = dot; best = o; reversed = !first; bestHw = ohw; }
+                }
+                if (best == null) return run;
+                used.Add(best);
+                var wp = best.points;
+                for (int j = 1; j < wp.Count && left > 0f; j++)
+                {
+                    var q = reversed ? wp[wp.Count - 1 - j] : wp[j];
+                    float len = Vector2.Distance(tip, q);
+                    if (len > left) q = tip + (q - tip) * (left / len);
+                    left -= Mathf.Min(len, left);
+                    if (len > 0.01f) dir = (q - tip).normalized;
+                    tip = q;
+                    run.Add((q, bestHw));
+                }
+            }
+            return run;
+        }
+
+        const float RestAreaNet = 250f;
+
+        /// <summary>Service roads (no parking aisles) touching the access road <paramref name="run"/> (from the ramp's end
+        /// <paramref name="tip"/>) or, in turn, such a road, within <see cref="RestAreaNet"/> m of the ramp's end along the
+        /// roads; each once (<paramref name="seen"/>).</summary>
+        static List<OsmWay> RestAreaBranches(List<(OsmWay way, float hw, Rect bounds)> roads, HashSet<OsmWay> own, HashSet<OsmWay> seen,
+                                             List<(Vector2 p, float hw)> run, Vector2 tip)
+        {
+            var found = new List<OsmWay>();
+            if (run.Count == 0) return found;
+            var dist = new Dictionary<Vector2Int, float>();
+            float along = 0f; var prev = tip;
+            dist[Key(tip)] = 0f;
+            foreach (var (q, _) in run) { along += Vector2.Distance(prev, q); prev = q; dist[Key(q)] = along; }
+            bool grew = true;
+            while (grew)
+            {
+                grew = false;
+                foreach (var (o, _, _) in roads)
+                {
+                    if (own.Contains(o) || seen.Contains(o) || !o.tags.Is("highway", "service") || o.tags.Is("service", "parking_aisle")) continue;
+                    var op = o.points;
+                    int at = -1; float d0 = float.MaxValue;
+                    for (int i = 0; i < op.Count; i++)
+                        if (dist.TryGetValue(Key(op[i]), out float d) && d < d0) { d0 = d; at = i; }
+                    if (at < 0 || d0 > RestAreaNet) continue;
+                    seen.Add(o);
+                    found.Add(o);
+                    grew = true;
+                    // Distances along the branch from where it touches.
+                    float s = d0;
+                    for (int i = at + 1; i < op.Count; i++) { s += Vector2.Distance(op[i - 1], op[i]); var k = Key(op[i]); if (!dist.ContainsKey(k) || dist[k] > s) dist[k] = s; }
+                    s = d0;
+                    for (int i = at - 1; i >= 0; i--) { s += Vector2.Distance(op[i + 1], op[i]); var k = Key(op[i]); if (!dist.ContainsKey(k) || dist[k] > s) dist[k] = s; }
+                }
+            }
+            return found;
         }
 
         /// <summary>Non-bridge motorway (or ramp) ways joined end to start into carriageway chains (a junction with two
@@ -158,11 +324,32 @@ namespace LeGamez.Editor.OsmImport
         }
 
         /// <summary>The way runs against the chain where it is closest (the other carriageway of the same motorway).</summary>
-        static bool Opposite(OsmWay o, List<Vector2> pts)
+        static bool Opposite(OsmWay o, List<Vector2> pts) => o.tags.Is("highway", "motorway") && AgainstChain(o.points, pts);
+
+        /// <summary>Points every ≤ <paramref name="max"/> m (offsets interpolated) – the median rail follows a converging
+        /// opposite carriageway between the way's points.</summary>
+        static void Densify(List<Vector2> pts, List<float> offs, float max)
         {
-            if (!o.tags.Is("highway", "motorway")) return false;
+            for (int i = 0; i < pts.Count - 1; i++)
+            {
+                float len = Vector2.Distance(pts[i], pts[i + 1]);
+                if (len <= max) continue;
+                int n = Mathf.CeilToInt(len / max);
+                Vector2 a = pts[i], b = pts[i + 1];
+                float oa = offs[i], ob = offs[i + 1];
+                for (int k = 1; k < n; k++)
+                {
+                    pts.Insert(i + k, Vector2.Lerp(a, b, (float)k / n));
+                    offs.Insert(i + k, Mathf.Lerp(oa, ob, (float)k / n));
+                }
+                i += n - 1;
+            }
+        }
+
+        /// <summary>The line runs against the chain where it is closest.</summary>
+        static bool AgainstChain(List<Vector2> op, List<Vector2> pts)
+        {
             float best = float.MaxValue, dot = 0f;
-            var op = o.points;
             for (int i = 0; i < op.Count - 1; i++)
             {
                 var m = (op[i] + op[i + 1]) * 0.5f;
@@ -183,12 +370,14 @@ namespace LeGamez.Editor.OsmImport
         /// (embankments) they keep the height of the carriageway edge. Pieces of ≤ 4 m are left out where another
         /// carriageway comes close (ramps). Returns the built length.
         /// </summary>
-        static float Rail(MeshSink sink, AreaRect area, TerrainField t, List<Vector2> pts, float offset, PropPlacer.Clearance others)
+        static float Rail(MeshSink sink, AreaRect area, TerrainField t, List<Vector2> pts, List<float> offset, PropPlacer.Clearance others,
+                          List<BridgeBuilder.Deck> level, List<List<Vector2>> opp, PropPlacer.Clearance parking)
         {
             // Mitred offset line + the outward direction at every vertex.
             int n = pts.Count;
             var line = new List<Vector2>(n);
             var outs = new List<Vector2>(n);
+            var eff = new float[n]; // the rail's distance from the centre line (after a squeezed median)
             for (int i = 0; i < n; i++)
             {
                 Vector2 dIn = i > 0 ? (pts[i] - pts[i - 1]).normalized : Vector2.zero;
@@ -198,8 +387,19 @@ namespace LeGamez.Editor.OsmImport
                 float scale = 1f;
                 if (dIn != Vector2.zero && dOut != Vector2.zero)
                     scale = 1f / Mathf.Max(0.5f, Vector2.Dot(nrm, new Vector2(-dOut.y, dOut.x)));
-                line.Add(pts[i] + nrm * offset * scale);
-                outs.Add(nrm * Mathf.Sign(offset));
+                // Median squeezed by a close opposite carriageway: the rail in the middle between both centre lines.
+                float off = offset[i];
+                var side = nrm * Mathf.Sign(off);
+                foreach (var o in opp)
+                {
+                    var c = Closest(o, pts[i]);
+                    float lateral = Vector2.Dot(c - pts[i], side);
+                    if (lateral <= 0f || (c - pts[i]).magnitude > lateral * 1.25f || lateral * 0.5f >= Mathf.Abs(off)) continue;
+                    off = Mathf.Sign(off) * Mathf.Max(lateral * 0.5f, 2f);
+                }
+                line.Add(pts[i] + nrm * off * scale);
+                outs.Add(nrm * Mathf.Sign(offset[i]));
+                eff[i] = Mathf.Abs(off);
             }
             float built = 0f, sincePost = 0f;
             bool open = false;
@@ -217,14 +417,15 @@ namespace LeGamez.Editor.OsmImport
                     Vector2 s0 = Vector2.Lerp(a, b, u0), s1 = Vector2.Lerp(a, b, u1);
                     Vector2 o0 = Vector2.Lerp(outs[i], outs[i + 1], u0).normalized, o1 = Vector2.Lerp(outs[i], outs[i + 1], u1).normalized;
                     var mid = (s0 + s1) * 0.5f;
-                    bool ok = area.Contains(mid, 2f) && AreaMask.Allows(mid) && !others.IsBlocked(mid, 0f);
+                    bool ok = area.Contains(mid, 2f) && AreaMask.Allows(mid) && !others.IsBlocked(mid, 0f) && !OnLevelDeck(level, mid, t) &&
+                              (parking == null || !parking.IsBlocked(mid, 0f) && !parking.IsBlocked(mid + (o0 + o1).normalized * 1.5f, 0f));
                     if (!ok)
                     {
                         if (open) { Cap(sink, prevA, prevO, prevD, false); Post(sink, prevA, prevO, prevT, prevD); }
                         open = false;
                         continue;
                     }
-                    float d0 = Drop(t, s0, o0, offset), d1 = Drop(t, s1, o1, offset);
+                    float d0 = Drop(t, s0, o0, Mathf.Lerp(eff[i], eff[i + 1], u0)), d1 = Drop(t, s1, o1, Mathf.Lerp(eff[i], eff[i + 1], u1));
                     var tan = (s1 - s0).normalized;
                     if (!open) { Cap(sink, s0, o0, d0, true); sincePost = float.MaxValue; }
                     if (sincePost >= 3f) { Post(sink, s0, o0, tan, d0); sincePost = 0f; }
@@ -417,6 +618,65 @@ namespace LeGamez.Editor.OsmImport
         }
 
         static float Cross(Vector2 a, Vector2 b) => a.x * b.y - a.y * b.x;
+
+        // A deck whose surface lies less than this above the ground at a rail would have the rail's wall stick out of it
+        // (wall 1.4 m + the drop to the carriageway); a bridge crossing over is ≥ 1.8 m clear + slab.
+        const float LevelDeck = 2.4f;
+
+        /// <summary>One of the decks covers <paramref name="p"/> (carriageway + 0.4 m) with its surface less than
+        /// <see cref="LevelDeck"/> above the ground.</summary>
+        static bool OnLevelDeck(List<BridgeBuilder.Deck> level, Vector2 p, TerrainField t)
+        {
+            foreach (var d in level)
+            {
+                float r = d.width * 0.5f + 0.4f;
+                var b = d.bounds;
+                if (p.x < b.xMin - r || p.x > b.xMax + r || p.y < b.yMin - r || p.y > b.yMax + r) continue;
+                var pts = d.pts;
+                for (int i = 0; i < pts.Count - 1; i++)
+                {
+                    Vector2 a = pts[i], ab = pts[i + 1] - a;
+                    float tt = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(1e-5f, ab.sqrMagnitude));
+                    if ((a + ab * tt - p).sqrMagnitude >= r * r) continue;
+                    float surface = d.HeightAt(d.along[i] + tt * (d.along[i + 1] - d.along[i]));
+                    if (Mathf.Abs(surface - t.Height(p.x, p.y)) < LevelDeck) return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>Points to explain (RoadStepCheck -railDebug): chains and roads near them are logged as "[RailDebug]".</summary>
+        public static readonly List<Vector2> DebugAt = new List<Vector2>();
+
+        /// <summary>The way carries on the chain (one-way: starts where the chain ends or ends where it starts) – the
+        /// chain's own bridge, whose deck runs on over the chain's end.</summary>
+        static bool Continues(OsmWay w, List<Vector2> road)
+        {
+            var wp = w.points;
+            return Key(wp[0]) == Key(road[road.Count - 1]) || Key(wp[wp.Count - 1]) == Key(road[0]);
+        }
+
+        static Vector2 Closest(List<Vector2> line, Vector2 p)
+        {
+            Vector2 best = line[0];
+            float bd = float.MaxValue;
+            for (int i = 0; i < line.Count - 1; i++)
+            {
+                Vector2 a = line[i], ab = line[i + 1] - a;
+                float t = ab.sqrMagnitude > 1e-6f ? Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude) : 0f;
+                var q = a + ab * t;
+                float d = (q - p).sqrMagnitude;
+                if (d < bd) { bd = d; best = q; }
+            }
+            return best;
+        }
+
+        static float DistSeg(Vector2 p, Vector2 a, Vector2 b)
+        {
+            var ab = b - a;
+            float t = ab.sqrMagnitude > 1e-6f ? Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude) : 0f;
+            return Vector2.Distance(p, a + ab * t);
+        }
 
         /// <summary>How far the ground at the rail lies below the carriageway (the highest point between the centre line
         /// and the rail – embankments are often narrower than the road in the 5 m terrain; 0 if the rail stands higher).</summary>

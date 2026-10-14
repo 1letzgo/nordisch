@@ -104,7 +104,16 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    ältere Apps würden die Wand zeichnen). Entlang verketteter Fahrbahnen/Rampen (Gehrung, keine Keillücken), Höhe =
    höchster Punkt zwischen Mittellinie und Planke + Holm/Wand (Dämme, Widerlager bis 12 m tiefer). Lücken nur, wo eine
    *anschließende* Fahrbahn (gemeinsamer Punkt, Rampen-Ketten) nahe kommt – nie für die Gegenfahrbahn (Mittelplanke),
-   Parallelstraßen oder Brücken darüber. Wand ≫ Radius der Auto-Kapsel (0,95 m): bei 1,05 m kletterte der
+   Parallelstraßen oder Brücken darüber. Zusätzlich öffnet jede andere Autobahn-/Rampenfahrbahn **ohne gemeinsamen
+   Knoten**, deren Band (+0,4 m) die Planke überdeckt (Einfädelkeile als eigene Ways, zwei Rampen nebeneinander), und
+   jede **ebenerdige Brückenplatte** daneben (Oberfläche < 2,4 m über dem Boden an der Planke; nicht die eigene
+   Fortsetzung, `Continues`) – sonst stand die Wand in deren Spur. Gegenfahrbahn (auch Rampen, `AgainstChain`) so nah,
+   dass die Mittelplanken in der anderen Spur stünden → Planke rückt in die Mitte zwischen beide Achsen (Linie alle 8 m
+   verdichtet). **Rastplätze**: endet eine Rampe nur an `service`-Wegen (≤ 3 m), laufen ihre Planken entlang der
+   geradesten Zufahrt bis 150 m weiter (Übergang 5,8 → 2,8 m Abstand), abzweigende Service-Wege (keine Parkgassen)
+   ≤ 250 m bekommen eigene Planken; an Parkflächen (`amenity=parking`) offen (`RestAreaRun/RestAreaBranches`).
+   Brückenbrüstungen haben oben drauf ebenfalls eine unsichtbare 1,4-m-Wand (`BridgeBuilder`, Bucket `Blockers`) –
+   die 1,1-m-Brüstung wurde von der Auto-Kapsel überklettert. Wand ≫ Radius der Auto-Kapsel (0,95 m): bei 1,05 m kletterte der
    CharacterController noch an einzelnen Stellen darüber; im Auto `stepOffset` ≤ 0,25 m, `slopeLimit` 35°.
    **Kartenende** (Fahrbahn verlässt den gebauten Teil, an Ende *und* Anfang einer Kette, nur die erste Sperre von innen,
    `MotorwayBuilder.DeadEnds`): Absperrschranke Z. 600 rot-weiß von Planke zu Planke mit gelben Warnleuchten, Leitbaken
@@ -117,7 +126,10 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    22-%-Senke im Viadukt am Dreieck Oldenburg-West, Autos flogen über die Brüstung); wo der drapierte Anschluss trotzdem höher/tiefer liegt, läuft die Platte auf ~1:12 (≥ 4 m, kurze Endfelder
    ganz) weich auf die Straße (`Deck.HeightAt`, Log „eased onto the road“). Brüstungen mit geschlossenen Enden. Prüfen: `-executeMethod LeGamez.Editor.MotorwayDriveTest.Run -area <id> [-fresh] [-trace x,z]`
    (Auto-Kapsel fährt von jedem 150. m jeder Autobahn-Fahrbahn 180 m geradeaus mit ±10/25°; `-fresh` baut Planken
-   neu ohne Re-Import). Westerstede: 1448 von 1452 Fahrten an der Planke, 4 über Rastplatz-/Ausfahrtslücken (vorher 1439, die meisten „Ausfahrtslücken“ waren übersprungene 1,05-m-Wände). `"key_size"` (areas.json) hält `AreaData.sizeMeters` und damit
+   neu ohne Re-Import, mit dem Gelände wie importiert). Endet die Kapsel abseits der Fahrbahn innerhalb eines
+   `highway=rest_area/services`-Polygons, zählt das als „inside a rest area“, nicht als Ausbruch. Westerstede: 1451 von
+   1452 an der Planke, 1 auf dem Rastplatz (Parkgasse), 0 Ausbrüche (vorher 1448 + 4 „Ausbrüche“ – alle über die
+   Ausfahrt in einen Rastplatz und hinter dem Rampenende ins Gebüsch). `"key_size"` (areas.json) hält `AreaData.sizeMeters` und damit
    `AreaInfo.MemoryKey` beim Vergrößern um denselben Mittelpunkt stabil (gespeicherte Positionen/eigene Startpunkte
    bleiben gültig). HUD-Titel = nächster Startpunkt (Westerstede/Oldenburg), Fahrradplätze bis 80.
    **Glatte Fahrbahnen** (`RoadProfile`, nach `BridgeBuilder.Prepare`, vor `EaseEnds`/`BuildBase`): drapierte Straßen
@@ -149,8 +161,15 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    Mittel ab) und Löcher → `Builds/RoadSteps/<id>.csv` + `-views`-Liste für `AreaViewSnapshot`; `-at x,z;…` druckt
    Profile/Plattenenden an einer Stelle. Westerstede Autobahn+Rampen: 84 Stellen → 19 (Rest ≤ 0,55 m auf Rampen an Dreieck
    Oldenburg-West/Wechloy: Rampe und Fahrbahn in derselben 5-m-Zelle auf verschiedener Höhe), alle Straßen 272 → 79;
-   „WALL in lane“ = Planken-Wand (`Blockers`) in einer Spur (Einfädelbereiche, Kartenende-Sperren) – Sache von
-   `MotorwayBuilder`.
+   „WALL in lane“ = `Blockers`-Wand in einer Spur; Sperren ≤ 6 m neben einer `MotorwayBuilder.DeadEnds`-Stelle zählen
+   extra als „map-end“. `-fresh` ersetzt die Blockers der Kacheln durch frisch gebaute (Planken „rail“, Brücken „deck“,
+   ohne Re-Import), `-railDebug "x,z;…"` loggt Ketten/Nachbarfahrbahnen dort (`[RailDebug]`), `-walkAt x,z` jede Probe
+   im Umkreis 10 m (`[Walk]`, mit Treffern). Westerstede: Wände in Spuren 13 → 1 (+ 3 echte Kartenende-Sperren; Rest =
+   `EndWedge` der kurzen Rampenbrücke 23704443 bei (17593, −12469) neben der 0,51-m-Stufe), Stufen > 5 cm 74 → 52; der
+   „1,42-m-Abbruch“ bei (17731, −11708) war die Brüstung der Rampenbrücke 135459833 in der Fahrbahn → `SideEdge` prüft
+   jetzt auch Fahrbahnen am Boden, wenn der Boden *unter der Brüstung* auf Plattenhöhe liegt (±0,3 m).
+   Offen: Rampe/Fahrbahn in derselben Zelle auf verschiedener Höhe (Wechloy (17586, −12473) 0,51 m, (17751, −11326)
+   0,55 m) – braucht gemeinsame Profile überlappender Fahrbahnen ohne gemeinsamen Knoten in `RoadProfile`.
    Log „road roughness“ (Abweichung von der 5-m-Sehne je Klasse vorher → nachher), Profile in
    `Builds/RoadProfile/<id>_roads.csv`, Plot `python3 Tools/dgm/plot_road_profile.py <id>`; nur das Gelände prüfen
    (ohne Import, ~1 min): `-executeMethod LeGamez.Editor.OsmImport.OsmAreaImporter.RoadProfileBatch -area <id>`.
@@ -360,7 +379,10 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
   Instanzen zu normalen Meshes gebacken (gleiche Formen/Farben). Materialien brauchen `enableInstancing` (sonst strippt
   der Build die INSTANCING_ON-Varianten; `EnsureMaterials` setzt es).
 - Shader `Assets/Shaders/VertexColorLit.shader`: Vertex-Farben, Fenster/Sprossen (Laibungsschatten, Gardinen), Klinker, Putz,
-  Sockel, Traufband, Dachpfannen, Wasser, großflächige Farbvariation auf Boden/Flachdächern. Bordsteinbänder: `GroundBuilder.Kerbs`.
+  Sockel, Traufband, Dachpfannen, Wasser, großflächige Farbvariation auf Boden/Flachdächern. Bordsteinbänder: `GroundBuilder.Kerbs`
+  (nicht an Autobahn/Rampen: Standstreifen bleibt Asphalt bis zum Bankett). Bankett/Mittelstreifen/Zwickel bis 9 m
+  neben Autobahn-/Rampenbändern = Rasen (`AerialImage` „verge“; der echte breitere Asphalt im Luftbild wurde sonst als
+  heller Acker/Pflaster-Streifen gezeichnet).
   `multi_compile_instancing` in allen Pässen; `_InstanceTint` nur in der Instancing-Variante (normale Meshes unverändert).
 - Himmel `Assets/Shaders/Sky.shader` (Verlauf, Sonne, ziehende Wolken); Licht/Nebel in `OsmAreaImporter.AddLighting`,
   HDR + Bloom/Farbkorrektur in `ProjectSetup` (`ConfigureUrp`, `CreatePostProfile`).

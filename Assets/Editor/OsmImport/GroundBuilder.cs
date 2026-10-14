@@ -120,6 +120,9 @@ namespace LeGamez.Editor.OsmImport
                 if (!area.Overlaps(way.points, 20f)) continue;
                 carriageways.AddLine(way.points, style.width * 0.5f);
                 if (BridgeBuilder.IsDeck(way)) continue; // the deck has its own kerbs
+                // Motorways and ramps: the hard shoulder runs on as plain asphalt to the verge and guard rail (no kerb band
+                // right beside the 0.30 m edge line; in merge zones it lay as a light wedge between the carriageways).
+                if (way.tags.Is("highway", "motorway") || way.tags.Is("highway", "motorway_link")) continue;
                 roads.Add((way, style));
             }
             const float piece = 1.2f, band = 0.2f;

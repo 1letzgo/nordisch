@@ -212,6 +212,9 @@ namespace LeGamez.Editor.OsmImport
             {
                 // Open country: smoothed field/meadow shapes instead of the per-pixel classes (bare fields read as paving).
                 float cx = x0 + size * (upper ? 1f / 3f : 2f / 3f), cz = z0 + size * (upper ? 2f / 3f : 1f / 3f);
+                // Verges, medians and gores of motorways: grass (the real carriageway with its shoulders is wider than the
+                // drawn one – its bright asphalt read as a bare field or paving, a light strip along the edges).
+                if (verge != null && verge.IsBlocked(new Vector2(cx, cz), 0f)) return Cover.Grass;
                 if (Open(cx, cz)) return FieldScore(cx, cz) >= 0.5f ? Cover.Field : Cover.Grass;
             }
             var votes = new int[11];
@@ -342,7 +345,16 @@ namespace LeGamez.Editor.OsmImport
             }
             for (int pass = 0; pass < 3; pass++) Blur(field, tone, weight);
             fieldMap = field; toneMap = tone;
+
+            verge = new PropPlacer.Clearance();
+            foreach (var w in data.ways)
+                if (w.points.Count >= 2 && (w.tags.Is("highway", "motorway") || w.tags.Is("highway", "motorway_link")) &&
+                    GroundBuilder.Carriageway(w.tags, out float width, out _))
+                    verge.AddLine(w.points, width * 0.5f + VergeWidth);
         }
+
+        const float VergeWidth = 9f; // m of grass beside a motorway carriageway (shoulder rest, verge, median)
+        PropPlacer.Clearance verge;
 
         /// <summary>Weighted [1 2 1]² blur (cells without pixels take their neighbours' values).</summary>
         void Blur(float[] a, float[] b, float[] wgt)
