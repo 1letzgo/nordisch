@@ -86,7 +86,6 @@ namespace LeGamez.Editor.OsmImport
             public Color32 color;
             public float y;
             public string mat;
-            public bool marking;
         }
 
         public static int BuildLines(OsmData data, MeshSink sink, AreaRect area)
@@ -97,8 +96,7 @@ namespace LeGamez.Editor.OsmImport
                 if (way.tags.Is("area", "yes") || way.tags.Is("tunnel", "yes") || way.tags.Has("tunnel") && !way.tags.Is("tunnel", "no")) continue;
                 if (!TryLineStyle(way.tags, out var style)) continue;
                 if (!area.Overlaps(way.points, 20f) || BridgeBuilder.IsDeck(way)) continue; // decks: BridgeBuilder
-                Ribbon(sink, way.points, style, area);
-                if (style.marking) DashedLine(sink, way.points, area, style.y + 0.012f);
+                Ribbon(sink, way.points, style, area); // markings: MarkingBuilder (by rule, along chained ways)
                 count++;
             }
             Kerbs(data, sink, area);
@@ -210,8 +208,6 @@ namespace LeGamez.Editor.OsmImport
                     default: return false;
                 }
                 if (explicitWidth.HasValue && explicitWidth.Value > 0.5f && explicitWidth.Value < 30f) s.width = explicitWidth.Value;
-                s.marking = s.width >= 6f && s.color.Equals(WorldStyle.Asphalt) && hw != "living_street" && hw != "road"
-                            && !t.Is("oneway", "yes") && !t.Is("lanes", "1");
                 return true;
             }
             var rw = t.Get("railway");
@@ -248,38 +244,6 @@ namespace LeGamez.Editor.OsmImport
                 // Round-ish joint so consecutive segments and junctions have no gaps.
                 Disc(batch, b, hw, style.y, style.color);
                 if (i == 0) Disc(batch, a, hw, style.y, style.color);
-            }
-        }
-
-        /// <summary>Dashed centre line: 3 m dash, 4 m gap, continuous across vertices.</summary>
-        static void DashedLine(MeshSink sink, List<Vector2> pts, AreaRect area, float y)
-        {
-            const float dash = 3f, gap = 4f, hw = 0.08f;
-            float phase = 0f; // distance into the current dash+gap cycle
-            for (int i = 0; i < pts.Count - 1; i++)
-            {
-                Vector2 a = pts[i], b = pts[i + 1];
-                float len = Vector2.Distance(a, b);
-                if (len < 0.01f) continue;
-                Vector2 dir = (b - a) / len, n = new Vector2(-dir.y, dir.x) * hw;
-                float d = 0f;
-                while (d < len)
-                {
-                    float inCycle = phase % (dash + gap);
-                    if (inCycle < dash)
-                    {
-                        float segLen = Mathf.Min(dash - inCycle, len - d);
-                        Vector2 p0 = a + dir * d, p1 = a + dir * (d + segLen);
-                        if (area.Contains(p0) && area.Contains(p1))
-                            MeshSink.Quad(sink.Get(WorldStyle.MatGround, p0), V(p0 + n, y), V(p1 + n, y), V(p1 - n, y), V(p0 - n, y), WorldStyle.LaneMarking);
-                        d += segLen; phase += segLen;
-                    }
-                    else
-                    {
-                        float skip = Mathf.Min(dash + gap - inCycle, len - d);
-                        d += skip; phase += skip;
-                    }
-                }
             }
         }
 

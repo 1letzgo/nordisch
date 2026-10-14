@@ -93,7 +93,7 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
    LoD2/Bäume/Flurstücke/Hecken über ein temporäres Gebiet `<id>_add` mit Maske = nur neue Teile holen und hinten anhängen
    (Reihenfolge der alten Einträge bleibt → gleiche Zufallszüge). Importer: `BridgeBuilder` (Brücken mit Lücke darunter
    ≥ 1,8 m, über Straßen/Wegen/Bahn ≥ 1 m: Fahrbahnplatte zwischen den Endhöhen, Kappen, Brüstung, Pfeiler wo unten nichts fährt; Kollider, nicht
-   drapiert – das DGM hat keine Brücken), `MotorwayBuilder` (Rand-/Leitlinien, Standstreifen, Schutzplanken beidseitig mit
+   drapiert – das DGM hat keine Brücken), `MotorwayBuilder` (Schutzplanken beidseitig mit
    Lücken an Rampen), `TrafficBuilder.Motorway` (blaue Vorwegweiser 500 m vor jeder Ausfahrt mit Nummer/Name/`destination`
    der Rampe, „Ausfahrt“-Schild; `motorway_junction` aus traffic.json). Rampen haben Rang 3 (Vorfahrt achten am Ende),
    an Autobahn-Ein-/Ausfädelungen keine Schilder. Straßenindex: Autobahn heißt nach `ref` („A 28“), Rampen
@@ -234,8 +234,26 @@ in der einen Welt-Szene auf (Plan „Eine Welt“: `Docs/one-world.md`).
   der Map-Editor hat dafür den Modus „Häuser“ (Adresssuche, Anklicken, Farbe/Dach/Giebelfenster).
   Nicht passende Einträge → Warnung im Import-Log.
   Fenster halten ≥ 0,6 m Abstand zum Dach (`BuildingBuilder.RoofGap`, Shader-Regel `head + 0.6` in VertexColorLit, Fensterbänke gleich).
-- `GroundBuilder`: Grund-Kacheln, Flächen (landuse/natural/leisure), Straßen-Bänder mit Mittellinie, Wasser, Hecken/Mauern/Zäune.
+- `GroundBuilder`: Grund-Kacheln, Flächen (landuse/natural/leisure), Straßen-Bänder, Wasser, Hecken/Mauern/Zäune.
   Geländeblöcke werden bis 40 m zusammengefasst, wenn jede Dreieckshälfte (Diagonale x0z0–x1z1) eben ist (±2 cm) und eine Bodenbedeckung hat.
+- `MarkingBuilder`: **Fahrbahnmarkierungen nach Regeln (RMS)**, alle an einer Stelle, nach `MotorwayBuilder`. Ways derselben
+  Klasse werden über Knoten mit genau zwei Enden zu Ketten verbunden (Strichphase läuft durch – kein Neustart an Way-Grenzen,
+  Kacheln, Brücken); jeder Way liefert seinen Querschnitt, Linien gleicher Lage gehen an Way-Grenzen nahtlos (Gehrung) über.
+  Autobahn (+ einbahnige trunk): Fahrbahnbegrenzung 0,30 m links und rechts vor dem Standstreifen (2,3 m), Leitlinien 6/12 m
+  0,15 m aus `lanes`; Ein-/Ausfädelstreifen (`lanes` = n+1, letzte Spur slight_right/merge_to_left bzw. `placement=right_of:1`):
+  Breitstrich 6/6 m 0,30 m zum Zusatzstreifen, durchgehende Begrenzung außen. Wo eine Rampe abgeht/einmündet, wird die rechte
+  Begrenzung zum Breitstrich, solange sie in der Rampe liegt; Rampenlinien beginnen erst außerhalb der Hauptfahrstreifen
+  (Spitze), dazwischen Sperrfläche (45°-Schraffur 0,30 m alle 5 m) bis die Fahrbahnen auseinander sind. Rampen: 0,30 m beidseitig.
+  Zweistreifige Straßen: Leitlinie Mitte nur primary…tertiary (unclassified mit lanes ≥ 2), außerorts 4/8 m, innerorts 3/6 m,
+  durchgezogen bei overtaking=no oder ≥ 4 Spuren; vor höherrangigen Straßen Warnlinie (6/3 bzw. 3/1,5) und dann
+  Fahrstreifenbegrenzung (30 m bzw. 15 m). Randlinien 0,15 m nur außerorts (maxspeed > 50, sonst Luftbild „offenes Land“).
+  Wohn-/Erschließungsstraßen, service, Wege: keine Markierung. Knoten: Linien enden im markierten Bereich einer anderen
+  Fahrbahn; Rang entscheidet (Nebenstraße endet an der Hauptstraße, deren Mittel-/Spurlinien laufen durch, ihre Randlinie
+  öffnet nur auf der Seite der Einmündung; gleicher Rang unterbricht sich gegenseitig); verschiedene Ebenen (bridge/layer)
+  ohne gemeinsamen Knoten stören sich nicht. Brücken: dieselben Linien auf der Plattenhöhe (auch über die Verlängerung auf die
+  Zufahrt), sonst drapiert. Kein Zugriff auf den gemeinsamen `rng`. Prüfen ohne Import (~1 min):
+  `-executeMethod LeGamez.Editor.OsmImport.MarkingBuilder.DebugBatch -area <id> [-at x,z]` (Statistik; mit `-at` Zustände
+  jeder Linie der Ways ≤ 40 m: `Normal@s Hidden@s(by chain …)`). Westerstede: 176 Ketten, 335 km Farbe, 33 Sperrflächen.
 - `CoastBuilder` (nur Inseln mit DGM + Luftbild): Meer/Watt bei **Niedrigwasser wie im Luftbild**. Wasser = DOP-NIR < 50 und < 0,5 m NHN
   oder keine DGM-Kachel (3×3-Mehrheit); Meeresspiegel = Median-DGM der Wasserpixel (≈ −1,5…−1,7 m NHN). `TerrainField.Remap`:
   Wasser → flacher Grund 0,8 m unter dem Spiegel (watbar), Watt (< 1,2 m NHN) auf ein 40-m-Gitter geglättet (an den Geländeblöcken

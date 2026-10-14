@@ -192,8 +192,11 @@ namespace LeGamez.Editor.OsmImport
             int lines = GroundBuilder.BuildLines(data, sink, area);
             ImportProfile.Mark("ground lines");
             BridgeBuilder.Build(data, sink, terrain);
-            var motorway = MotorwayBuilder.Build(data, sink, area, terrain); // lane markings, guard rails
+            var motorway = MotorwayBuilder.Build(data, sink, area, terrain); // guard rails, map-end barriers
             ImportProfile.Mark("bridges/motorway");
+            var markings = MarkingBuilder.Build(data, sink, area); // road markings by rule (RMS), incl. bridge decks
+            Debug.Log($"[OSM] road markings: {markings.chains} chains, {markings.km:0.0} km paint, {markings.gores} gores ({markings.stripes} stripes)");
+            ImportProfile.Mark("markings");
             // Prefer official LGLN LoD2 buildings (real roof shapes); fall back to OSM extrusion.
             string lod2Path = Path.Combine(Path.GetDirectoryName(jsonPath), meta.id + ".lod2.json");
             bool island = meta.ground == "sand";

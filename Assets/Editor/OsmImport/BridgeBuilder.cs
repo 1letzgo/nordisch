@@ -445,17 +445,8 @@ namespace LeGamez.Editor.OsmImport
                     }
                 }
             }
-            if (d.width >= 5f) CentreLine(sink, d);
+            // Markings on the deck: MarkingBuilder (same lines as on the road, at deck height).
             Pillars(sink, t, d, below, ow);
-        }
-
-        /// <summary>Dashed centre line of two-way roads (one-way carriageways get their markings from MotorwayBuilder).</summary>
-        static void CentreLine(MeshSink sink, Deck d)
-        {
-            var tags = d.way.tags;
-            string hw = tags.Get("highway");
-            if (tags.Is("oneway", "yes") || hw == "motorway" || hw == "motorway_link" || tags.Is("lanes", "1")) return;
-            DeckLine(sink, d, 0f, 3f, 4f, 0.08f);
         }
 
         /// <summary>A marking line on the deck at <paramref name="offset"/> (left of the way's direction), dashed when gap &gt; 0.</summary>

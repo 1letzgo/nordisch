@@ -5,12 +5,10 @@ using UnityEngine;
 namespace LeGamez.Editor.OsmImport
 {
     /// <summary>
-    /// What makes a motorway look like one: white edge lines (hard shoulder on the right), dashed lane lines, and guard
+    /// What makes a motorway look like one besides its markings (<see cref="MarkingBuilder"/>): guard
     /// rails on both sides of every carriageway and ramp (gaps where a ramp leaves or joins, none on bridges – the deck has
     /// parapets; drawn as W-profile beams on posts, held by an invisible closed wall). Where a carriageway leaves the map
-    /// it is closed by a barrier with lamps and beacons. Ramps (motorway_link) get edge lines too. One-way carriageways
-    /// run along their points; left = median.
-    /// Markings on bridge decks are built at deck height (<see cref="BridgeBuilder.DeckLine"/>), all others are draped.
+    /// it is closed by a barrier with lamps and beacons. One-way carriageways run along their points; left = median.
     /// Blue exit signs come from <see cref="TrafficBuilder"/> (motorway_junction nodes in traffic.json).
     /// No shared random numbers – object ids stay as they are.
     /// </summary>
@@ -20,8 +18,6 @@ namespace LeGamez.Editor.OsmImport
 
         static Vector2Int Key(Vector2 p) => new Vector2Int(Mathf.RoundToInt(p.x * 10f), Mathf.RoundToInt(p.y * 10f));
 
-        const float Line = 0.075f;          // half width of a marking line
-        const float Shoulder = 2.3f;        // hard shoulder right of the solid line
         const float RailOut = 0.8f;         // guard rail outside the carriageway edge
         static readonly Color32 RailColor = WorldStyle.Hex("#A9AEB2");
         static readonly Color32 PostColor = WorldStyle.Hex("#7E8388");
@@ -45,28 +41,9 @@ namespace LeGamez.Editor.OsmImport
             }
             if (ways.Count == 0) return st;
 
+            // Lane markings: MarkingBuilder (by rule, along chained carriageways).
             foreach (var w in ways)
-            {
-                if (!GroundBuilder.Carriageway(w.tags, out float width, out float y)) continue;
-                float hw = width * 0.5f;
-                BridgeBuilder.TryGet(w, out var deck);
-                if (w.tags.Is("highway", "motorway"))
-                {
-                    int lanes = int.TryParse(w.tags.Get("lanes"), out int l) ? Mathf.Clamp(l, 1, 5) : 2;
-                    float left = hw - 0.35f, right = -(hw - Shoulder);
-                    Mark(sink, area, w, deck, left, 0f, y);
-                    Mark(sink, area, w, deck, right, 0f, y);
-                    float lane = (left - right) / lanes;
-                    for (int k = 1; k < lanes; k++) Mark(sink, area, w, deck, left - k * lane, 6f, y);
-                    st.carriageways++;
-                }
-                else
-                {
-                    Mark(sink, area, w, deck, hw - 0.3f, 0f, y);
-                    Mark(sink, area, w, deck, -(hw - 0.3f), 0f, y);
-                    st.ramps++;
-                }
-            }
+                if (w.tags.Is("highway", "motorway")) st.carriageways++; else st.ramps++;
 
             // Guard rails along whole carriageways and ramps (consecutive ways chained, mitred offset – no wedge gaps in bends or
             // at way joints), with gaps only where another carriageway comes close: a ramp leaving or joining. The
@@ -148,45 +125,6 @@ namespace LeGamez.Editor.OsmImport
             }
             return st;
         }
-
-
-        /// <summary>A marking line at <paramref name="offset"/> (left of travel), solid (dash 0) or 6 m dash / 12 m gap.</summary>
-        static void Mark(MeshSink sink, AreaRect area, OsmWay w, BridgeBuilder.Deck deck, float offset, float dash, float y)
-        {
-            if (deck != null) { BridgeBuilder.DeckLine(sink, deck, offset, dash > 0f ? dash : 1e6f, dash > 0f ? dash * 2f : 0f, Line); return; }
-            var pts = w.points;
-            float phase = 0f, h = y + 0.012f;
-            for (int i = 0; i < pts.Count - 1; i++)
-            {
-                Vector2 a = pts[i], b = pts[i + 1];
-                float len = Vector2.Distance(a, b);
-                if (len < 0.05f) continue;
-                Vector2 dir = (b - a) / len, n = new Vector2(-dir.y, dir.x);
-                if (dash <= 0f)
-                {
-                    // Solid: the segment, stretched a little into the bends so consecutive pieces overlap.
-                    Vector2 p0 = a + n * offset - dir * 0.3f, p1 = b + n * offset + dir * 0.3f;
-                    if (area.Contains(p0) && area.Contains(p1)) Strip(sink, p0, p1, n, h);
-                    continue;
-                }
-                float d = 0f;
-                while (d < len)
-                {
-                    float inCycle = phase % (dash * 3f);
-                    float step = inCycle < dash ? Mathf.Min(dash - inCycle, len - d) : Mathf.Min(dash * 3f - inCycle, len - d);
-                    if (inCycle < dash)
-                    {
-                        Vector2 p0 = a + dir * d + n * offset, p1 = a + dir * (d + step) + n * offset;
-                        if (area.Contains(p0) && area.Contains(p1)) Strip(sink, p0, p1, n, h);
-                    }
-                    d += step; phase += step;
-                }
-            }
-        }
-
-        static void Strip(MeshSink sink, Vector2 p0, Vector2 p1, Vector2 n, float y) =>
-            MeshSink.Quad(sink.Get(WorldStyle.MatGround, p0), V(p0 + n * Line, y), V(p1 + n * Line, y), V(p1 - n * Line, y), V(p0 - n * Line, y),
-                WorldStyle.LaneMarking);
 
         /// <summary>Non-bridge motorway (or ramp) ways joined end to start into carriageway chains (a junction with two
         /// continuations ends the chain).</summary>
