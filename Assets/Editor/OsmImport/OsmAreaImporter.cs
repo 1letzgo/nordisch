@@ -63,7 +63,8 @@ namespace LeGamez.Editor.OsmImport
             var args = System.Environment.GetCommandLineArgs();
             int i = System.Array.IndexOf(args, "-area");
             if (i < 0 || i + 1 >= args.Length) throw new System.ArgumentException("missing -area <id>");
-            ImportArea(Path.Combine(DataDir, args[i + 1] + ".osm.json"), preview: false);
+            // -full: rebuild every tile (otherwise only tiles whose content changed are draped, meshed and written).
+            ImportArea(Path.Combine(DataDir, args[i + 1] + ".osm.json"), preview: false, full: System.Array.IndexOf(args, "-full") >= 0);
             var sw = Stopwatch.StartNew();
             SceneSnapshot.RenderThumbnails(args[i + 1]); // only this area
             AssetDatabase.SaveAssets();
@@ -124,7 +125,8 @@ namespace LeGamez.Editor.OsmImport
 
         /// <param name="preview">Leave the area open with all tiles loaded (snapshot tools); batch imports don't need it –
         /// loading every tile of a whole municipality costs minutes and gigabytes.</param>
-        public static string ImportArea(string jsonPath, bool preview = true)
+        /// <param name="full">Rebuild every tile, even those whose signature is unchanged (<see cref="TileBuild"/>).</param>
+        public static string ImportArea(string jsonPath, bool preview = true, bool full = false)
         {
             var sw = Stopwatch.StartNew();
             ImportProfile.Begin(Path.GetFileName(jsonPath).Replace(".osm.json", ""));
@@ -193,17 +195,23 @@ namespace LeGamez.Editor.OsmImport
             foreach (var poi in pois) poi.position.y = terrain.Height(poi.position.x, poi.position.z);
             ImportProfile.Mark("edits/pois");
 
-            // Fit everything onto the terrain: overlays are cut & draped, small objects lifted. Every batch on its own
-            // (pure C#, the terrain is read-only) – in parallel, the result is the same as one after the other.
-            System.Threading.Tasks.Parallel.ForEach(sink.Batches.ToList(), kv =>
+            // Incremental: only tiles whose content (before draping) changed since the last import are built from here on.
+            var sea = new MeshSink();
+            CoastBuilder.BuildSea(sea, area); // level sea surface, not draped – added after draping
+            var plan = TileBuild.Make(meta.id, sink, sea, terrain, full || !AssetDatabase.IsValidFolder($"{GeneratedRoot}/{meta.id}/tiles"));
+            ImportProfile.Mark("sea/tile signatures");
+
+            // Fit everything onto the terrain: overlays are cut & draped, small objects lifted.
+            foreach (var kv in sink.Batches)
             {
+                if (!plan.Builds(TileBuild.KeyOf(kv.Key))) continue; // unchanged tile: its asset stays
                 string m = kv.Key.mat;
                 if (m == WorldStyle.MatGround || m == WorldStyle.MatWater) TerrainDrape.Drape(kv.Value, terrain);
                 else if (m == WorldStyle.MatTrees || m == WorldStyle.MatTreeTrunks || m == WorldStyle.MatProps) TerrainDrape.Lift(kv.Value, terrain);
-            });
+            }
             TerrainDrape.Lift(sink.instances, terrain); // instanced trees, bushes, lamps
-            CoastBuilder.BuildSea(sink, area); // level sea surface, not draped
-            ImportProfile.Mark("drape/lift/sea");
+            TileBuild.Append(sink, sea);
+            ImportProfile.Mark("drape/lift");
 
             string areaDir = $"{GeneratedRoot}/{meta.id}";
             EnsureFolder(areaDir);
@@ -258,7 +266,7 @@ namespace LeGamez.Editor.OsmImport
             TrafficBuilder.Export(terrain, d.trafficHeads, d.trafficSignals, d.signTexts);
             ImportProfile.Mark("bikes/cars/streets/traffic export");
             // World geometry: one asset per WorldStreamer tile (meshes as sub-assets), loaded around the camera at runtime.
-            d.tileKeys = WriteTiles(sink, meta.id, areaDir);
+            d.tileKeys = WriteTiles(sink, meta.id, areaDir, plan);
             ImportProfile.Mark("write tiles");
             EditorUtility.SetDirty(d);
             UpdateCatalog(meta, pois.Count, d.starts);
@@ -282,17 +290,16 @@ namespace LeGamez.Editor.OsmImport
 
         /// <summary>
         /// Sorts the sink's batches (100 m chunks, 25 m for details) into <see cref="WorldStreamer.TileSize"/> tiles and
-        /// writes one <see cref="WorldTile"/> asset per tile to &lt;areaDir&gt;/tiles. Tile by tile (the geometry is released
-        /// as it goes): meshes are built, the tile's content hash is compared with the last import (<see cref="TileManifest"/>)
-        /// and only changed tiles are written – unchanged ones keep their asset; tiles that are gone are deleted.
-        /// Meshes without collider are not CPU-readable – halves their memory on the device.
+        /// writes one <see cref="WorldTile"/> asset per tile to &lt;areaDir&gt;/tiles – only tiles the plan builds
+        /// (<see cref="TileBuild"/>); the others keep their asset, tiles that are gone are deleted. Tile by tile, the
+        /// geometry is released as it goes. Meshes without collider are not CPU-readable – halves their memory on the device.
         /// </summary>
-        static List<Vector2Int> WriteTiles(MeshSink sink, string id, string areaDir)
+        static List<Vector2Int> WriteTiles(MeshSink sink, string id, string areaDir, TileBuild.Plan plan)
         {
             string tileDir = $"{areaDir}/tiles";
             AssetDatabase.DeleteAsset($"{areaDir}/{id}_meshes.asset"); // pre-streaming single mesh file
-            var previous = AssetDatabase.IsValidFolder(tileDir) ? TileManifest.Load(id) : null;
-            // Unknown state (first import with hashes, tiles deleted by hand …): rewrite everything.
+            var previous = plan.previous;
+            // Unknown state (first import with signatures, forced rebuild …): rewrite everything.
             if (previous == null && AssetDatabase.IsValidFolder(tileDir)) AssetDatabase.DeleteAsset(tileDir);
             TileManifest.Clear(id); // until the tiles below are written
             EnsureFolder(tileDir);
@@ -303,10 +310,8 @@ namespace LeGamez.Editor.OsmImport
             var order = new List<Vector2Int>();
             foreach (var kv in sink.Batches)
             {
-                var (mat, chunk) = kv.Key;
                 if (kv.Value.vertices.Count == 0) continue;
-                float chunkSize = mat == WorldStyle.MatDetails ? MeshSink.DetailChunkSize : MeshSink.ChunkSize;
-                var key = WorldStreamer.KeyOf((chunk.x + 0.5f) * chunkSize, (chunk.y + 0.5f) * chunkSize);
+                var key = TileBuild.KeyOf(kv.Key);
                 if (!batchesOf.TryGetValue(key, out var list))
                 {
                     batchesOf[key] = list = new List<KeyValuePair<(string, Vector2Int), MeshSink.Batch>>();
@@ -356,6 +361,14 @@ namespace LeGamez.Editor.OsmImport
             {
                 foreach (var key in order)
                 {
+                    hashes[key] = plan.signatures[key];
+                    if (!plan.Builds(key))
+                    {
+                        // Unchanged: the asset on disk has exactly this content.
+                        if (batchesOf.TryGetValue(key, out var skipped)) foreach (var kv in skipped) Release(kv.Value);
+                        kept++;
+                        continue;
+                    }
                     var tile = ScriptableObject.CreateInstance<WorldTile>();
                     tile.key = key;
                     tile.name = WorldStreamer.TileName(id, key);
@@ -385,19 +398,9 @@ namespace LeGamez.Editor.OsmImport
                             });
                         }
                     if (instancesOf.TryGetValue(key, out var instances)) tile.instances.AddRange(instances);
-                    ulong hash = MapFormat.TileHash(tile);
                     tMesh.Stop();
-                    hashes[key] = hash;
 
                     string path = WorldStreamer.EditorTilePath(id, key);
-                    if (previous != null && previous.TryGetValue(key, out var old) && old == hash && File.Exists(path))
-                    {
-                        // Unchanged: the asset on disk has exactly this content.
-                        foreach (var part in tile.parts) Object.DestroyImmediate(part.mesh);
-                        Object.DestroyImmediate(tile);
-                        kept++;
-                        continue;
-                    }
                     tWrite.Start();
                     if (File.Exists(path)) AssetDatabase.DeleteAsset(path); // changed tile: replace the old asset
                     AssetDatabase.CreateAsset(tile, path);
@@ -435,7 +438,7 @@ namespace LeGamez.Editor.OsmImport
             TileManifest.Save(id, hashes);
             TileManifest.MarkMapsDirty(id, previous == null ? null : changed);
             LastChangedTiles = previous == null ? null : changed;
-            Debug.Log($"[Import] {id} tiles: {written} written, {kept} unchanged, {removed} removed (meshes+hash {tMesh.ElapsedMilliseconds} ms, write {tWrite.ElapsedMilliseconds} ms)");
+            Debug.Log($"[Import] {id} tiles: {written} written, {kept} unchanged, {removed} removed (meshes {tMesh.ElapsedMilliseconds} ms, write {tWrite.ElapsedMilliseconds} ms)");
 
             var keys = hashes.Keys.ToList();
             keys.Sort((a, b) => a.x != b.x ? a.x.CompareTo(b.x) : a.y.CompareTo(b.y));

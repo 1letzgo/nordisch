@@ -47,6 +47,13 @@ namespace LeGamez.Editor.OsmImport
             return b;
         }
 
+        /// <summary>The batch of an exact (material, chunk) key, created if missing.</summary>
+        public Batch GetBatch(string material, Vector2Int chunk)
+        {
+            if (!batches.TryGetValue((material, chunk), out var b)) batches[(material, chunk)] = b = new Batch();
+            return b;
+        }
+
         public static readonly Vector4 NoFacade = new Vector4(0f, -1f, 0f, 0f);
 
         /// <summary>Adds a triangle (clockwise seen from the front) with a flat normal.</summary>
